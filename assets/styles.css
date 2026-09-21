@@ -93,19 +93,21 @@ a { color: var(--accent-ink); }
 @media (prefers-color-scheme: dark) { .tab .count { color: #171512; } }
 
 /* ---------- intro ---------- */
-.intro { padding: 38px 0 6px; }
+.intro { padding: 30px 0 20px; }
 .intro h1 {
-  font-family: var(--serif); font-size: clamp(27px, 5vw, 40px);
-  line-height: 1.15; margin: 0 0 12px; letter-spacing: -.02em; font-weight: 600;
+  font-family: var(--serif); font-size: clamp(25px, 3.6vw, 33px);
+  line-height: 1.2; margin: 0 0 8px; letter-spacing: -.015em; font-weight: 600;
+  max-width: 24ch; text-wrap: balance;
 }
-.intro p { margin: 0; color: var(--ink-soft); max-width: 56ch; font-size: 17px; }
+.intro p { margin: 0; color: var(--ink-soft); max-width: 52ch; font-size: 16.5px; text-wrap: pretty; }
 
 /* ---------- form ---------- */
 .card {
   background: var(--bg-raised); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow);
 }
-.step { margin: 26px 0; }
+.step { margin: 0 0 28px; }
+.step:first-child { margin-top: 2px; }
 .step > h2 {
   font-size: 15px; text-transform: uppercase; letter-spacing: .07em;
   color: var(--ink-faint); margin: 0 0 4px; font-weight: 700;
@@ -180,6 +182,17 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 .btn.ghost:hover { border-color: var(--accent); color: var(--accent-ink); filter: none; }
 .btn.sm { font-size: 14px; padding: 7px 14px; }
 .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+
+/* Keeps the main action in reach while scrolling through the long chip list. */
+.submit-bar {
+  position: sticky; bottom: 0; z-index: 5;
+  margin: 18px -22px -22px; padding: 14px 22px;
+  background: var(--bg-raised); border-top: 1px solid var(--line);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+.submit-bar #surprise { margin-left: auto; margin-right: 96px; }
+.picked { font-size: 13.5px; color: var(--ink-faint); }
+.picked.ready { color: var(--moss); font-weight: 600; }
 .err { color: var(--accent-ink); font-size: 14px; margin: 10px 0 0; }
 
 /* ---------- results ---------- */
@@ -314,6 +327,9 @@ footer.site-footer p { margin: 0 0 6px; }
 @media (max-width: 560px) {
   .intro { padding-top: 26px; }
   .card { padding: 17px; }
+  .submit-bar { margin: 16px -17px -17px; padding: 12px 17px; }
+  .submit-bar #surprise { margin-right: 0; }
+  .picked { order: 3; width: 100%; padding-right: 96px; } /* clear the Feedback tab */
   /* Keep the header to a single row on a phone — it is sticky, so every
      wrapped line is permanently stolen from the content. */
   .site-header .wrap { min-height: 52px; gap: 8px; padding: 0 14px; flex-wrap: nowrap; }

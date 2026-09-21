@@ -57,7 +57,7 @@
     FYC.cities.forEach(function (c) {
       host.appendChild(el('button', {
         type: 'button', class: 'chip',
-        onclick: function () { $('#location').value = c.name; }
+        onclick: function () { $('#location').value = c.name; paintPicked(); }
       }, [c.name]));
     });
   }
@@ -91,7 +91,23 @@
     paintInterests();
   }
 
+  // One-line readiness hint beside the submit button, so people can see what's
+  // still missing without scrolling back up.
+  function paintPicked() {
+    var box = $('#picked');
+    var city = $('#location').value.trim();
+    var n = state.interests.length;
+    var missing = [];
+    if (!city) missing.push('a city');
+    if (!n) missing.push('at least one interest');
+    box.classList.toggle('ready', !missing.length);
+    box.textContent = missing.length
+      ? 'Still need ' + missing.join(' and ')
+      : (FYC.findCity(city) ? FYC.findCity(city).name : city) + ' · ' + n + (n === 1 ? ' interest' : ' interests');
+  }
+
   function paintInterests() {
+    paintPicked();
     $$('[data-interest]').forEach(function (btn) {
       var idx = state.interests.indexOf(btn.getAttribute('data-interest'));
       var on = idx !== -1;
@@ -501,6 +517,7 @@
     $('#tab-find').addEventListener('click', function () { showTab('find'); });
     $('#tab-plan').addEventListener('click', function () { showTab('plan'); });
     $('#surprise').addEventListener('click', surprise);
+    $('#location').addEventListener('input', paintPicked);
 
     // Restore the last search so a refresh doesn't punish you.
     var saved = load(KEY.profile, null);
@@ -527,6 +544,8 @@
           });
         });
     }
+
+    paintPicked();
 
     $('#finder').addEventListener('submit', function (e) {
       e.preventDefault();

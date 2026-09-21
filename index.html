@@ -26,29 +26,29 @@
     <div class="wrap">
 
       <div class="intro" id="intro">
-        <h1>Finding people shouldn&rsquo;t require knowing people.</h1>
-        <p>Tell us where you live and what you&rsquo;re drawn to. You&rsquo;ll get real local groups &mdash; and for each one, exactly what to do first, what will happen when you get there, and what to say.</p>
+        <h1>Find your people, one easy first step at a time.</h1>
+        <p>Real local groups, plus exactly what to do first and what to say.</p>
       </div>
 
       <form class="card" id="finder" novalidate>
 
         <div class="step">
           <h2>1 &middot; Where are you?</h2>
-          <p class="hint">A city or a neighbourhood. Anywhere works &mdash; five cities have hand-picked groups, everywhere else gets vetted national routes.</p>
+          <p class="hint">Any city or neighbourhood works.</p>
           <label class="sr-only" for="location">Your city</label>
           <input type="text" id="location" name="location" placeholder="e.g. Oakland, or Brooklyn, or Boise" autocomplete="address-level2">
-          <div class="quick" id="city-quick"><span class="lbl">Hand-picked:</span></div>
+          <div class="quick" id="city-quick"><span class="lbl">Hand-picked lists:</span></div>
         </div>
 
         <div class="step">
           <h2>2 &middot; What pulls at you?</h2>
-          <p class="hint">Pick up to six. Order matters &mdash; the first thing you tap counts most.</p>
+          <p class="hint">Pick up to six. Your first pick counts most.</p>
           <div class="groups" id="interest-groups"></div>
         </div>
 
         <div class="step">
           <h2>3 &middot; How does this feel right now?</h2>
-          <p class="hint">Honestly. It changes what we put in front of you.</p>
+          <p class="hint">Be honest. It changes what we show you first.</p>
           <div class="choices" id="comfort">
             <button type="button" class="choice" data-value="1" aria-pressed="true">
               <b>Honestly, daunting</b><span>Show me the gentlest possible options</span>
@@ -108,8 +108,9 @@
         </details>
 
         <p class="err" id="form-error" hidden></p>
-        <div class="actions">
-          <button class="btn" type="submit">Find my people</button>
+        <div class="actions submit-bar">
+          <button class="btn" type="submit">Find my people &rarr;</button>
+          <span class="picked" id="picked" aria-live="polite">Pick a city and at least one interest</span>
           <button class="btn ghost sm" type="button" id="surprise">Surprise me</button>
         </div>
       </form>
