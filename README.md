@@ -39,6 +39,33 @@ python3 -m http.server 4173
 
 Then open <http://localhost:4173>.
 
+### As a Mac app
+
+There is a native macOS wrapper in `mac/`. It builds a real double-clickable
+`.app` with its own icon and Dock entry, with the whole site bundled inside, so
+it works with no internet connection and no dev server.
+
+```bash
+./mac/build.sh
+open "mac/dist/find your community.app"
+```
+
+Needs only the Xcode command line tools (`swiftc`, `iconutil`) — no npm, no
+Rust, no Electron. The result is about 1 MB.
+
+Drag it to `/Applications` to keep it. It's ad-hoc signed for local use, so if
+you ever move it to another Mac, Gatekeeper will ask you to confirm the first
+launch (right-click → Open).
+
+**How it works.** `mac/Sources/main.swift` is a Cocoa app hosting a `WKWebView`;
+`mac/Sources/StaticServer.swift` is a small read-only HTTP server bound to
+loopback on a random port, serving `Contents/Resources/web`. The server exists
+because WKWebView gives `file://` pages an opaque origin, which disables
+`localStorage` and would break your saved plan. Serving from `127.0.0.1` gives
+the page a normal web origin, so the app behaves exactly like the browser build.
+Links to real organisations open in your default browser rather than inside the
+app window. ⌘R reloads; ⇧⌘R clears your saved search, plan and feedback.
+
 ### Deploying
 
 It is a static site. Push the repo and point GitHub Pages at the root, or drop
@@ -90,6 +117,11 @@ src/
   app.js              DOM rendering, plan, feedback
 tests/run-tests.js    the test suite
 tools/check-links.js  the link checker
+mac/
+  Sources/main.swift        Cocoa + WKWebView shell, menus, link handling
+  Sources/StaticServer.swift  loopback static server (so localStorage works)
+  makeicon.swift            generates the app icon
+  build.sh                  builds mac/dist/"find your community".app
 ```
 
 ### The matcher
