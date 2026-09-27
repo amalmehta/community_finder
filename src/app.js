@@ -480,7 +480,7 @@
     });
     $('#fb-copy').addEventListener('click', function () {
       var p = payload();
-      var text = 'find_your_community feedback\nRating: ' + (p.rating || '-') + '/5\n' + p.text;
+      var text = 'community_finder feedback\nRating: ' + (p.rating || '-') + '/5\n' + p.text;
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(function () {});
       thanks.textContent = 'Copied.';
       thanks.hidden = false;

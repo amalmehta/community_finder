@@ -5,7 +5,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$HERE")"
-APP_NAME="find your community"
+APP_NAME="community_finder"
 BUILD="$HERE/build"
 DIST="$HERE/dist"
 APP="$DIST/$APP_NAME.app"
@@ -36,7 +36,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>$APP_NAME</string>
   <key>CFBundleDisplayName</key><string>$APP_NAME</string>
   <key>CFBundleExecutable</key><string>fyc</string>
-  <key>CFBundleIdentifier</key><string>com.amalmehta.findyourcommunity</string>
+  <key>CFBundleIdentifier</key><string>com.amalmehta.communityfinder</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
@@ -44,7 +44,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.lifestyle</string>
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSHumanReadableCopyright</key><string>find your community</string>
+  <key>NSHumanReadableCopyright</key><string>community_finder</string>
 </dict>
 </plist>
 PLIST

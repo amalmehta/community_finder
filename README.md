@@ -1,4 +1,4 @@
-# find your community
+# community_finder
 
 A small web app for the problem of *"I live here and I don't know anyone."*
 
@@ -47,7 +47,7 @@ it works with no internet connection and no dev server.
 
 ```bash
 ./mac/build.sh
-open "mac/dist/find your community.app"
+open "mac/dist/community_finder.app"
 ```
 
 Needs only the Xcode command line tools (`swiftc`, `iconutil`) — no npm, no
@@ -121,7 +121,7 @@ mac/
   Sources/main.swift        Cocoa + WKWebView shell, menus, link handling
   Sources/StaticServer.swift  loopback static server (so localStorage works)
   makeicon.swift            generates the app icon
-  build.sh                  builds mac/dist/"find your community".app
+  build.sh                  builds mac/dist/community_finder.app
 ```
 
 ### The matcher

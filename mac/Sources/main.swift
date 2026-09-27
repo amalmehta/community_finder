@@ -1,7 +1,7 @@
 import Cocoa
 import WebKit
 
-/// Native macOS shell for find_your_community.
+/// Native macOS shell for community_finder.
 ///
 /// The whole site ships inside the bundle at Contents/Resources/web and is
 /// served over loopback, so the app is fully offline and behaves identically
@@ -58,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             backing: .buffered,
             defer: false
         )
-        window.title = "find your community"
+        window.title = "community_finder"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.minSize = NSSize(width: 380, height: 520)
@@ -77,12 +77,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About find your community",
+        appMenu.addItem(withTitle: "About community_finder",
                         action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide find your community",
+        appMenu.addItem(withTitle: "Hide community_finder",
                         action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        appMenu.addItem(withTitle: "Quit find your community",
+        appMenu.addItem(withTitle: "Quit community_finder",
                         action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         main.addItem(appItem)
@@ -127,7 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     private func fail(_ message: String) {
         let alert = NSAlert()
-        alert.messageText = "find your community could not start"
+        alert.messageText = "community_finder could not start"
         alert.informativeText = message
         alert.addButton(withTitle: "Quit")
         alert.runModal()
