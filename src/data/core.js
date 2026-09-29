@@ -1,4 +1,4 @@
-/* find_your_community — data core.
+/* community_finder — data core.
  * Defines the interest taxonomy and the registry that city data files push into.
  * Works as a plain <script> in the browser and as a require() in Node (tests).
  */

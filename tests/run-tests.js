@@ -1,4 +1,4 @@
-/* find_your_community — test suite. Plain Node, no dependencies.
+/* community_finder — test suite. Plain Node, no dependencies.
  * Run: node tests/run-tests.js
  */
 'use strict';

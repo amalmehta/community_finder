@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds "find your community.app" into mac/dist/.
+# Builds community_finder.app into mac/dist/.
 # Requires only the Xcode command line tools (swiftc, iconutil, codesign).
 set -euo pipefail
 

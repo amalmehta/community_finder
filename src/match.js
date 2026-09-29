@@ -1,4 +1,4 @@
-/* find_your_community — matching engine.
+/* community_finder — matching engine.
  * Pure functions: profile in, ranked+explained results out. No DOM, no I/O,
  * so it can be unit-tested in Node.
  */

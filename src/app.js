@@ -1,4 +1,4 @@
-/* find_your_community — UI.
+/* community_finder — UI.
  * Vanilla DOM, no build step, no network. State lives in localStorage.
  */
 (function () {
