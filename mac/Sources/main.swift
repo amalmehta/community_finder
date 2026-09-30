@@ -46,30 +46,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         config.websiteDataStore = .default()          // persists localStorage between launches
         config.suppressesIncrementalRendering = false
 
-        webView = WKWebView(frame: .zero, configuration: config)
+        let frame = NSRect(x: 0, y: 0, width: 1040, height: 800)
+        webView = WKWebView(frame: frame, configuration: config)
         webView.navigationDelegate = self
         webView.uiDelegate = self
+        webView.autoresizingMask = [.width, .height]
         webView.allowsBackForwardNavigationGestures = false
-        webView.setValue(false, forKey: "drawsBackground")   // let the page paint its own
 
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1040, height: 800),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            contentRect: frame,
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "community_finder"
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
         window.minSize = NSSize(width: 380, height: 520)
         window.contentView = webView
-        window.setFrameAutosaveName("FYCMainWindow")
+        window.setFrameAutosaveName("CommunityFinderMainWindow")
         window.center()
         window.makeKeyAndOrderFront(nil)
-
-        // The page draws its own header; nudge content below the traffic lights.
-        webView.setValue(NSEdgeInsets(top: 28, left: 0, bottom: 0, right: 0),
-                         forKey: "_topContentInset")
     }
 
     private func buildMenu() {
@@ -132,6 +127,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         alert.addButton(withTitle: "Quit")
         alert.runModal()
         NSApp.terminate(nil)
+    }
+
+    // MARK: - Load failures
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        showLoadFailure(error)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
+                 withError error: Error) {
+        showLoadFailure(error)
+    }
+
+    /// A blank window tells the user nothing; say what went wrong.
+    private func showLoadFailure(_ error: Error) {
+        let html = """
+        <html><body style="font: 15px -apple-system; padding: 40px; color: #221f1b;
+        background: #fbf8f4"><h2 style="font-weight:600">The page could not load.</h2>
+        <p>\(error.localizedDescription)</p><p style="color:#8a8176">Try View &rarr; Reload.</p>
+        </body></html>
+        """
+        webView.loadHTMLString(html, baseURL: nil)
     }
 
     // MARK: - Navigation policy
