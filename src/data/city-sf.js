@@ -336,7 +336,7 @@
         name: 'San Francisco Public Library',
         neighborhood: 'Every neighborhood',
         blurb: 'Free book clubs, language conversation circles, writing groups, craft nights and lectures at 27 branches. The most underrated free social infrastructure in the city.',
-        interests: ['books', 'language', 'social', 'newcomer', 'writing', 'crafts'],
+        interests: ['books', 'language', 'social', 'newcomer', 'writing', 'crafts', 'parents'],
         url: 'https://sfpl.org/',
         firstStep: {
           kind: 'rsvp',
@@ -422,6 +422,75 @@
         ],
         solo: 5, gentleness: 4, structure: 'course', commitment: 'one-off', cost: 2,
         when: ['weekday-eve', 'weekend'], size: 'small', goals: ['skill', 'friends']
+      },
+      {
+        id: 'sf-muttville',
+        name: 'Muttville Senior Dog Rescue',
+        neighborhood: 'Mission',
+        blurb: 'A rescue for older dogs that runs a "Cuddle Club" — you turn up, sit on the floor, and senior dogs climb into your lap. That is the entire activity and it is genuinely therapeutic.',
+        interests: ['animals', 'volunteering', 'support', 'social'],
+        url: 'https://muttville.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Book a Cuddle Club session or a volunteer orientation',
+          url: 'https://muttville.org/volunteer',
+          when: 'Cuddle Club runs regularly; check the calendar'
+        },
+        script: null,
+        expect: [
+          'The dogs do all the social work — nobody expects you to make conversation',
+          'Cuddle Club needs no experience and no ongoing commitment',
+          'Free, and you will see the same volunteers if you keep coming',
+          'Regular volunteering needs an orientation first'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'one-off', cost: 0,
+        when: ['weekday-day', 'weekend'], size: 'small', goals: ['impact', 'friends', 'routine']
+      },
+      {
+        id: 'sf-ggmg',
+        name: 'Golden Gate Mothers Group',
+        neighborhood: 'Citywide',
+        blurb: 'A large parents\' network running neighbourhood groups, playdates and parent nights. Being new and knowing nobody is the standard reason people join.',
+        interests: ['parents', 'social', 'newcomer', 'support'],
+        url: 'https://www.ggmg.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Join and ask to be placed in a neighbourhood group',
+          url: 'https://www.ggmg.org/',
+          when: 'Groups and events year-round'
+        },
+        script: 'Hi! I\'m a new-ish parent in {city} and I don\'t know many other parents here. How do I get into a neighbourhood group, and is there an upcoming event that\'s good for a first-timer?',
+        expect: [
+          'Neighbourhood groups put you with parents who live near you and have same-age kids',
+          'There is a membership fee — check the current rate before joining',
+          'Having a child with you removes most of the awkwardness of meeting strangers',
+          'Events range from playdates to parent nights out'
+        ],
+        solo: 4, gentleness: 4, structure: 'register', commitment: 'seasonal', cost: 1,
+        when: ['weekday-day', 'weekend'], size: 'large', goals: ['friends', 'routine']
+      },
+      {
+        id: 'sf-sffilm',
+        name: 'SFFILM',
+        neighborhood: 'Citywide venues',
+        blurb: 'The organisation behind the San Francisco International Film Festival. Volunteering at the festival puts you on a team for a week with other people who like films enough to give up their evenings.',
+        interests: ['filmphoto', 'art', 'volunteering', 'social'],
+        url: 'https://sffilm.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Sign up as a festival volunteer, or go to one screening',
+          url: 'https://sffilm.org/',
+          when: 'Festival volunteering is seasonal; screenings year-round'
+        },
+        script: 'Hi! I\'d like to volunteer at the festival. I haven\'t done it before and I\'ll be coming on my own — what roles suit a first-timer, and when does sign-up open?',
+        expect: [
+          'Volunteers work shifts in small teams and usually get into screenings free',
+          'A film gives you something to talk about afterwards, which is easier than small talk',
+          'Festival volunteering is intense but time-boxed to a couple of weeks',
+          'Screenings on their own are a zero-commitment way to start'
+        ],
+        solo: 5, gentleness: 4, structure: 'shift', commitment: 'seasonal', cost: 0,
+        when: ['weekday-eve', 'weekend'], size: 'large', goals: ['friends', 'impact']
       }
     ]
   });

@@ -58,6 +58,18 @@ group('curated data integrity', function () {
   Object.keys(FYC.INTERESTS).forEach(function (i) {
     ok(covered[i], 'interest "' + i + '" is reachable from at least one listing');
   });
+
+  // Stronger: every chip the UI offers must reach a real curated organisation
+  // somewhere, not just a national directory. Otherwise picking it produces a
+  // page of groups that have nothing to do with what was asked for.
+  var curatedByInterest = {};
+  orgs.forEach(function (o) {
+    o.interests.forEach(function (i) { curatedByInterest[i] = (curatedByInterest[i] || 0) + 1; });
+  });
+  Object.keys(FYC.INTERESTS).forEach(function (i) {
+    ok((curatedByInterest[i] || 0) >= 1,
+       'interest "' + i + '" has at least one curated listing (' + (curatedByInterest[i] || 0) + ')');
+  });
 });
 
 // ---------------------------------------------------------------- city match
@@ -127,6 +139,39 @@ group('matcher behaviour', function () {
   // Scores must be ordered and bounded.
   var ordered = FYC.match({ location: 'Seattle', interests: ['outdoors', 'nature'], comfort: 2 }).results;
   ok(ordered.every(function (r) { return r.score >= 0 && r.score <= 1; }), 'scores are within 0..1');
+
+  // --- the silent-mismatch regression ---------------------------------------
+  // Previously, picking an interest with no curated listing returned a
+  // confident list of unrelated groups with no matching reason on any card.
+
+  // Chicago has no curated board-games listing; the app must say so rather
+  // than pad the page out.
+  var gap = FYC.match({ location: 'Chicago', interests: ['games'], comfort: 2 });
+  eq(gap.cityMatched, true, 'uncovered interest: city still recognised');
+  eq(gap.results.length, 0, 'uncovered interest returns no curated results');
+  ok(gap.uncovered.indexOf('games') !== -1, 'uncovered interest is reported');
+  ok(gap.universal.length > 0, 'uncovered interest still gets national routes');
+
+  // A mix of covered and uncovered: keep the real matches, flag the rest.
+  var mixed = FYC.match({ location: 'Chicago', interests: ['books', 'games'], comfort: 2 });
+  ok(mixed.results.length > 0, 'mixed coverage still returns the covered matches');
+  ok(mixed.results.every(function (r) { return r.overlap > 0; }),
+     'every curated result matches at least one chosen interest');
+  ok(mixed.covered.indexOf('books') !== -1, 'covered interest reported as covered');
+  ok(mixed.uncovered.indexOf('games') !== -1, 'uncovered interest reported as uncovered');
+
+  // Across every city and every interest: never present a non-match as a match.
+  var leaked = 0, reasonless = 0;
+  FYC.cities.forEach(function (c) {
+    Object.keys(FYC.INTERESTS).forEach(function (i) {
+      FYC.match({ location: c.name, interests: [i], comfort: 2 }).results.forEach(function (r) {
+        if (r.overlap === 0) leaked++;
+        if (!r.reasons.length) reasonless++;
+      });
+    });
+  });
+  eq(leaked, 0, 'no zero-overlap listing is ever returned as a match');
+  eq(reasonless, 0, 'every returned match explains itself');
 
   // Diversity: the top 4 should not all be the same single organisation type.
   var diverse = FYC.match({ location: 'nyc', interests: ['volunteering', 'books', 'outdoors'], comfort: 2 }).results;

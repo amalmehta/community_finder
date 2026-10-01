@@ -198,7 +198,7 @@
         name: 'Chicago Public Library',
         neighborhood: '80+ branches',
         blurb: 'Free book clubs, conversation circles for English learners, maker labs at Harold Washington, chess, crafts and talks — in every neighbourhood.',
-        interests: ['books', 'language', 'social', 'newcomer', 'crafts', 'making', 'writing'],
+        interests: ['books', 'language', 'social', 'newcomer', 'crafts', 'making', 'writing', 'parents'],
         url: 'https://www.chipublib.org/',
         firstStep: {
           kind: 'rsvp',
@@ -284,6 +284,98 @@
         ],
         solo: 5, gentleness: 5, structure: 'shift', commitment: 'one-off', cost: 0,
         when: ['weekend'], size: 'medium', goals: ['impact', 'friends']
+      },
+      {
+        id: 'chi-paws',
+        name: 'PAWS Chicago',
+        neighborhood: 'Lincoln Park + Little Village',
+        blurb: 'The city\'s largest no-kill shelter, with a big, well-run volunteer programme — dog walking, cat socialising and adoption events.',
+        interests: ['animals', 'volunteering'],
+        url: 'https://www.pawschicago.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Sign up for a volunteer orientation',
+          url: 'https://www.pawschicago.org/how-to-help/volunteer/',
+          when: 'Orientations monthly; shifts daily'
+        },
+        script: null,
+        expect: [
+          'Orientation first, then you pick recurring shifts',
+          'The animals give you something to do with your hands and eyes',
+          'Shift regulars become familiar faces quickly',
+          'Free, but they ask for a real commitment after training you'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'weekly', cost: 0,
+        when: ['weekday-day', 'weekday-eve', 'weekend'], size: 'large', goals: ['impact', 'routine', 'friends']
+      },
+      {
+        id: 'chi-filmmakers',
+        name: 'Chicago Filmmakers',
+        neighborhood: 'Edgewater',
+        blurb: 'A film cooperative running classes, screenings and volunteer opportunities for people who want to make things rather than just watch them.',
+        interests: ['filmphoto', 'art', 'making', 'social'],
+        url: 'https://www.chicagofilmmakers.org/',
+        firstStep: {
+          kind: 'register',
+          label: 'Take one short class, or volunteer at a screening',
+          url: 'https://www.chicagofilmmakers.org/',
+          when: 'Classes and screenings through the year'
+        },
+        script: 'Hi! I\'m interested in {interest} and completely new to it. Which class would you point a beginner to, and do you need volunteers at screenings?',
+        expect: [
+          'Classes are aimed at independent beginners, not industry professionals',
+          'Making anything on film requires collaborators — a structural reason to meet people',
+          'Classes cost money; volunteering at a screening is free',
+          'Screenings are a low-commitment way to see the place first'
+        ],
+        solo: 4, gentleness: 4, structure: 'course', commitment: 'one-off', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['skill', 'friends']
+      },
+      {
+        id: 'chi-zlmc',
+        name: 'Zen Life & Meditation Center of Chicago',
+        neighborhood: 'Oak Park',
+        blurb: 'Meditation centre running introductory sessions and courses for people with no background, in a deliberately unintimidating, non-monastic setting.',
+        interests: ['stillness', 'faith', 'support'],
+        url: 'https://www.zlmc.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Attend an introductory session',
+          url: 'https://www.zlmc.org/',
+          when: 'Weekly sittings plus intro courses'
+        },
+        script: 'Hi — I\'ve never meditated before. Is there an introductory session coming up, and do I need to know anything or bring anything?',
+        expect: [
+          'The introduction exists for people who have never done it',
+          'You are told where to sit and what to do with your hands',
+          'Usually by donation or a modest fee',
+          'Silence means no pressure to make conversation'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'weekly', cost: 0,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['routine', 'friends']
+      },
+      {
+        id: 'chi-oldtown',
+        name: 'Old Town School of Folk Music',
+        neighborhood: 'Lincoln Square',
+        blurb: 'An institution built on adult group classes for absolute beginners — guitar, banjo, singing, ukulele — that end in a jam session in the bar downstairs.',
+        interests: ['music', 'social', 'dance'],
+        url: 'https://www.oldtownschool.org/',
+        firstStep: {
+          kind: 'register',
+          label: 'Enrol in an eight-week adult beginner class',
+          url: 'https://www.oldtownschool.org/classes/',
+          when: 'Terms start several times a year'
+        },
+        script: null,
+        expect: [
+          'Group classes for adults who have never touched the instrument are the core of the place',
+          'Eight weeks with the same people, then many classes carry on to the bar — this is how people actually make friends there',
+          'Classes cost real money; instruments can be rented',
+          'Free concerts and open jams are a way to scout first'
+        ],
+        solo: 5, gentleness: 5, structure: 'course', commitment: 'seasonal', cost: 2,
+        when: ['weekday-eve', 'weekend'], size: 'large', goals: ['skill', 'friends', 'routine']
       }
     ]
   });

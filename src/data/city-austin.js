@@ -60,7 +60,7 @@
         name: 'Austin Public Library',
         neighborhood: 'Branches citywide + Central Library',
         blurb: 'Free book clubs, conversation circles, writing groups, craft nights and talks — plus one of the best public buildings in Texas downtown.',
-        interests: ['books', 'language', 'social', 'newcomer', 'writing', 'crafts'],
+        interests: ['books', 'language', 'social', 'newcomer', 'writing', 'crafts', 'parents'],
         url: 'https://library.austintexas.gov/',
         firstStep: {
           kind: 'rsvp',
@@ -284,6 +284,75 @@
         ],
         solo: 5, gentleness: 5, structure: 'shift', commitment: 'one-off', cost: 0,
         when: ['weekday-day', 'weekday-eve', 'weekend'], size: 'small', goals: ['impact', 'friends', 'skill']
+      },
+      {
+        id: 'atx-pets-alive',
+        name: 'Austin Pets Alive!',
+        neighborhood: 'Town Lake + Tarrytown',
+        blurb: 'One of the biggest no-kill shelters in the country, with a volunteer programme that genuinely runs on volunteers — dog walking, cat care, fostering.',
+        interests: ['animals', 'volunteering'],
+        url: 'https://www.austinpetsalive.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Do the volunteer orientation, then pick a shift',
+          url: 'https://www.austinpetsalive.org/volunteer',
+          when: 'Orientations regularly; shifts daily'
+        },
+        script: null,
+        expect: [
+          'Orientation first, then you choose what you want to do',
+          'Dog walking is a solo-friendly task that still puts you among people',
+          'Free, and fostering is an option if leaving the house is the hard part',
+          'Regular shifts mean the same faces each week'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'weekly', cost: 0,
+        when: ['weekday-day', 'weekday-eve', 'weekend'], size: 'large', goals: ['impact', 'routine', 'friends']
+      },
+      {
+        id: 'atx-afs',
+        name: 'Austin Film Society',
+        neighborhood: 'AFS Cinema, north Austin',
+        blurb: 'Runs a cinema, classes and a members\' community for people who make and watch films. Volunteering and member screenings are the easy ways in.',
+        interests: ['filmphoto', 'art', 'volunteering', 'social'],
+        url: 'https://www.austinfilm.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Go to one screening, or sign up to volunteer',
+          url: 'https://www.austinfilm.org/',
+          when: 'Screenings most nights; events year-round'
+        },
+        script: 'Hi! I\'d like to get involved. I\'m interested in {interest} and new to this — do you need volunteers, and which events suit someone coming alone?',
+        expect: [
+          'A screening is the classic thing you can do alone without it being odd',
+          'The conversation afterwards has a built-in subject',
+          'Membership and tickets cost money; volunteering does not',
+          'Classes and workshops exist for people who want to make things'
+        ],
+        solo: 5, gentleness: 5, structure: 'rsvp', commitment: 'one-off', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['friends', 'skill']
+      },
+      {
+        id: 'atx-zen',
+        name: 'Austin Zen Center',
+        neighborhood: 'North Loop / Hyde Park',
+        blurb: 'A quiet residential zendo with introductory sessions that explain, out loud, exactly what to do. Newcomers are expected, not tolerated.',
+        interests: ['stillness', 'faith', 'support'],
+        url: 'https://www.austinzencenter.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come to a newcomer introduction session',
+          url: 'https://www.austinzencenter.org/',
+          when: 'Weekly sittings plus newcomer sessions'
+        },
+        script: 'Hi — I\'ve never meditated in a group before. Is there an introduction session for newcomers, and is there anything I should wear or bring?',
+        expect: [
+          'The introduction is specifically for people who have never done this',
+          'You are shown where to sit and when to stand — nothing is assumed',
+          'By donation; nobody checks',
+          'Silence means you do not have to talk until you want to'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'weekly', cost: 0,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['routine', 'friends']
       }
     ]
   });

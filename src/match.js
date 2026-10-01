@@ -134,6 +134,13 @@
     return { level: 1, label: 'Worth the nerve' };
   }
 
+  /** How many of the person's chosen interests this listing actually covers. */
+  function overlapCount(org, interests) {
+    return (interests || []).filter(function (id) {
+      return org.interests.indexOf(id) !== -1;
+    }).length;
+  }
+
   function scoreOrg(org, p) {
     var parts = {
       interest: interestScore(org, p.interests || []),
@@ -147,7 +154,11 @@
     Object.keys(WEIGHTS).forEach(function (k) {
       total += WEIGHTS[k] * parts[k];
     });
-    return { org: org, score: total, parts: parts, reasons: explain(org, p, parts), ease: ease(org) };
+    return {
+      org: org, score: total, parts: parts,
+      reasons: explain(org, p, parts), ease: ease(org),
+      overlap: overlapCount(org, p.interests)
+    };
   }
 
   /**
@@ -194,6 +205,18 @@
 
     var scored = pool.map(function (o) { return scoreOrg(o, p); });
 
+    // Which of the chosen interests this city actually has listings for. An
+    // interest nobody covers is reported, not quietly padded out with
+    // unrelated groups that happen to score well on cost and gentleness.
+    var uncovered = (p.interests || []).filter(function (id) {
+      return !pool.some(function (o) { return o.interests.indexOf(id) !== -1; });
+    });
+
+    // A listing that matches none of the chosen interests is not a match.
+    if ((p.interests || []).length) {
+      scored = scored.filter(function (r) { return r.overlap > 0; });
+    }
+
     // Budget is a stated constraint: filter, but relax if it empties the list.
     var affordable = scored.filter(function (r) { return r.org.cost <= (p.budget == null ? 2 : p.budget); });
     var results = affordable.length >= 4 ? affordable : scored;
@@ -211,7 +234,10 @@
       cityMatched: !!city,
       locationText: p.location || '',
       results: results,
-      universal: uni
+      universal: uni,
+      // Interests this city has no hand-picked listing for, so the UI can say so.
+      uncovered: uncovered,
+      covered: (p.interests || []).filter(function (id) { return uncovered.indexOf(id) === -1; })
     };
   };
 

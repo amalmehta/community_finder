@@ -221,7 +221,7 @@
         name: 'Seattle Public Library',
         neighborhood: '27 branches',
         blurb: 'Free book groups, Talk Time conversation circles for English learners, writing groups, craft nights and lectures — including in the famous downtown building.',
-        interests: ['books', 'language', 'social', 'newcomer', 'writing', 'crafts'],
+        interests: ['books', 'language', 'social', 'newcomer', 'writing', 'crafts', 'parents'],
         url: 'https://www.spl.org/',
         firstStep: {
           kind: 'rsvp',
@@ -284,6 +284,121 @@
         ],
         solo: 4, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
         when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['routine', 'friends', 'skill']
+      },
+      {
+        id: 'sea-humane',
+        name: 'Seattle Humane',
+        neighborhood: 'Bellevue',
+        blurb: 'Regional shelter with a large volunteer programme — animal care, dog walking, adoption support — and proper training before you start.',
+        interests: ['animals', 'volunteering'],
+        url: 'https://www.seattlehumane.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Apply and book a volunteer orientation',
+          url: 'https://www.seattlehumane.org/volunteer/',
+          when: 'Orientations regularly; shifts most days'
+        },
+        script: null,
+        expect: [
+          'Application and orientation come before your first shift',
+          'Animals mean you never have to invent small talk',
+          'Recurring shifts put you with the same volunteers each week',
+          'Free, with a minimum commitment expected after training'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'weekly', cost: 0,
+        when: ['weekday-day', 'weekend'], size: 'large', goals: ['impact', 'routine', 'friends']
+      },
+      {
+        id: 'sea-peps',
+        name: 'PEPS (Program for Early Parent Support)',
+        neighborhood: 'Groups across the region',
+        blurb: 'Seattle\'s answer to new-parent isolation: small groups of parents with same-age babies, meeting weekly in each other\'s homes with a trained facilitator.',
+        interests: ['parents', 'support', 'social', 'newcomer'],
+        url: 'https://www.peps.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Register for a newborn or new-parent group near you',
+          url: 'https://www.peps.org/',
+          when: 'Groups form continuously'
+        },
+        script: 'Hi! I\'m a new parent and new-ish to the area. How do I join a group near me, and what happens if I can\'t afford the fee?',
+        expect: [
+          'Small groups of 6\u201310 parents whose babies are the same age as yours',
+          'A trained facilitator runs the first weeks, so nobody has to break the ice',
+          'There is a fee, with financial assistance available — ask',
+          'Many groups keep meeting for years after the programme ends'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'weekly', cost: 1,
+        when: ['weekday-day', 'weekday-eve'], size: 'small', goals: ['friends', 'routine']
+      },
+      {
+        id: 'sea-nwff',
+        name: 'Northwest Film Forum',
+        neighborhood: 'Capitol Hill',
+        blurb: 'Cinema and film-arts centre with classes, workshops and a volunteer programme. Volunteers usher screenings and get to watch for free.',
+        interests: ['filmphoto', 'art', 'volunteering', 'social'],
+        url: 'https://nwfilmforum.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Volunteer as an usher, or book a workshop',
+          url: 'https://nwfilmforum.org/',
+          when: 'Screenings most nights; workshops through the year'
+        },
+        script: 'Hi! I\'d like to volunteer. I\'m interested in {interest} and I\'ll be coming alone — what does an usher shift involve and how do I start?',
+        expect: [
+          'Ushering is a defined job for an evening, which is far easier than mingling',
+          'Volunteers usually watch the film free',
+          'You see the same volunteers and staff repeatedly',
+          'Workshops cost money; volunteering does not'
+        ],
+        solo: 5, gentleness: 5, structure: 'shift', commitment: 'weekly', cost: 0,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'skill', 'impact']
+      },
+      {
+        id: 'sea-insight',
+        name: 'Seattle Insight Meditation Society',
+        neighborhood: 'Central Seattle + online',
+        blurb: 'Large secular-leaning meditation community with free weekly sittings and talks, and introductory courses for people who have never sat still on purpose.',
+        interests: ['stillness', 'faith', 'support'],
+        url: 'https://seattleinsight.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Go to one weekly sitting, or sign up for an intro course',
+          url: 'https://seattleinsight.org/',
+          when: 'Weekly sittings; courses through the year'
+        },
+        script: 'Hi — I\'m completely new to meditation. Is the weekly sitting open to beginners, and what should I expect on a first visit?',
+        expect: [
+          'Guidance is spoken aloud, so you always know what to do',
+          'Donation-based — nobody is turned away',
+          'You can sit on a chair; no particular posture is required',
+          'Tea afterwards is where the talking happens, and it is optional'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'weekly', cost: 0,
+        when: ['weekday-eve', 'weekend'], size: 'large', goals: ['routine', 'friends']
+      },
+      {
+        id: 'sea-raincity',
+        name: 'Rain City Rock Camp',
+        neighborhood: 'Central District',
+        blurb: 'Runs an adult rock camp where grown-ups with no musical experience form a band with strangers over a weekend and play a show at the end.',
+        interests: ['music', 'social', 'lgbtq'],
+        url: 'https://raincityrockcamp.org/',
+        firstStep: {
+          kind: 'register',
+          label: 'Sign up for adult rock camp, or volunteer at a youth session',
+          url: 'https://raincityrockcamp.org/',
+          when: 'Adult camps run periodically; volunteering year-round'
+        },
+        script: 'Hi! I have no musical experience at all. Is adult rock camp genuinely open to someone like me, and when is the next one?',
+        expect: [
+          'No experience required — that is the entire premise',
+          'You are placed in a band, so the group is assigned rather than negotiated',
+          'Camp costs money, usually with sliding-scale places — ask',
+          'Volunteering at youth sessions is the free way in'
+        ],
+        solo: 5, gentleness: 4, structure: 'course', commitment: 'one-off', cost: 2,
+        when: ['weekend'], size: 'medium', goals: ['skill', 'friends']
       }
     ]
   });

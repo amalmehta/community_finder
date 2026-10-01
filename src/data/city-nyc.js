@@ -221,7 +221,7 @@
         name: 'Brooklyn & New York Public Libraries',
         neighborhood: 'Every neighborhood',
         blurb: 'Free book clubs, ESOL conversation groups, knitting circles, chess, writing workshops and talks at hundreds of branches. Nobody asks why you came.',
-        interests: ['books', 'language', 'social', 'newcomer', 'crafts', 'writing', 'games'],
+        interests: ['books', 'language', 'social', 'newcomer', 'crafts', 'writing', 'games', 'parents'],
         url: 'https://www.bklynlibrary.org/',
         firstStep: {
           kind: 'rsvp',
@@ -422,6 +422,121 @@
         ],
         solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'weekly', cost: 1,
         when: ['weekday-day', 'weekday-eve', 'weekend'], size: 'large', goals: ['routine', 'friends']
+      },
+      {
+        id: 'nyc-acc',
+        name: 'Animal Care Centers of NYC',
+        neighborhood: 'Manhattan, Brooklyn, Staten Island',
+        blurb: 'The city\'s shelter system. Volunteers walk dogs, socialise cats and help at adoption events — work where the animal carries the social load for you.',
+        interests: ['animals', 'volunteering'],
+        url: 'https://www.nycacc.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Apply and attend a volunteer orientation',
+          url: 'https://www.nycacc.org/',
+          when: 'Orientations run regularly; shifts daily'
+        },
+        script: null,
+        expect: [
+          'Expect an application and an orientation — shelters invest in training you',
+          'Dog walking and cat socialising are solo-friendly by design',
+          'You see the same regular volunteers week to week',
+          'Free, with a minimum commitment once you are trained'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'weekly', cost: 0,
+        when: ['weekday-day', 'weekday-eve', 'weekend'], size: 'large', goals: ['impact', 'routine', 'friends']
+      },
+      {
+        id: 'nyc-parkslopeparents',
+        name: 'Park Slope Parents',
+        neighborhood: 'Brooklyn',
+        blurb: 'A long-running Brooklyn parents\' network with new-parent groups organised by your baby\'s birth month — which means everyone in the room is at exactly your stage.',
+        interests: ['parents', 'social', 'newcomer', 'support'],
+        url: 'https://parkslopeparents.com/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Join and sign up for a new-parent group',
+          url: 'https://parkslopeparents.com/',
+          when: 'Groups form continuously'
+        },
+        script: 'Hi! I\'m a new parent in Brooklyn and would like to join a group. How do the birth-month groups work, and is there one forming now?',
+        expect: [
+          'Birth-month groups mean everyone is dealing with the same week of chaos you are',
+          'There is a membership fee — check the current rate',
+          'Meetings happen in homes and parks, which is lower-key than an event',
+          'The classifieds and advice archive alone are worth the membership'
+        ],
+        solo: 4, gentleness: 5, structure: 'register', commitment: 'weekly', cost: 1,
+        when: ['weekday-day', 'weekend'], size: 'large', goals: ['friends', 'routine']
+      },
+      {
+        id: 'nyc-bronxdoc',
+        name: 'Bronx Documentary Center',
+        neighborhood: 'South Bronx',
+        blurb: 'A photography and documentary space running free classes and exhibitions, with a strong commitment to its own neighbourhood rather than the art world.',
+        interests: ['filmphoto', 'art', 'civic', 'social'],
+        url: 'https://www.bronxdoc.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Go to a free exhibition opening, or apply for a free class',
+          url: 'https://www.bronxdoc.org/',
+          when: 'Exhibitions and classes through the year'
+        },
+        script: 'Hi — I\'m interested in {interest} and I\'m a beginner. Are your classes open to adults with no background, and when does the next one start?',
+        expect: [
+          'Free classes exist and are aimed at the community, not professionals',
+          'Openings are free and you can look at photographs instead of making conversation',
+          'Small space, so people notice and talk to newcomers',
+          'A course gives you the same group of people over several weeks'
+        ],
+        solo: 5, gentleness: 4, structure: 'course', commitment: 'seasonal', cost: 0,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['skill', 'friends']
+      },
+      {
+        id: 'nyc-nyinsight',
+        name: 'New York Insight Meditation Center',
+        neighborhood: 'Chelsea',
+        blurb: 'Secular-leaning meditation centre with free and donation-based sittings, plus courses explicitly for people who have never meditated.',
+        interests: ['stillness', 'faith', 'support', 'social'],
+        url: 'https://www.nyimc.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Go to one drop-in sitting or an introductory course',
+          url: 'https://www.nyimc.org/',
+          when: 'Sittings most weeks; courses through the year'
+        },
+        script: 'Hi — I\'ve never meditated in a group. Is the drop-in sitting suitable for a complete beginner, and is there anything I should know before coming?',
+        expect: [
+          'Instructions are given out loud — you are told exactly what to do',
+          'Silence means you are not required to talk to anyone',
+          'Most sittings are by donation and nobody checks what you give',
+          'Courses run in blocks, so you see the same faces repeatedly'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'weekly', cost: 0,
+        when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['routine', 'friends']
+      },
+      {
+        id: 'nyc-bkcm',
+        name: 'Brooklyn Conservatory of Music',
+        neighborhood: 'Park Slope',
+        blurb: 'Community music school with adult group classes, ensembles and a community chorus that takes people who cannot read music.',
+        interests: ['music', 'social'],
+        url: 'https://www.bkcm.org/',
+        firstStep: {
+          kind: 'email',
+          label: 'Ask which adult group class or chorus takes beginners',
+          url: 'https://www.bkcm.org/',
+          when: 'Terms start a few times a year'
+        },
+        script: 'Hi — I\'m an adult beginner interested in {interest}. Which group classes or ensembles are open to someone with no background, and is there financial aid?',
+        expect: [
+          'Adult beginner groups exist and are not full of former prodigies',
+          'A chorus or ensemble is a weekly commitment with the same people — the thing that builds friendships',
+          'Classes cost money; ask about sliding scale or aid',
+          'No audition for the community groups'
+        ],
+        solo: 4, gentleness: 4, structure: 'course', commitment: 'seasonal', cost: 2,
+        when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['skill', 'friends', 'routine']
       }
     ]
   });

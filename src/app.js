@@ -284,9 +284,23 @@
     var host = $('#results');
     host.innerHTML = '';
 
+    // A curated city with nothing matching the chosen interests is not a
+    // curated result — fall through to the national routes rather than
+    // padding the page with groups that match nothing the person asked for.
+    var hasCurated = m.cityMatched && m.results.length > 0;
     var curated = m.results.slice(0, 8);
-    var uni = m.universal.slice(0, m.cityMatched ? 3 : 8);
-    var primary = m.cityMatched ? curated : uni;
+    var uni = m.universal.slice(0, hasCurated ? 4 : 8);
+    var primary = hasCurated ? curated : uni;
+
+    function labels(ids) {
+      return (ids || []).map(function (id) {
+        return (FYC.INTERESTS[id] || {}).label || id;
+      });
+    }
+    function joinList(arr) {
+      if (arr.length <= 1) return arr[0] || '';
+      return arr.slice(0, -1).join(', ') + ' and ' + arr[arr.length - 1];
+    }
 
     if (!primary.length) {
       host.appendChild(el('div', { class: 'empty' }, [
@@ -299,9 +313,21 @@
 
     var where = m.cityMatched ? m.city.name : (p.location || 'your area');
     host.appendChild(el('div', { class: 'results-head' }, [
-      el('h2', { text: m.cityMatched ? 'Places to start in ' + where : 'Ways in, near ' + where }),
+      el('h2', { text: hasCurated ? 'Places to start in ' + where : 'Ways in, near ' + where }),
       el('p', { text: primary.length + ' matches, easiest to walk into first' })
     ]));
+
+    // Say outright which interests this city has no hand-picked listing for.
+    if (m.cityMatched && m.uncovered && m.uncovered.length) {
+      var missing = joinList(labels(m.uncovered));
+      host.appendChild(el('div', { class: 'notice' }, [
+        el('b', { text: 'No hand-picked ' + missing + ' listings in ' + where + ' yet. ' }),
+        hasCurated
+          ? 'The groups below match your other interests. For ' + missing +
+            ', use the national routes further down — they are live searches, not guesses.'
+          : 'Rather than show you groups that match none of that, here are the national routes for it.'
+      ]));
+    }
 
     if (!m.cityMatched) {
       host.appendChild(el('div', { class: 'notice' }, [
@@ -322,10 +348,15 @@
       host.appendChild(orgCard(r, p, { starter: i === 0 }));
     });
 
-    if (m.cityMatched && uni.length) {
+    if (hasCurated && uni.length) {
+      var uncoveredLabels = labels(m.uncovered || []);
       host.appendChild(el('div', { class: 'results-head' }, [
         el('h2', { text: 'Works anywhere' }),
-        el('p', { text: 'National routes in, if none of the above fits' })
+        el('p', {
+          text: uncoveredLabels.length
+            ? 'Including ' + joinList(uncoveredLabels)
+            : 'National routes in, if none of the above fits'
+        })
       ]));
       uni.forEach(function (r) { host.appendChild(orgCard(r, p, {})); });
     }
