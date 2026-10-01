@@ -4,3 +4,4 @@ node_modules/
 *.log
 mac/build/
 mac/dist/
+community_finder.md
