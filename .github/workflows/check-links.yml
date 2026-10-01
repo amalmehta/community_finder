@@ -1,0 +1,74 @@
+# The dataset is a point-in-time snapshot: groups fold, rename and move.
+# This runs the test suite and the link checker weekly and opens an issue when
+# a listing's link actually breaks, so dead entries surface without anyone
+# remembering to look.
+name: Check listing links
+
+on:
+  schedule:
+    # Mondays, 14:00 UTC.
+    - cron: '0 14 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run the test suite
+        run: node tests/run-tests.js
+
+      - name: Check every listing link
+        id: links
+        run: |
+          set +e
+          node tools/check-links.js > report.txt 2>&1
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          cat report.txt
+
+      - name: Report broken listings
+        if: steps.links.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TITLE="Broken listing links"
+          BODY_FILE=issue.md
+          {
+            echo "The weekly link check found listings whose links no longer resolve."
+            echo
+            echo "Fix each one by finding the organisation's current URL, or replace the"
+            echo "listing if the group no longer exists. Then re-run:"
+            echo
+            echo '```bash'
+            echo 'node tools/check-links.js'
+            echo '```'
+            echo
+            echo "<details><summary>Full report</summary>"
+            echo
+            echo '```'
+            cat report.txt
+            echo '```'
+            echo
+            echo "</details>"
+            echo
+            echo "_Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}_"
+          } > "$BODY_FILE"
+
+          # Keep one open issue rather than a new one every week.
+          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body-file "$BODY_FILE"
+            echo "Commented on existing issue #$EXISTING"
+          else
+            gh issue create --title "$TITLE" --body-file "$BODY_FILE"
+          fi

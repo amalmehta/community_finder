@@ -98,6 +98,13 @@ intercepted by a corporate TLS proxy. Those are not dead links; they were
 confirmed live by hand and their DNS resolves. Pass `--all` to also check the
 national directory URLs used by the fallback engine.
 
+### Automated checks
+
+`.github/workflows/check-links.yml` runs the test suite and the link checker
+every Monday on GitHub Actions, and opens an issue if a listing's link breaks.
+It keeps a single open issue and comments on it rather than filing a new one
+each week. You can also run it on demand from the Actions tab.
+
 Manual check: open the app, type `Brooklyn`, pick a few interests, and confirm
 you get New York listings with a "Start here" card. Then type `Boise, Idaho` and
 confirm you get the national-routes view instead.
