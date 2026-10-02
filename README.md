@@ -111,6 +111,20 @@ npm start          # http://localhost:4000
 Node 22+ only — it uses the built-in `node:sqlite`. Still no dependencies and
 nothing to install. The database appears at `server/data/community.db`.
 
+**Email verification** is optional for the finder and required before you can
+contact anyone. The default mail transport writes the message to the console
+and to `server/data/outbox/`, so the whole flow works with no provider, no API
+key and no cost — open the link in the file to finish verifying. Swapping in a
+real sender means one transport in `server/mail.js`.
+
+**The alignment graph** on the People tab draws you, your visible interests, and
+the people who share them, so you can see *why* someone is recommended. It is
+bipartite on purpose: it exposes nothing that discovery does not already show.
+
+**Messaging without a request** is unlocked by strong alignment: 3+ shared
+interests, the same city, and both people verified. The recipient can switch it
+off, blocking always wins, and the daily caps still apply.
+
 See [server/README.md](server/README.md) for the API, the safety rules and how
 to change the rate limits. In short: contact is request-then-accept, a new
 account gets three introductions a day, interests can be hidden from discovery

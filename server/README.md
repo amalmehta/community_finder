@@ -40,7 +40,21 @@ it did before, with no account and no network calls.
 - **Blocking is mutual and immediate**: they vanish from your discovery, you
   vanish from theirs, and any existing connection is closed.
 
-Limits are configurable — see `DEFAULT_LIMITS` in `server/app.js`.
+- **Strong alignment can skip the request step**: 3+ shared visible interests,
+  the same city, and both people verified. Every leg is checked server-side, the
+  recipient can turn it off with `openToDirect`, and blocking still wins. See
+  `DIRECT_RULE` in `server/app.js`.
+- **Contacting anyone requires a verified email.** The finder does not.
+
+Limits and the alignment rule are configurable — see `DEFAULT_LIMITS` and
+`DIRECT_RULE` in `server/app.js`.
+
+## Mail
+
+`server/mail.js` has one interface and a default transport that writes to the
+console and `server/data/outbox/`. That is enough to run and test the whole
+verification flow with no provider. For real delivery, implement a transport
+there and set `MAIL_TRANSPORT`.
 
 ## Passwords
 

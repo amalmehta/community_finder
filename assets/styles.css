@@ -415,3 +415,26 @@ footer.site-footer p { margin: 0 0 6px; }
 .vis-list { display: grid; gap: 5px; margin-top: 4px; }
 .vis-row { display: flex; gap: 9px; align-items: center; font-size: 14.5px; }
 .vis-row input { width: 16px; height: 16px; accent-color: var(--moss); }
+
+/* ---------- alignment graph ---------- */
+.graph { width: 100%; max-width: 640px; height: auto; display: block; margin-top: 6px; }
+.glink { stroke: var(--line-strong); stroke-width: 1; }
+.glink.strong { stroke: var(--line-strong); stroke-width: 1.6; }
+.gnode circle { fill: var(--bg-sunk); stroke: var(--line-strong); stroke-width: 1.5; }
+.gnode.gme circle { fill: var(--accent); stroke: var(--accent); }
+.gnode.ginterest circle { fill: var(--moss); stroke: var(--moss); }
+.gnode.gperson circle { fill: var(--bg-raised); stroke: var(--ink-faint); stroke-width: 2; cursor: pointer; }
+.gnode.gperson.gdirect circle { stroke: var(--accent); stroke-width: 3.5; }
+.gnode.gperson:hover circle, .gnode.gperson:focus-visible circle { stroke: var(--accent); }
+.glabel { font: 500 11px var(--font); fill: var(--ink-soft); }
+.gnode.gme .glabel { fill: var(--ink); font-weight: 700; }
+
+.direct-note { color: var(--accent-ink); font-weight: 600; }
+.person.flash { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.notice.bad { background: var(--accent-soft); border-left-color: var(--accent); }
+.notice.bad b { color: var(--accent-ink); }
+.field input[type="email"] {
+  width: 100%; padding: 11px 13px; font: inherit; font-size: 15.5px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--ink);
+}

@@ -33,6 +33,16 @@ CREATE TABLE IF NOT EXISTS user_interests (
   PRIMARY KEY (user_id, interest)
 );
 
+-- A verification token is single-use and short-lived.
+CREATE TABLE IF NOT EXISTS verifications (
+  token      TEXT PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email      TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  used_at    INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
   token      TEXT PRIMARY KEY,
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -89,12 +99,30 @@ CREATE INDEX IF NOT EXISTS idx_msg_conn ON messages(connection_id, id);
 CREATE INDEX IF NOT EXISTS idx_ui_interest ON user_interests(interest, visible);
 `;
 
+// Columns added after the first release. Existing databases are migrated in
+// place rather than rebuilt, so nobody loses their messages to an upgrade.
+const ADDED_COLUMNS = [
+  ['users', 'email', "TEXT NOT NULL DEFAULT ''"],
+  ['users', 'email_verified', 'INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'open_to_direct', 'INTEGER NOT NULL DEFAULT 1']
+];
+
+function migrate(db) {
+  ADDED_COLUMNS.forEach(([table, column, decl]) => {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+    if (!cols.includes(column)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
+    }
+  });
+}
+
 function open(file) {
   if (file !== ':memory:') {
     fs.mkdirSync(path.dirname(file), { recursive: true });
   }
   const db = new DatabaseSync(file);
   db.exec(SCHEMA);
+  migrate(db);
   return db;
 }
 
@@ -155,6 +183,7 @@ function createStore(db) {
       const marks = wanted.map(() => '?').join(',');
       const rows = q(`
         SELECT u.id, u.display, u.city, u.bio, u.last_seen,
+               u.email_verified, u.open_to_direct,
                COUNT(*) AS shared,
                GROUP_CONCAT(ui.interest) AS interests
         FROM user_interests ui
@@ -174,6 +203,7 @@ function createStore(db) {
       return rows.map((r) => ({
         id: r.id, display: r.display, city: r.city, bio: r.bio,
         shared: r.shared, lastSeen: r.last_seen,
+        verified: !!r.email_verified, openToDirect: !!r.open_to_direct,
         interests: String(r.interests || '').split(',').filter(Boolean)
       }));
     },
@@ -259,6 +289,42 @@ function createStore(db) {
     report(reporterId, reportedId, reason, detail) {
       q('INSERT INTO reports (reporter_id, reported_id, reason, detail, created_at) VALUES (?, ?, ?, ?, ?)')
         .run(reporterId, reportedId, String(reason).slice(0, 60), String(detail || '').slice(0, 1000), now());
+    },
+
+    // ---- email verification ----
+    setEmail(userId, email) {
+      q('UPDATE users SET email = ?, email_verified = 0 WHERE id = ?')
+        .run(String(email).toLowerCase().slice(0, 190), userId);
+    },
+    emailInUse(email, exceptUserId) {
+      const row = q('SELECT id FROM users WHERE email = ? AND email != \'\' AND id != ?')
+        .get(String(email).toLowerCase(), exceptUserId || 0);
+      return !!row;
+    },
+    createVerification(token, userId, email, ttlMs) {
+      const t = now();
+      q('DELETE FROM verifications WHERE user_id = ? AND used_at IS NULL').run(userId);
+      q('INSERT INTO verifications (token, user_id, email, created_at, expires_at) VALUES (?, ?, ?, ?, ?)')
+        .run(token, userId, String(email).toLowerCase(), t, t + ttlMs);
+    },
+    /** Consume a token. Returns the user id, or null if unknown/expired/used. */
+    useVerification(token) {
+      const v = q('SELECT * FROM verifications WHERE token = ?').get(String(token || ''));
+      if (!v || v.used_at || v.expires_at < now()) return null;
+      q('UPDATE verifications SET used_at = ? WHERE token = ?').run(now(), token);
+      q('UPDATE users SET email = ?, email_verified = 1 WHERE id = ?').run(v.email, v.user_id);
+      return v.user_id;
+    },
+    setOpenToDirect(userId, on) {
+      q('UPDATE users SET open_to_direct = ? WHERE id = ?').run(on ? 1 : 0, userId);
+    },
+
+    // ---- connections created without a request ----
+    createAccepted(fromId, toId) {
+      const t = now();
+      const info = q(`INSERT INTO connections (from_id, to_id, status, intro, created_at, decided_at)
+                      VALUES (?, ?, 'accepted', '', ?, ?)`).run(fromId, toId, t, t);
+      return Number(info.lastInsertRowid);
     },
 
     // ---- sessions ----

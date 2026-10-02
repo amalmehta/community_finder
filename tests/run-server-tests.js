@@ -13,9 +13,20 @@ const eq = (a, b, name) => ok(a === b, `${name} (got ${JSON.stringify(a)}, want 
 const group = (n, fn) => { console.log('\n— ' + n); return fn(); };
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fyc-test-'));
+// A mailer that captures instead of sending, so verification links can be used.
+const sentMail = [];
+const captureMailer = {
+  transport: 'capture',
+  async sendVerification({ to, link }) { sentMail.push({ to, link }); return { ok: true }; }
+};
+
 // Signup-per-IP is the one limit that gets in the test's way (every request
 // here comes from one address); the limits under test keep their real values.
-const { server } = createApp({ file: path.join(tmp, 'test.db'), limits: { signupsPerIpPerHour: 100 } });
+const { server } = createApp({
+  file: path.join(tmp, 'test.db'),
+  limits: { signupsPerIpPerHour: 100 },
+  mailer: captureMailer
+});
 
 /** Minimal cookie-aware client. */
 function client() {
@@ -35,6 +46,15 @@ function client() {
 }
 
 let base;
+
+/** Add an address and click the link, the way a person would. */
+async function verifyEmail(call, email) {
+  const r = await call('POST', '/api/email', { email });
+  if (r.status !== 202) return r;
+  const link = sentMail[sentMail.length - 1].link;
+  const token = new URL(link).searchParams.get('token');
+  return call('GET', '/api/verify?token=' + token);
+}
 
 (async function main() {
   await new Promise((r) => server.listen(0, r));
@@ -100,6 +120,37 @@ let base;
     await ava('PATCH', '/api/me', { city: 'Boston', interests: [{ id: 'outdoors' }, { id: 'support', visible: false }] });
   });
 
+  await group('email verification', async () => {
+    eq((await ava('POST', '/api/requests', { toUserId: 2, intro: 'hello there, nice to meet you' })).status, 403,
+       'contacting people is blocked until an email is verified');
+
+    eq((await ava('POST', '/api/email', { email: 'not-an-email' })).status, 400, 'a malformed address is refused');
+
+    const r = await ava('POST', '/api/email', { email: 'ava@example.com' });
+    eq(r.status, 202, 'a verification email is accepted for sending');
+    eq(sentMail[sentMail.length - 1].to, 'ava@example.com', 'and addressed correctly');
+
+    let me = (await ava('GET', '/api/me')).data.user;
+    eq(me.emailVerified, false, 'the address is not verified just by being added');
+
+    const link = sentMail[sentMail.length - 1].link;
+    const token = new URL(link).searchParams.get('token');
+    eq((await ava('GET', '/api/verify?token=' + token)).status, 200, 'the link verifies the address');
+    me = (await ava('GET', '/api/me')).data.user;
+    eq(me.emailVerified, true, 'and the account is now verified');
+
+    eq((await ava('GET', '/api/verify?token=' + token)).status, 400, 'a verification link cannot be reused');
+    eq((await ava('GET', '/api/verify?token=deadbeef')).status, 400, 'an unknown token is refused');
+
+    await verifyEmail(ben, 'ben@example.com');
+    eq((await client()('POST', '/api/email', { email: 'x@example.com' })).status, 401,
+       'adding an email requires a session');
+
+    const dupe = await ben('POST', '/api/email', { email: 'ava@example.com' });
+    eq(dupe.status, 409, 'an address already in use is refused');
+    await verifyEmail(ben, 'ben@example.com');
+  });
+
   await group('request, accept, message', async () => {
     const benId = (await ava('GET', '/api/people')).data.people[0].id;
 
@@ -136,6 +187,7 @@ let base;
 
     // A third party must not be able to read or write the conversation.
     await mal('POST', '/api/signup', { username: 'mal', password: 'hunter2hunter', display: 'Mal', city: 'Boston', ageOk: true, interests: [{ id: 'outdoors' }] });
+    await verifyEmail(mal, 'mal@example.com');
     eq((await mal('GET', `/api/threads/${tid}/messages`)).status, 404, 'an outsider cannot read the thread');
     eq((await mal('POST', `/api/threads/${tid}/messages`, { body: 'butting in' })).status, 404,
        'an outsider cannot post to the thread');
@@ -169,6 +221,7 @@ let base;
     }
     const spammer = client();
     await spammer('POST', '/api/signup', { username: 'spammer', password: 'hunter2hunter', city: 'Boston', ageOk: true, interests: [{ id: 'outdoors' }] });
+    await verifyEmail(spammer, 'spammer@example.com');
     const targets = (await spammer('GET', '/api/people')).data.people;
     ok(targets.length >= 5, 'there are enough people to attempt a spam run (' + targets.length + ')');
 
@@ -180,6 +233,83 @@ let base;
     }
     eq(sent, 3, 'a brand new account gets exactly three introductions');
     ok(blocked > 0, 'further attempts are refused');
+  });
+
+  await group('alignment, direct messages and the graph', async () => {
+    // Two people who align strongly: same city, four shared interests, both verified.
+    const dana = client(), eli = client();
+    const shared = [{ id: 'books' }, { id: 'games' }, { id: 'stillness' }, { id: 'music' }];
+    await dana('POST', '/api/signup', { username: 'dana', password: 'hunter2hunter', display: 'Dana', city: 'Portland', ageOk: true, interests: shared });
+    await eli('POST', '/api/signup', { username: 'eli', password: 'hunter2hunter', display: 'Eli', city: 'Portland', ageOk: true, interests: shared });
+    await verifyEmail(dana, 'dana@example.com');
+    await verifyEmail(eli, 'eli@example.com');
+
+    const seen = (await dana('GET', '/api/people')).data.people.filter((p) => p.display === 'Eli')[0];
+    eq(seen.shared, 4, 'four shared interests are counted');
+    eq(seen.canDirect, true, 'strong alignment unlocks a direct message');
+
+    const sent = await dana('POST', '/api/direct', { toUserId: seen.id, body: 'Hello! Four things in common — fancy a board game night?' });
+    eq(sent.status, 201, 'the direct message is delivered');
+    const threads = (await eli('GET', '/api/threads')).data.threads;
+    eq(threads.length, 1, 'and it appears as a conversation for the recipient');
+    eq((await eli('GET', `/api/threads/${threads[0].id}/messages`)).data.messages.length, 1,
+       'with the message already in it');
+    eq((await eli('GET', '/api/requests')).data.incoming.length, 0,
+       'no pending request is created — that is the point');
+
+    // Every leg of the rule has to hold.
+    const far = client();
+    await far('POST', '/api/signup', { username: 'far', password: 'hunter2hunter', display: 'Far', city: 'Seattle', ageOk: true, interests: shared });
+    await verifyEmail(far, 'far@example.com');
+    const farSees = (await far('GET', '/api/people')).data.people.filter((p) => p.display === 'Dana')[0];
+    eq(farSees.canDirect, false, 'a different city blocks direct messaging');
+    eq((await far('POST', '/api/direct', { toUserId: farSees.id, body: 'Hello from another city entirely' })).status, 403,
+       'and the server refuses it, not just the UI');
+
+    const thin = client();
+    await thin('POST', '/api/signup', { username: 'thin', password: 'hunter2hunter', display: 'Thin', city: 'Portland', ageOk: true, interests: [{ id: 'books' }, { id: 'games' }] });
+    await verifyEmail(thin, 'thin@example.com');
+    const thinSees = (await thin('GET', '/api/people')).data.people.filter((p) => p.display === 'Dana')[0];
+    eq(thinSees.canDirect, false, 'two shared interests is not enough');
+    eq((await thin('POST', '/api/direct', { toUserId: thinSees.id, body: 'Only two things in common here' })).status, 403,
+       'the server enforces the minimum');
+
+    const unverified = client();
+    await unverified('POST', '/api/signup', { username: 'unver', password: 'hunter2hunter', display: 'Unver', city: 'Portland', ageOk: true, interests: shared });
+    const unvSees = (await unverified('GET', '/api/people')).data.people.filter((p) => p.display === 'Dana')[0];
+    eq(unvSees.canDirect, false, 'an unverified sender cannot message directly');
+    eq((await unverified('POST', '/api/direct', { toUserId: unvSees.id, body: 'Let me straight into your inbox' })).status, 403,
+       'and the server refuses that too');
+
+    // The recipient can switch it off for themselves.
+    await eli('PATCH', '/api/me', { city: 'Portland', openToDirect: false });
+    const after = (await dana('GET', '/api/people')).data.people.filter((p) => p.display === 'Eli')[0];
+    eq(after.canDirect, false, 'opting out of direct messages is respected');
+    await eli('PATCH', '/api/me', { city: 'Portland', openToDirect: true });
+
+    // Blocking still wins over alignment.
+    await eli('POST', '/api/blocks', { userId: (await eli('GET', '/api/people')).data.people.filter((p) => p.display === 'Dana')[0].id });
+    eq((await dana('POST', '/api/direct', { toUserId: seen.id, body: 'Trying again after being blocked' })).status, 403,
+       'a block beats alignment');
+
+    // The graph.
+    const g = (await thin('GET', '/api/graph')).data;
+    ok(g.nodes.some((n) => n.kind === 'me'), 'the graph has you in it');
+    ok(g.nodes.some((n) => n.kind === 'interest'), 'and interest nodes');
+    ok(g.nodes.some((n) => n.kind === 'person'), 'and people');
+    ok(g.links.length > 0, 'with links between them');
+    eq(g.rule.minShared, 3, 'the graph states the rule it is applying');
+
+    // It must not leak anything discovery would not show.
+    const interestIds = g.nodes.filter((n) => n.kind === 'interest').map((n) => n.id.slice(2));
+    const mine = (await thin('GET', '/api/me')).data.user.interests.filter((i) => i.visible).map((i) => i.id);
+    ok(interestIds.every((i) => mine.indexOf(i) !== -1),
+       'every interest node is one of your own visible interests');
+    const personIds = g.nodes.filter((n) => n.kind === 'person').map((n) => n.userId);
+    const discoverable = (await thin('GET', '/api/people')).data.people.map((p) => p.id);
+    ok(personIds.every((id) => discoverable.indexOf(id) !== -1),
+       'the graph shows only people discovery already shows');
+    eq((await client()('GET', '/api/graph')).status, 401, 'the graph requires a session');
   });
 
   await group('static files and safety of the server itself', async () => {

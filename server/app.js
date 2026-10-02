@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { open, createStore } = require('./db.js');
+const { createMailer } = require('./mail.js');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -15,7 +16,32 @@ require(path.join(ROOT, 'src/data/core.js'));
 const INTERESTS = globalThis.FYC.INTERESTS;
 
 const SESSION_TTL = 30 * 24 * 3600 * 1000;   // 30 days
+const VERIFY_TTL = 24 * 3600 * 1000;         // 24 hours
 const DAY = 86400000, HOUR = 3600000;
+
+// "Enough things align" to skip the request step. Deliberately strict: the
+// recipient can still turn it off, block, and report, and rate limits apply.
+const DIRECT_RULE = {
+  minShared: 3,
+  sameCity: true,
+  bothVerified: true
+};
+
+/** Can `from` message `to` without waiting to be accepted? */
+function directAllowed(from, to, shared) {
+  if (!to.open_to_direct) return { ok: false, why: 'They only accept introductions.' };
+  if (DIRECT_RULE.bothVerified && (!from.email_verified || !to.email_verified)) {
+    return { ok: false, why: 'Both people need a verified email.' };
+  }
+  if (DIRECT_RULE.sameCity &&
+      String(from.city || '').trim().toLowerCase() !== String(to.city || '').trim().toLowerCase()) {
+    return { ok: false, why: 'Direct messages are for people in the same city.' };
+  }
+  if (shared < DIRECT_RULE.minShared) {
+    return { ok: false, why: `${DIRECT_RULE.minShared} shared interests needed; you have ${shared}.` };
+  }
+  return { ok: true };
+}
 
 // ---------------------------------------------------------------- helpers
 const MIME = {
@@ -89,8 +115,12 @@ function cleanInterests(list) {
 const publicUser = (u, store) => ({
   id: u.id, username: u.username, display: u.display, city: u.city, bio: u.bio,
   discoverable: !!u.discoverable, createdAt: u.created_at,
+  email: u.email || '', emailVerified: !!u.email_verified,
+  openToDirect: !!u.open_to_direct,
   interests: store.interestsOf(u.id).map((r) => ({ id: r.interest, visible: !!r.visible }))
 });
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 // ---------------------------------------------------------------- server
 // Defaults are deliberately tight. Tests and self-hosting can adjust them.
@@ -101,12 +131,15 @@ const DEFAULT_LIMITS = {
   requestsPerDay: 10,
   requestsPerHour: 3,
   messagesPerHour: 60,
-  reportsPerDay: 10
+  reportsPerDay: 10,
+  verificationsPerHour: 5
 };
 
-function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure = false, limits = {} } = {}) {
+function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure = false,
+                    limits = {}, mailer = null, baseUrl = null } = {}) {
   const L = Object.assign({}, DEFAULT_LIMITS, limits);
   const store = createStore(open(file));
+  const mail = mailer || createMailer();
   setInterval(() => store.prune(), HOUR).unref?.();
 
   function setSession(res, token) {
@@ -207,8 +240,115 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
       bio: String(body.bio || ''),
       discoverable: body.discoverable !== false
     });
+    if (body.openToDirect !== undefined) store.setOpenToDirect(u.id, body.openToDirect !== false);
     if (body.interests) store.setInterests(u.id, cleanInterests(body.interests));
     send(res, 200, { user: publicUser(store.userById(u.id), store) });
+  });
+
+  // ---- email verification ----
+  function origin(req) {
+    return baseUrl || `http://${req.headers.host || '127.0.0.1:4000'}`;
+  }
+
+  route('POST', /^\/api\/email$/, async (req, res) => {
+    const u = currentUser(req);
+    if (!u) return fail(res, 401, 'Sign in first.');
+    if (store.countSince('u:' + u.id, 'verify', HOUR) >= L.verificationsPerHour) {
+      return fail(res, 429, 'Too many verification emails. Wait an hour.');
+    }
+    const body = await readJson(req);
+    const email = String(body.email || '').trim().toLowerCase();
+    if (!EMAIL_RE.test(email) || email.length > 190) return fail(res, 400, 'That does not look like an email address.');
+    if (store.emailInUse(email, u.id)) return fail(res, 409, 'That address is already in use.');
+
+    store.setEmail(u.id, email);
+    const token = crypto.randomBytes(32).toString('hex');
+    store.createVerification(token, u.id, email, VERIFY_TTL);
+    store.note('u:' + u.id, 'verify');
+
+    const link = `${origin(req)}/verify?token=${token}`;
+    try {
+      await mail.sendVerification({ to: email, link, display: u.display });
+    } catch (e) {
+      return fail(res, 502, 'Could not send the email: ' + e.message);
+    }
+    send(res, 202, { sent: true, transport: mail.transport });
+  });
+
+  route('GET', /^\/api\/verify$/, async (req, res) => {
+    const url = new URL(req.url, 'http://x');
+    const id = store.useVerification(url.searchParams.get('token'));
+    if (!id) return fail(res, 400, 'That link is invalid, already used, or expired.');
+    send(res, 200, { verified: true });
+  });
+
+  // ---- the alignment graph ----
+  // Bipartite on purpose: you → your visible interests → people who share them.
+  // It shows why someone is recommended without exposing anything that is not
+  // already visible through discovery.
+  route('GET', /^\/api\/graph$/, async (req, res) => {
+    const u = currentUser(req);
+    if (!u) return fail(res, 401, 'Sign in first.');
+    const people = store.discover(u.id, {});
+    const mineVisible = store.interestsOf(u.id).filter((r) => r.visible).map((r) => r.interest);
+
+    const used = new Set();
+    const links = [];
+    people.forEach((p) => {
+      p.interests.forEach((i) => {
+        if (mineVisible.indexOf(i) === -1) return;
+        used.add(i);
+        links.push({ source: 'i:' + i, target: 'p:' + p.id, value: 1 });
+      });
+    });
+
+    const nodes = [{ id: 'me', kind: 'me', label: u.display }]
+      .concat(Array.from(used).map((i) => ({ id: 'i:' + i, kind: 'interest', label: i })))
+      .concat(people.map((p) => {
+        const d = directAllowed(u, { open_to_direct: p.openToDirect, email_verified: p.verified, city: p.city }, p.shared);
+        const c = store.connectionBetween(u.id, p.id);
+        return {
+          id: 'p:' + p.id, kind: 'person', label: p.display, userId: p.id,
+          city: p.city, shared: p.shared, interests: p.interests,
+          canDirect: d.ok, why: d.why || null,
+          connection: c ? { id: c.id, status: c.status, mine: c.from_id === u.id } : null
+        };
+      }));
+
+    Array.from(used).forEach((i) => links.push({ source: 'me', target: 'i:' + i, value: 2 }));
+    send(res, 200, { nodes, links, rule: DIRECT_RULE, meVerified: !!u.email_verified });
+  });
+
+  // ---- messaging someone directly, when alignment allows it ----
+  route('POST', /^\/api\/direct$/, async (req, res) => {
+    const u = currentUser(req);
+    if (!u) return fail(res, 401, 'Sign in first.');
+    const body = await readJson(req);
+    const other = store.userById(Number(body.toUserId));
+    if (!other || other.id === u.id) return fail(res, 400, 'No such person.');
+    if (store.isBlocked(u.id, other.id)) return fail(res, 403, 'You cannot contact this person.');
+
+    const shared = store.discover(u.id, {}).filter((p) => p.id === other.id)[0];
+    const verdict = directAllowed(u, other, shared ? shared.shared : 0);
+    if (!verdict.ok) return fail(res, 403, verdict.why);
+
+    // Same limits as introductions; alignment removes the wait, not the cap.
+    if (store.countSince('u:' + u.id, 'request', DAY) >= L.requestsPerDay) {
+      return fail(res, 429, `That is ${L.requestsPerDay} new conversations today.`);
+    }
+    const text = String(body.body || '').trim();
+    if (text.length < 10) return fail(res, 400, 'Write at least a sentence.');
+
+    let conn = store.connectionBetween(u.id, other.id);
+    if (!conn) {
+      const id = store.createAccepted(u.id, other.id);
+      conn = { id };
+      store.note('u:' + u.id, 'request');
+    } else if (conn.status !== 'accepted') {
+      return fail(res, 409, 'There is already a pending request with this person.');
+    }
+    store.addMessage(conn.id, u.id, text);
+    send(res, 201, { threadId: conn.id });
   });
 
   // ---- discovery ----
@@ -224,10 +364,13 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     send(res, 200, {
       people: people.map((p) => {
         const c = store.connectionBetween(u.id, p.id);
+        const d = directAllowed(u, { open_to_direct: p.openToDirect, email_verified: p.verified, city: p.city }, p.shared);
         return Object.assign({}, p, {
-          connection: c ? { id: c.id, status: c.status, mine: c.from_id === u.id } : null
+          connection: c ? { id: c.id, status: c.status, mine: c.from_id === u.id } : null,
+          canDirect: d.ok, directBlockedBecause: d.why || null
         });
-      })
+      }),
+      meVerified: !!u.email_verified
     });
   });
 
@@ -241,6 +384,7 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     if (!other || other.id === u.id) return fail(res, 400, 'No such person.');
     if (store.isBlocked(u.id, other.id)) return fail(res, 403, 'You cannot contact this person.');
     if (store.connectionBetween(u.id, other.id)) return fail(res, 409, 'There is already a conversation or request with this person.');
+    if (!u.email_verified) return fail(res, 403, 'Verify your email before contacting people.');
 
     // New accounts are limited harder: this is where mass-messaging starts.
     const fresh = Date.now() - u.created_at < DAY;
@@ -387,6 +531,8 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
         return fail(res, 404, 'No such endpoint.');
       }
       if (req.method !== 'GET') return fail(res, 405, 'Method not allowed');
+      // The verification link is a page; the front end reads the token from it.
+      if (pathname === '/verify') return serveStatic(req, res, '/index.html');
       serveStatic(req, res, pathname);
     } catch (err) {
       fail(res, 400, err.message || 'Bad request');

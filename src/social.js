@@ -25,6 +25,19 @@
     });
     return n;
   }
+  /** Namespaced element builder for the graph. (app.js has its own copy; these
+   *  two files are separate scopes on purpose, so neither depends on the other.) */
+  function svg(tag, props, kids) {
+    var n = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.keys(props || {}).forEach(function (k) {
+      if (props[k] == null) return;
+      if (k === 'text') n.textContent = props[k];
+      else n.setAttribute(k, props[k]);
+    });
+    (kids || []).forEach(function (c) { n.appendChild(c); });
+    return n;
+  }
+
   function $(s) { return document.querySelector(s); }
 
   async function api(method, url, body) {
@@ -197,6 +210,105 @@
     } catch (e) { /* offline */ }
   }
 
+  // ---------- the alignment graph ----------
+
+  /** A small spring/repulsion layout. Deterministic: same data, same picture. */
+  function layout(nodes, links, w, h, steps) {
+    var byId = {};
+    nodes.forEach(function (n, i) {
+      // Seeded placement on a circle so the result does not jump around.
+      var a = (i / nodes.length) * Math.PI * 2;
+      n.x = w / 2 + Math.cos(a) * (n.kind === 'me' ? 0 : n.kind === 'interest' ? w * 0.18 : w * 0.34);
+      n.y = h / 2 + Math.sin(a) * (n.kind === 'me' ? 0 : n.kind === 'interest' ? h * 0.18 : h * 0.34);
+      byId[n.id] = n;
+    });
+
+    for (var s = 0; s < steps; s++) {
+      var cool = 1 - s / steps;
+      // repulsion
+      for (var i = 0; i < nodes.length; i++) {
+        for (var j = i + 1; j < nodes.length; j++) {
+          var a1 = nodes[i], b1 = nodes[j];
+          var dx = b1.x - a1.x, dy = b1.y - a1.y;
+          var d2 = dx * dx + dy * dy || 0.01;
+          var f = 9000 / d2;
+          var d = Math.sqrt(d2);
+          var fx = (dx / d) * f * cool, fy = (dy / d) * f * cool;
+          a1.x -= fx; a1.y -= fy; b1.x += fx; b1.y += fy;
+        }
+      }
+      // springs
+      links.forEach(function (l) {
+        var a2 = byId[l.source], b2 = byId[l.target];
+        if (!a2 || !b2) return;
+        var dx = b2.x - a2.x, dy = b2.y - a2.y;
+        var d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+        var rest = l.value === 2 ? 110 : 150;
+        var f = (d - rest) * 0.04 * cool;
+        var fx = (dx / d) * f, fy = (dy / d) * f;
+        a2.x += fx; a2.y += fy; b2.x -= fx; b2.y -= fy;
+      });
+      nodes.forEach(function (n) {
+        if (n.kind === 'me') { n.x += (w / 2 - n.x) * 0.25; n.y += (h / 2 - n.y) * 0.25; }
+      });
+    }
+
+    // Scale the finished layout to fill the canvas. Without this the graph
+    // sits in a small clump in the middle and the labels collide.
+    var pad = { x: 70, y: 34 };
+    var xs = nodes.map(function (n) { return n.x; });
+    var ys = nodes.map(function (n) { return n.y; });
+    var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+    var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+    var sx = (w - pad.x * 2) / Math.max(1, maxX - minX);
+    var sy = (h - pad.y * 2) / Math.max(1, maxY - minY);
+    var k = Math.min(sx, sy);
+    var offX = (w - (maxX - minX) * k) / 2 - minX * k;
+    var offY = (h - (maxY - minY) * k) / 2 - minY * k;
+    nodes.forEach(function (n) { n.x = n.x * k + offX; n.y = n.y * k + offY; });
+    return byId;
+  }
+
+  function graphSvg(data, onPick) {
+    var w = 640, h = 420;
+    var nodes = data.nodes.map(function (n) { return Object.assign({}, n); });
+    var byId = layout(nodes, data.links, w, h, 260);
+
+    var kids = [];
+    data.links.forEach(function (l) {
+      var a = byId[l.source], b = byId[l.target];
+      if (!a || !b) return;
+      kids.push(svg('line', {
+        x1: a.x.toFixed(1), y1: a.y.toFixed(1), x2: b.x.toFixed(1), y2: b.y.toFixed(1),
+        class: 'glink' + (l.value === 2 ? ' strong' : '')
+      }));
+    });
+
+    nodes.forEach(function (n) {
+      var r = n.kind === 'me' ? 15 : n.kind === 'interest' ? 7 : 11 + Math.min(6, n.shared || 0);
+      // 'g' prefix so graph nodes never collide with the .person cards below.
+      var g = svg('g', { class: 'gnode g' + n.kind + (n.canDirect ? ' gdirect' : ''), tabindex: n.kind === 'person' ? '0' : null });
+      g.appendChild(svg('circle', { cx: n.x.toFixed(1), cy: n.y.toFixed(1), r: r }));
+      var text = n.kind === 'interest' ? label(n.label).split(' & ')[0] : n.label;
+      g.appendChild(svg('text', {
+        x: n.x.toFixed(1), y: (n.y + r + 13).toFixed(1), 'text-anchor': 'middle',
+        class: 'glabel', text: text
+      }));
+      if (n.kind === 'person' && onPick) {
+        g.addEventListener('click', function () { onPick(n); });
+        g.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(n); }
+        });
+      }
+      kids.push(g);
+    });
+
+    return svg('svg', {
+      viewBox: '0 0 ' + w + ' ' + h, class: 'graph', role: 'img',
+      'aria-label': 'People you share interests with, linked through the interests you have in common'
+    }, kids);
+  }
+
   // ---------- People ----------
   async function renderPeople() {
     var host = $('#people-body');
@@ -206,10 +318,31 @@
       el('p', { text: 'Shared visible interests. Contact requires your acceptance.' })
     ]));
 
-    var data;
-    try { data = await api('GET', '/api/people'); }
+    var data, graph;
+    try {
+      data = await api('GET', '/api/people');
+      graph = await api('GET', '/api/graph');
+    }
     catch (e) { host.appendChild(el('p', { class: 'err', text: e.message })); return; }
     S.people = data.people;
+
+    if (!data.meVerified) {
+      host.appendChild(el('div', { class: 'notice' }, [
+        el('b', { text: 'Verify your email to contact people. ' }),
+        'Add an address on the You tab. Until then you can look, but not message.'
+      ]));
+    }
+
+    if (graph && graph.nodes.filter(function (n) { return n.kind === 'person'; }).length) {
+      host.appendChild(el('article', { class: 'card' }, [
+        el('h3', { text: 'How you overlap' }),
+        el('p', { class: 'hint', text: 'Lines run through the interests you have in common. Ringed names can be messaged directly: ' + graph.rule.minShared + '+ shared interests, same city, both verified.' }),
+        graphSvg(graph, function (n) {
+          var card = document.getElementById('person-' + n.userId);
+          if (card) { card.scrollIntoView({ block: 'center' }); card.classList.add('flash'); setTimeout(function () { card.classList.remove('flash'); }, 1200); }
+        })
+      ]));
+    }
 
     if (!S.people.length) {
       host.appendChild(el('div', { class: 'card empty' }, [
@@ -226,13 +359,14 @@
         : c.status === 'accepted' ? 'You are connected'
         : 'Not connected';
 
+      var direct = !c && p.canDirect;
       var intro = el('textarea', {
-        class: 'intro-box', hidden: true, maxlength: '300',
-        placeholder: 'Your introduction (300 characters)'
+        class: 'intro-box', hidden: true, maxlength: direct ? '2000' : '300',
+        placeholder: direct ? 'Your message' : 'Your introduction (300 characters)'
       });
       var err = el('p', { class: 'err', hidden: true });
 
-      var card = el('article', { class: 'card person' }, [
+      var card = el('article', { class: 'card person', id: 'person-' + p.id }, [
         el('div', { class: 'person-top' }, [
           el('h3', { text: p.display }),
           el('span', { class: 'badge', text: p.shared + ' shared' })
@@ -243,6 +377,9 @@
           return el('span', { class: 'badge', text: label(i) });
         })),
         statusText ? el('p', { class: 'hint', text: statusText }) : null,
+        (!c && p.canDirect) ? el('p', { class: 'hint direct-note', text: 'Enough in common to message directly — no waiting to be accepted.' }) : null,
+        (!c && !p.canDirect && p.directBlockedBecause && data.meVerified)
+          ? el('p', { class: 'hint', text: 'Introduction only: ' + p.directBlockedBecause }) : null,
         intro, err,
         el('div', { class: 'actions' }, [
           (!c) ? el('button', { class: 'btn sm', type: 'button', onclick: async function (ev) {
@@ -250,17 +387,21 @@
             if (intro.hidden) {
               intro.hidden = false;
               intro.focus();
-              btn.textContent = 'Send introduction';
+              btn.textContent = direct ? 'Send message' : 'Send introduction';
               return;
             }
             err.hidden = true;
             try {
-              await api('POST', '/api/requests', { toUserId: p.id, intro: intro.value });
+              if (direct) {
+                await api('POST', '/api/direct', { toUserId: p.id, body: intro.value });
+              } else {
+                await api('POST', '/api/requests', { toUserId: p.id, intro: intro.value });
+              }
               btn.disabled = true;
               btn.textContent = 'Sent ✓';
               intro.hidden = true;
             } catch (e2) { err.textContent = e2.message; err.hidden = false; }
-          } }, ['Say hello']) : null,
+          } }, [direct ? 'Message directly' : 'Say hello']) : null,
           el('button', { class: 'btn ghost sm', type: 'button', onclick: async function () {
             if (!confirm('Block ' + p.display + '? They will disappear from your results and cannot contact you.')) return;
             await api('POST', '/api/blocks', { userId: p.id });
@@ -461,7 +602,45 @@
       return el('label', { class: 'vis-row' }, [cb, el('span', { text: label(i.id) })]);
     }));
 
-    return el('article', { class: 'card' }, [
+    var emailInput = el('input', { type: 'email', value: u.email || '', placeholder: 'you@example.com' });
+    var emailMsg = el('p', { class: 'hint', hidden: true });
+    var emailErr = el('p', { class: 'err', hidden: true });
+    var directCb = el('input', { type: 'checkbox' });
+    directCb.checked = u.openToDirect !== false;
+
+    var emailCard = el('article', { class: 'card' }, [
+      el('h3', { text: 'Email' }),
+      el('p', { class: 'hint', text: u.emailVerified
+        ? 'Verified. You can contact people and be contacted.'
+        : 'Optional for the finder. Required before you can message anyone — it is the only accountability this place has.' }),
+      el('label', { class: 'field' }, [
+        el('span', { text: u.emailVerified ? 'Verified address' : 'Address' }),
+        emailInput
+      ]),
+      emailMsg, emailErr,
+      el('div', { class: 'actions' }, [
+        el('button', { class: 'btn sm', type: 'button', onclick: async function (ev) {
+          emailErr.hidden = true; emailMsg.hidden = true;
+          var btn = ev.currentTarget;
+          btn.disabled = true;
+          try {
+            var out = await api('POST', '/api/email', { email: emailInput.value.trim() });
+            emailMsg.textContent = out.transport === 'file'
+              ? 'Sent. This server writes mail to server/data/outbox/ and the console — open the link there to finish.'
+              : 'Sent. Check your inbox for the link.';
+            emailMsg.hidden = false;
+          } catch (e) { emailErr.textContent = e.message; emailErr.hidden = false; }
+          btn.disabled = false;
+        } }, [u.emailVerified ? 'Change address' : 'Send verification link'])
+      ]),
+      el('label', { class: 'check' }, [
+        directCb,
+        el('span', { text: 'Let people with a lot in common message me without sending a request first' })
+      ]),
+      el('p', { class: 'hint', text: 'Only applies to people in your city who share at least three of your visible interests and have a verified email. Blocking always wins.' })
+    ]);
+
+    var profile = el('article', { class: 'card' }, [
       el('h3', { text: 'Your profile' }),
       el('p', { class: 'hint', text: 'Signed in as ' + u.display + ' (@' + u.username + ').' }),
       el('label', { class: 'field' }, [el('span', { text: 'City' }), city]),
@@ -479,6 +658,7 @@
           });
           var out = await api('PATCH', '/api/me', {
             city: city.value, bio: bio.value, discoverable: disc.checked,
+            openToDirect: directCb.checked,
             interests: interests.length ? interests : undefined
           });
           S.user = out.user;
@@ -488,12 +668,30 @@
         saved
       ])
     ]);
+
+    var wrap = document.createDocumentFragment();
+    wrap.appendChild(profile);
+    wrap.appendChild(emailCard);
+    return wrap;
   }
 
   // ---------- boot ----------
   async function init() {
     var gate = $('#auth-gate');
     if (!gate) return;
+
+    // The verification link lands here; consume the token before anything else.
+    var verifyNote = null;
+    if (location.pathname === '/verify') {
+      var token = new URLSearchParams(location.search).get('token');
+      try {
+        await api('GET', '/api/verify?token=' + encodeURIComponent(token || ''));
+        verifyNote = { ok: true, text: 'Email verified. You can contact people now.' };
+      } catch (e) {
+        verifyNote = { ok: false, text: e.message };
+      }
+      history.replaceState({}, '', '/');
+    }
 
     try {
       var me = await api('GET', '/api/me');
@@ -525,6 +723,15 @@
 
     if (!S.user) renderGate('signup');
     else closeGate();
+
+    if (verifyNote) {
+      var banner = el('div', { class: 'notice' + (verifyNote.ok ? '' : ' bad') }, [
+        el('b', { text: verifyNote.ok ? 'Done. ' : 'That did not work. ' }),
+        verifyNote.text
+      ]);
+      var intro = document.querySelector('#view-find .intro');
+      if (intro && intro.parentNode) intro.parentNode.insertBefore(banner, intro.nextSibling);
+    }
 
     // Let the You tab render the profile editor underneath its charts.
     window.FYC_SOCIAL = { profileCard: profileCard, state: S };
