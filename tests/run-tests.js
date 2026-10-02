@@ -6,7 +6,7 @@ var path = require('path');
 var root = path.join(__dirname, '..');
 
 require(path.join(root, 'src/data/core.js'));
-['sf', 'nyc', 'chicago', 'seattle', 'austin'].forEach(function (c) {
+['sf', 'nyc', 'chicago', 'seattle', 'austin', 'boston', 'philadelphia', 'dc'].forEach(function (c) {
   require(path.join(root, 'src/data/city-' + c + '.js'));
 });
 require(path.join(root, 'src/data/universal.js'));
@@ -23,7 +23,7 @@ function group(name, fn) { console.log('\n— ' + name); fn(); }
 // ---------------------------------------------------------------- data shape
 group('curated data integrity', function () {
   var orgs = FYC.allOrgs();
-  ok(orgs.length >= 60, 'at least 60 curated organisations (' + orgs.length + ')');
+  ok(orgs.length >= 120, 'at least 120 curated organisations (' + orgs.length + ')');
 
   var ids = {};
   orgs.forEach(function (o) {
@@ -184,7 +184,8 @@ group('front-end wiring', function () {
   var fs = require('fs');
   var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   ['src/data/core.js', 'src/data/city-sf.js', 'src/data/city-nyc.js', 'src/data/city-chicago.js',
-   'src/data/city-seattle.js', 'src/data/city-austin.js', 'src/data/universal.js',
+   'src/data/city-seattle.js', 'src/data/city-austin.js', 'src/data/city-boston.js',
+   'src/data/city-philadelphia.js', 'src/data/city-dc.js', 'src/data/universal.js',
    'src/match.js', 'src/app.js', 'assets/styles.css'].forEach(function (f) {
     ok(html.indexOf(f) !== -1, 'index.html loads ' + f);
     ok(fs.existsSync(path.join(root, f)), f + ' exists on disk');

@@ -9,7 +9,7 @@ var { execFile } = require('child_process');
 var root = path.join(__dirname, '..');
 
 require(path.join(root, 'src/data/core.js'));
-['sf', 'nyc', 'chicago', 'seattle', 'austin'].forEach(function (c) {
+['sf', 'nyc', 'chicago', 'seattle', 'austin', 'boston', 'philadelphia', 'dc'].forEach(function (c) {
   require(path.join(root, 'src/data/city-' + c + '.js'));
 });
 require(path.join(root, 'src/data/universal.js'));
