@@ -4,10 +4,23 @@ Accounts, people discovery and messaging. Node's built-in SQLite and crypto —
 no dependencies, nothing to install.
 
 ```bash
-node server/app.js            # http://localhost:4000
-PORT=8080 node server/app.js  # somewhere else
-SECURE=1  node server/app.js  # behind HTTPS: marks the session cookie Secure
+npm run start:bg   # detached; survives closing the terminal
+npm run status     # is it up, and on what pid
+npm run log        # last 40 lines
+npm run stop
 ```
+
+Or in the foreground, where Ctrl-C stops it:
+
+```bash
+npm start                     # http://localhost:4000
+PORT=8080 npm start           # somewhere else
+SECURE=1  npm start           # behind HTTPS: marks the session cookie Secure
+```
+
+Run it in a terminal tab and it dies when that tab is closed, reused or
+interrupted — which is easy to do by accident. `start:bg` detaches it, writes
+`server/data/server.pid` and logs to `server/data/server.log`.
 
 The database is created at `server/data/community.db` on first run and is
 gitignored. Delete that file to start over.

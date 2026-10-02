@@ -6,3 +6,5 @@ mac/build/
 mac/dist/
 community_finder.md
 server/data/
+server/data/server.pid
+server/data/server.log
