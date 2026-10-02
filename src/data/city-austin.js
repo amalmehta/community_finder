@@ -22,7 +22,6 @@
           url: 'https://austinparks.org/volunteer/',
           when: 'Weekend mornings, year-round'
         },
-        script: null,
         expect: [
           'No experience needed; gloves and tools are handed to you',
           'You work in a small crew for the morning, which makes talking easy',
@@ -45,9 +44,7 @@
           url: 'https://www.centraltexasfoodbank.org/volunteer',
           when: 'Most days, including evenings and weekends'
         },
-        script: null,
         expect: [
-          'Individual sign-ups are completely normal',
           'Brief training, simple task',
           'Two to three hours, then you are done',
           'Free'
@@ -68,7 +65,6 @@
           url: 'https://library.austintexas.gov/events',
           when: 'Daily'
         },
-        script: null,
         expect: [
           'Free and usually drop-in',
           'Conversation circles exist specifically so strangers talk to each other',
@@ -91,12 +87,10 @@
           url: 'https://atxhackerspace.org/',
           when: 'Open nights and classes — check the calendar'
         },
-        script: 'Hi — I\'m interested in {interest} and would like to visit. When\'s a good open night, and is it OK to come with no project and just look?',
         expect: [
           'Open nights exist so non-members can wander in',
           'Asking someone what they are building is always welcome',
-          'Visiting is free; membership and materials are not',
-          'Nobody expects you to know how anything works'
+          'Visiting is free; membership and materials are not'
         ],
         solo: 4, gentleness: 4, structure: 'drop-in', commitment: 'one-off', cost: 0,
         when: ['weekday-eve', 'weekend'], size: 'small', goals: ['skill', 'friends']
@@ -114,7 +108,6 @@
           url: 'https://www.open-austin.org/',
           when: 'Regular evening sessions'
         },
-        script: 'Hi! I\'d like to come to a meeting. I\'m interested in {interest} — is there something a newcomer could help with, or should I just come and listen?',
         expect: [
           'Meetings open with introductions, so you are not invisible',
           'Research, design and writing help is always needed',
@@ -137,7 +130,6 @@
           url: 'https://keepaustinbeautiful.org/volunteer/',
           when: 'Weekend mornings, most weeks'
         },
-        script: null,
         expect: [
           'Supplies and a site leader are provided',
           'Two to three hours, early enough to beat the heat',
@@ -160,7 +152,6 @@
           url: 'https://www.hideouttheatre.com/classes',
           when: 'Shows most nights; classes in terms'
         },
-        script: null,
         expect: [
           'Level 1 assumes nothing and there is no public performance early on',
           'You will be on first-name terms with a dozen people within two sessions',
@@ -183,12 +174,10 @@
           url: 'https://www.austinrunners.org/',
           when: 'Weekday evenings and weekend mornings'
         },
-        script: 'Hi! I\'m new and fairly slow. Which of your group runs is the most beginner-friendly, and do I need to be a member to come along?',
         expect: [
           'Pace groups mean there is always someone your speed',
           'Weekly group runs are usually free and open to non-members',
-          'Beginner training programs run in multi-week blocks',
-          'Running beside someone is easier than talking across a table'
+          'Beginner training programs run in multi-week blocks'
         ],
         solo: 4, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 0,
         when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['routine', 'friends']
@@ -206,9 +195,7 @@
           url: 'https://allgo.org/events/',
           when: 'Events through the month'
         },
-        script: 'Hi — I\'m new to Austin and looking for community. Is the upcoming event open to people who haven\'t been before?',
         expect: [
-          'Events are built for people arriving without a group',
           'Many are free',
           'Arts and wellness events give you something to look at besides each other',
           'Staff are used to newcomers'
@@ -229,10 +216,8 @@
           url: 'https://sustainablefoodcenter.org/volunteer',
           when: 'Markets on weekends; classes through the week'
         },
-        script: 'Hi! I\'d like to volunteer. I\'m interested in {interest} — which role would suit someone brand new?',
         expect: [
           'Market shifts are a few hours and very social by nature',
-          'Cooking classes give you a task, which beats mingling',
           'Volunteering is free; classes may have a sliding-scale fee',
           'Food is the easiest thing in the world to talk about'
         ],
@@ -252,12 +237,10 @@
           url: 'https://bikeaustin.org/',
           when: 'Rides and classes through the season'
         },
-        script: 'Hi! I\'d like to ride more but I\'m nervous in traffic. Do you have a class or a slow social ride coming up that would suit me?',
         expect: [
           'Classes exist specifically for anxious riders',
           'Social rides go at a conversational pace',
-          'Usually free or low-cost',
-          'A shared route removes the need to invent conversation'
+          'Usually free or low-cost'
         ],
         solo: 4, gentleness: 4, structure: 'rsvp', commitment: 'one-off', cost: 0,
         when: ['weekend', 'weekday-eve'], size: 'medium', goals: ['skill', 'friends', 'impact']
@@ -275,7 +258,6 @@
           url: 'https://austincreativereuse.org/',
           when: 'Shifts through the week; check the volunteer page'
         },
-        script: 'Hi! I\'d like to volunteer. I\'m interested in {interest} and I\'ve never volunteered with you before — what\'s the first step, and when are shifts available?',
         expect: [
           'Sorting beads and fabric next to someone is a low-stakes way to spend two hours',
           'No skills needed at all',
@@ -298,7 +280,6 @@
           url: 'https://www.austinpetsalive.org/volunteer',
           when: 'Orientations regularly; shifts daily'
         },
-        script: null,
         expect: [
           'Orientation first, then you choose what you want to do',
           'Dog walking is a solo-friendly task that still puts you among people',
@@ -321,10 +302,7 @@
           url: 'https://www.austinfilm.org/',
           when: 'Screenings most nights; events year-round'
         },
-        script: 'Hi! I\'d like to get involved. I\'m interested in {interest} and new to this — do you need volunteers, and which events suit someone coming alone?',
         expect: [
-          'A screening is the classic thing you can do alone without it being odd',
-          'The conversation afterwards has a built-in subject',
           'Membership and tickets cost money; volunteering does not',
           'Classes and workshops exist for people who want to make things'
         ],
@@ -344,12 +322,9 @@
           url: 'https://www.austinzencenter.org/',
           when: 'Weekly sittings plus newcomer sessions'
         },
-        script: 'Hi — I\'ve never meditated in a group before. Is there an introduction session for newcomers, and is there anything I should wear or bring?',
         expect: [
           'The introduction is specifically for people who have never done this',
-          'You are shown where to sit and when to stand — nothing is assumed',
-          'By donation; nobody checks',
-          'Silence means you do not have to talk until you want to'
+          'You are shown where to sit and when to stand — nothing is assumed'
         ],
         solo: 5, gentleness: 5, structure: 'register', commitment: 'weekly', cost: 0,
         when: ['weekday-eve', 'weekend'], size: 'small', goals: ['routine', 'friends']
@@ -367,11 +342,9 @@
           url: 'https://www.austinswingsyndicate.org/',
           when: 'Weekly dance night \u2014 check the site for the current night'
         },
-        script: null,
         expect: [
           'A beginner lesson runs before the dance — turn up for that and you are taught the basics',
           'Partners rotate during the lesson, so you do not need to bring one',
-          'Nobody cares that you are bad; everyone there was bad once and remembers it',
           'One fixed night a week, which is what turns faces into friends'
         ],
         solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
@@ -390,7 +363,6 @@
           url: 'https://www.austinultimate.org/',
           when: 'Seasonal leagues; pickup year-round'
         },
-        script: 'Hi! I\'d like to try ultimate but I\'ve basically never played. Is there a beginner league or a pickup game where turning up alone is normal?',
         expect: [
           'Signing up as an individual gets you placed on a team \u2014 you do not need friends first',
           'Beginner divisions exist and are where you should start',
@@ -413,12 +385,9 @@
           url: 'https://austinyellowbike.org/',
           when: 'Open shop several evenings a week'
         },
-        script: 'Hi! I\'d like to come to open shop. I know nothing about bike repair \u2014 is that fine, and do I need to bring anything besides the bike?',
         expect: [
-          'Arriving with a broken bike does all the social work for you',
           'Volunteers teach you rather than fixing it for you',
-          'Donation-based, and you can earn a bike with volunteer hours',
-          'Nobody expects you to know any of the jargon'
+          'Donation-based, and you can earn a bike with volunteer hours'
         ],
         solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'one-off', cost: 0,
         when: ['weekday-eve', 'weekend'], size: 'small', goals: ['skill', 'friends', 'impact']
@@ -436,9 +405,7 @@
           url: 'https://www.centraltexasmycology.org/',
           when: 'Forays after rain; workshops through the year'
         },
-        script: 'Hello \u2014 I\'m a complete beginner and know nothing about mushrooms. Is the next foray suitable for me, and what should I bring?',
         expect: [
-          'Beginners are welcome and experts enjoy explaining',
           'Slow walking and crouching rather than hiking',
           'Small membership or event fee',
           'Never eat anything without an expert confirming it'
@@ -459,12 +426,10 @@
           url: 'https://www.themuseumofhumanachievement.com/',
           when: 'Events through the month'
         },
-        script: null,
         expect: [
           'Artist-run, so the crowd is friendlier and less polished than a club',
           'Tickets are usually cheap or sliding scale',
-          'An event with a defined start and end means you always have an exit',
-          'Nobody there is trying to look like they belong, which helps'
+          'An event with a defined start and end means you always have an exit'
         ],
         solo: 5, gentleness: 4, structure: 'rsvp', commitment: 'one-off', cost: 1,
         when: ['weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'skill']
@@ -482,7 +447,6 @@
           url: 'https://library.austintexas.gov/recycled-reads',
           when: 'Open several days a week'
         },
-        script: 'Hi! I\'d love to volunteer at Recycled Reads. What do shifts involve, and how do I sign up?',
         expect: [
           'Sorting and shelving books is a genuinely calming first volunteer job',
           'Free to volunteer, and the books cost almost nothing',
@@ -505,10 +469,8 @@
           url: 'https://austinbatrefuge.org/',
           when: 'Varies \u2014 ask what they need'
         },
-        script: 'Hi! I\'m interested in what you do and would like to help or learn more. Do you take volunteers, and is there an event where I could come and see the work?',
         expect: [
           'A tiny operation, so expect a real conversation rather than a volunteer portal',
-          'Bats are the entire conversation starter',
           'Free',
           'In a city that watches bats every evening, almost nobody knows this exists'
         ],
@@ -528,12 +490,9 @@
           url: 'https://emeraldtavern.com/',
           when: 'Open play daily; game nights through the week'
         },
-        script: 'Hi! I\'d like to come to an open game night on my own. How does it work if you arrive without a group \u2014 do people get matched into games?',
         expect: [
-          'Staff will seat you with other people \u2014 you do not need to bring a group',
-          'A game gives everyone a script for the first hour',
           'Small table fee plus whatever you drink',
-          'Turning up alone is common and nobody finds it odd'
+          'Staff will seat you with other people \u2014 you do not need to bring a group'
         ],
         solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
         when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['friends', 'routine', 'skill']
@@ -551,7 +510,6 @@
           url: 'https://austinpartners.org/',
           when: 'School-year commitment, weekday mornings'
         },
-        script: 'Hi! I\'d like to volunteer as a coach. I\'ve never taught anything \u2014 is the training enough for someone like me, and when does the next cohort start?',
         expect: [
           'Training is provided and assumes no teaching experience',
           'You see the same students weekly, which is the point',

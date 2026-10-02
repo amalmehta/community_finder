@@ -22,10 +22,8 @@
           url: 'https://november-project.com/boston/',
           when: 'Wednesday mornings (check the site for this week\'s location)'
         },
-        script: null,
         expect: [
           'First-timers raise a hand and get cheered at — mortifying for 20 seconds, then you know people',
-          'The stadium stairs are brutal and nobody cares how slowly you do them',
           'Free, weekly, in all weather. This is where the whole thing started',
           'Everyone hugs. Consider yourself warned'
         ],
@@ -45,9 +43,7 @@
           url: 'https://www.gbfb.org/volunteer/',
           when: 'Day and evening shifts most days'
         },
-        script: null,
         expect: [
-          'Individuals sign up constantly — you will not be the only person alone',
           'Short training, then a task you cannot get wrong',
           'Two to three hours, complete in itself, no follow-up expected',
           'Free'
@@ -68,9 +64,7 @@
           url: 'https://www.bostoncares.org/',
           when: 'Projects daily, including evenings and weekends'
         },
-        script: null,
         expect: [
-          'Every project has a leader who expects people arriving alone',
           'You pick one project at a time — no ongoing obligation',
           'Hundreds of options a month, so something will fit your schedule',
           'Free'
@@ -91,7 +85,6 @@
           url: 'https://artisansasylum.com/',
           when: 'Tours and classes through the month'
         },
-        script: 'Hi — I\'m interested in {interest} and I\'m a beginner. When\'s the next tour, and is there a one-off class that suits someone who has never used any of this equipment?',
         expect: [
           'A tour is a zero-commitment way to see it without having to join anything',
           'Members like being asked what they are building',
@@ -114,7 +107,6 @@
           url: 'https://www.bpl.org/events/',
           when: 'Daily, including evenings and weekends'
         },
-        script: null,
         expect: [
           'Free, and mostly no registration at all',
           'Conversation circles for English learners exist so strangers talk to each other',
@@ -137,12 +129,10 @@
           url: 'https://bostoncyclistsunion.org/',
           when: 'Rides and events through the riding season'
         },
-        script: 'Hi! I\'d like to ride more but I\'m nervous in traffic. Is there a class or a slow group ride coming up that would suit someone just starting?',
         expect: [
           'Classes exist specifically for anxious riders',
           'A group of fifteen people is visible in a way you alone are not',
-          'Usually free or low-cost',
-          'A shared route removes the need to invent conversation'
+          'Usually free or low-cost'
         ],
         solo: 4, gentleness: 4, structure: 'rsvp', commitment: 'one-off', cost: 0,
         when: ['weekend', 'weekday-eve'], size: 'medium', goals: ['skill', 'friends', 'impact']
@@ -160,12 +150,9 @@
           url: 'https://www.outdoors.org/',
           when: 'Trips year-round, most on weekends'
         },
-        script: 'Hi! I\'m new to this and I\'ll be coming on my own. Which upcoming trip would you recommend for a beginner who isn\'t especially fit?',
         expect: [
-          'Trips are graded honestly — pick an easy one and you will be fine',
-          'Leaders are volunteers who enjoy taking beginners out',
-          'Coming alone is the normal way people join',
-          'Some trips are free; membership is modest'
+          'Some trips are free; membership is modest',
+          'Trips are graded honestly — pick an easy one and you will be fine'
         ],
         solo: 5, gentleness: 4, structure: 'register', commitment: 'one-off', cost: 1,
         when: ['weekend'], size: 'large', goals: ['friends', 'skill', 'routine']
@@ -183,10 +170,8 @@
           url: 'https://www.mspca.org/',
           when: 'Orientations regularly; shifts most days'
         },
-        script: null,
         expect: [
           'Expect an application and training before your first shift',
-          'The animals do the social work for you',
           'Recurring shifts mean the same volunteers each week',
           'Free, with a minimum commitment once trained'
         ],
@@ -206,12 +191,10 @@
           url: 'https://www.improvasylum.com/',
           when: 'Shows most nights; classes in terms'
         },
-        script: null,
         expect: [
           'Level 1 assumes zero experience and no public performance early on',
           'You will learn a dozen names in a single evening',
-          'Classes cost money — a show is cheap reconnaissance first',
-          'Everyone is equally bad for the first twenty minutes, then it stops mattering'
+          'Classes cost money — a show is cheap reconnaissance first'
         ],
         solo: 5, gentleness: 3, structure: 'course', commitment: 'seasonal', cost: 2,
         when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['friends', 'skill']
@@ -229,9 +212,7 @@
           url: 'https://www.massaudubon.org/',
           when: 'Weekend and weekday mornings, best in spring and fall'
         },
-        script: 'Hello — I\'m a complete beginner and don\'t own binoculars. Is the next walk suitable for me, and do you have loaner pairs?',
         expect: [
-          'Beginner walks are a standing category — you are the intended guest',
           'Loaner binoculars are often available if you ask when booking',
           'Mostly standing still rather than hiking',
           'Small fee for some programmes; sanctuary walks are often free'
@@ -252,9 +233,7 @@
           url: 'https://cmcb.org/',
           when: 'Terms start a few times a year'
         },
-        script: 'Hi — I\'m an adult beginner interested in {interest}. Which group classes or ensembles take people with no background, and how does the sliding scale work?',
         expect: [
-          'Sliding-scale pricing is real and asking about it is normal',
           'Adult beginner groups are not full of former prodigies',
           'An ensemble is a weekly commitment with the same people — the thing that builds friendship',
           'No audition for the community groups'
@@ -275,11 +254,9 @@
           url: 'https://www.cimc.info/',
           when: 'Sittings most weeks; courses through the year'
         },
-        script: 'Hi — I\'ve never meditated in a group before. Is the drop-in sitting open to complete beginners, and what should I expect on a first visit?',
         expect: [
           'Instructions are spoken aloud, so you always know what to do',
           'Silence means you are not required to talk to anyone',
-          'By donation — nobody checks what you give',
           'You may sit on a chair; no particular posture is required'
         ],
         solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'weekly', cost: 0,
@@ -298,12 +275,9 @@
           url: 'https://www.brattlefilm.org/',
           when: 'Screenings most nights'
         },
-        script: 'Hi! I\'d like to get more involved. Do you take volunteers, and is there a regular series that draws the same crowd each week?',
         expect: [
-          'A screening is the classic thing you can do alone without it being strange',
           'Recurring series bring back the same faces',
-          'Tickets are cheap; volunteering is free and usually comes with screenings',
-          'The conversation afterwards has a built-in subject'
+          'Tickets are cheap; volunteering is free and usually comes with screenings'
         ],
         solo: 5, gentleness: 5, structure: 'rsvp', commitment: 'one-off', cost: 1,
         when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['friends', 'skill']
@@ -321,12 +295,10 @@
           url: 'https://thetheateroffensive.org/',
           when: 'Programmes and performances through the year'
         },
-        script: 'Hi \u2014 I\'m new to Boston and looking for queer community. Are your events open to people who haven\'t been before, and is there one coming up you\'d recommend?',
         expect: [
           'A performance gives you somewhere to look and something to talk about afterwards',
           'Many community events are free',
-          'Workshops put you in a small group with a shared task',
-          'Coming alone is normal'
+          'Workshops put you in a small group with a shared task'
         ],
         solo: 5, gentleness: 4, structure: 'rsvp', commitment: 'one-off', cost: 1,
         when: ['weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'skill']
@@ -344,11 +316,9 @@
           url: 'https://www.bostonswingcentral.org/',
           when: 'Weekly dance night \u2014 check the site'
         },
-        script: null,
         expect: [
           'A beginner lesson runs before the dance — turn up for that and you are taught the basics',
           'Partners rotate during the lesson, so you do not need to bring one',
-          'Nobody cares that you are bad; everyone there was bad once and remembers it',
           'One fixed night a week, which is what turns faces into friends'
         ],
         solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
@@ -367,9 +337,7 @@
           url: 'https://www.buda.org/',
           when: 'Seasonal leagues, spring through fall plus indoor winter'
         },
-        script: 'Hi! I\'d like to try ultimate and I\'ve never played. Which league should someone brand new sign up for, and is signing up alone normal?',
         expect: [
-          'Individual sign-ups get placed on a team \u2014 no friends required',
           'Recreational divisions are genuinely recreational',
           'Leagues cost money; hat leagues are the cheapest way in',
           'A weekly fixture with the same team is the whole point'
@@ -390,9 +358,7 @@
           url: 'https://www.bostonmycologicalclub.org/',
           when: 'Forays through the season; meetings monthly'
         },
-        script: 'Hello \u2014 I\'m a complete beginner. Can I come on a foray as a guest, and is there anything I should bring?',
         expect: [
-          'Beginners are welcome and experts enjoy identifying things for you',
           'Slow walking and crouching, not hiking',
           'Modest membership; guests usually welcome first',
           'Never eat anything without an expert confirming it'
@@ -413,10 +379,8 @@
           url: 'https://bikesnotbombs.org/',
           when: 'Weekly volunteer nights'
         },
-        script: 'Hi! I\'d like to come to a volunteer night. I don\'t know much about bike mechanics \u2014 is that alright, and what should I expect?',
         expect: [
           'You are taught as you go; no mechanical knowledge assumed',
-          'Working on a bike beside someone makes conversation easy',
           'Free, and the same people turn up weekly',
           'The bikes go somewhere, so the work is not busywork'
         ],
@@ -436,7 +400,6 @@
           url: 'https://therecord.co/',
           when: 'Rooms bookable daily; events through the month'
         },
-        script: 'Hi! I play a bit and I\'m looking to meet other musicians. Do you run community events or anything where people connect with each other?',
         expect: [
           'Rates are set low on purpose \u2014 this is a nonprofit, not a studio',
           'Community events are where people actually meet collaborators',
@@ -459,12 +422,9 @@
           url: 'https://thegrowingcenter.org/',
           when: 'Work sessions and festivals through the growing season'
         },
-        script: null,
         expect: [
           'Tiny, volunteer-run and genuinely hidden \u2014 you walk past the entrance without seeing it',
-          'Free, and no gardening knowledge assumed',
-          'Festivals are family-friendly and easy to attend alone',
-          'Small enough that someone will talk to you'
+          'Free, and no gardening knowledge assumed'
         ],
         solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
         when: ['weekend', 'weekday-eve'], size: 'small', goals: ['impact', 'friends']
@@ -482,7 +442,6 @@
           url: 'https://bostonathenaeum.org/',
           when: 'Tours and events through the week'
         },
-        script: null,
         expect: [
           'Tours are open to non-members and are the easiest way in',
           'Talks give you a reason to be there and something to discuss afterwards',
@@ -505,9 +464,7 @@
           url: 'https://boylstonchess.org/',
           when: 'Club nights through the week'
         },
-        script: 'Hi! I play chess casually and would like to come by. Which night suits an unrated beginner, and what is the fee for a first visit?',
         expect: [
-          'A board is a conversation you do not have to start',
           'Casual nights are separate from the rated tournaments \u2014 start there',
           'Small entry fee or membership',
           'Unrated beginners do turn up, and have for a century'

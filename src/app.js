@@ -118,7 +118,7 @@
     if (!n) missing.push('at least one interest');
     box.classList.toggle('ready', !missing.length);
     box.textContent = missing.length
-      ? 'Still need ' + missing.join(' and ')
+      ? missing.join(' and ') + ' needed'
       : (FYC.findCity(city) ? FYC.findCity(city).name : city) + ' · ' + n + (n === 1 ? ' interest' : ' interests');
   }
 
@@ -189,16 +189,6 @@
     };
   }
 
-  function fillScript(tpl, p, org) {
-    if (!tpl) return null;
-    var firstInterest = p.interests.length ? (FYC.INTERESTS[p.interests[0]] || {}).label : 'this';
-    var out = tpl
-      .replace(/\{interest\}/g, String(firstInterest).toLowerCase())
-      .replace(/\{city\}/g, p.location || org.cityName || 'the area');
-    if (p.name) out += '\n\nThanks,\n' + p.name;
-    return out;
-  }
-
   var STRUCTURE_LABEL = {
     'drop-in': 'Drop-in', 'register': 'Sign up first', 'course': 'Runs as a course',
     'shift': 'Book a shift', 'rsvp': 'RSVP first', 'search': 'Directory'
@@ -229,7 +219,7 @@
 
     // --- first step panel ---
     var step = el('div', { class: 'first-step' }, [
-      el('h4', { text: 'Your first step' }),
+      el('h4', { text: 'First step' }),
       el('p', { class: 'do', text: org.firstStep.label }),
       org.firstStep.when ? el('p', { class: 'when', text: org.firstStep.when }) : null,
       el('div', { class: 'actions' }, [
@@ -246,37 +236,6 @@
       el('ul', { class: 'expect' }, org.expect.map(function (t) { return el('li', { text: t }); }))
     ]);
 
-    var scriptText = fillScript(org.script, p, org);
-    if (scriptText) {
-      var ta = el('textarea', { readonly: true, 'aria-label': 'Message you can send' });
-      ta.value = scriptText;
-      var copied = el('span', { class: 'copied', hidden: true, text: 'Copied' });
-      step.appendChild(el('div', { class: 'script' }, [
-        el('label', { text: 'What to say (copy this)' }),
-        ta,
-        el('div', { class: 'actions' }, [
-          el('button', {
-            class: 'btn ghost sm', type: 'button',
-            onclick: function () {
-              ta.select();
-              var ok = false;
-              try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-              if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(ta.value).catch(function () {});
-                ok = true;
-              }
-              if (ok) {
-                track('copy', org);
-                copied.hidden = false;
-                setTimeout(function () { copied.hidden = true; }, 2000);
-              }
-            }
-          }, ['Copy message']),
-          copied
-        ])
-      ]));
-    }
-
     body.appendChild(head);
     body.appendChild(badges);
     if (r.reasons.length) body.appendChild(why);
@@ -292,9 +251,9 @@
           if (open) track('expand', org);
           wrapStep.hidden = !open;
           e.currentTarget.setAttribute('aria-expanded', open ? 'true' : 'false');
-          e.currentTarget.textContent = open ? 'Hide the first step' : 'Show me the first step →';
+          e.currentTarget.textContent = open ? 'Hide' : 'Details';
         }
-      }, ['Show me the first step →']);
+      }, ['Details']);
       body.appendChild(toggle);
       body.appendChild(wrapStep);
     }
@@ -326,8 +285,8 @@
 
     if (!primary.length) {
       host.appendChild(el('div', { class: 'empty' }, [
-        el('h2', { text: 'Nothing matched that combination.' }),
-        el('p', { text: 'Try picking a couple more interests, or loosening the budget and timing filters.' })
+        el('h2', { text: 'No matches.' }),
+        el('p', { text: 'Loosen the budget or timing filters, or pick more interests.' })
       ]));
       host.hidden = false;
       return;
@@ -359,13 +318,6 @@
       ]));
     }
 
-    if (p.comfort === 1) {
-      host.appendChild(el('div', { class: 'notice' }, [
-        el('b', { text: 'One thing, once. ' }),
-        'Do not plan a social life. Pick the first card, do only the first step this week, and ignore everything else on this page.'
-      ]));
-    }
-
     primary.forEach(function (r, i) {
       host.appendChild(orgCard(r, p, { starter: i === 0 }));
     });
@@ -388,10 +340,10 @@
 
   // ---------- plan ----------
   var PLAN_STEPS = [
-    'Open the page and read what actually happens there',
+    'Read what it involves',
     null, // replaced by the org's own first step
-    'Go once. You are allowed to leave early',
-    'Go back a second time — this is the one that turns it into a community'
+    'Go',
+    'Go again'
   ];
 
   function addToPlan(org, btn) {
@@ -434,15 +386,15 @@
     host.innerHTML = '';
     if (!plan.length) {
       host.appendChild(el('div', { class: 'empty' }, [
-        el('h2', { text: 'Your plan is empty.' }),
-        el('p', { text: 'Find something on the Find tab and add it here. One is the right number to start with.' })
+        el('h2', { text: 'Nothing saved.' }),
+        el('p', { text: 'Add something from the Find tab.' })
       ]));
       return;
     }
 
     host.appendChild(el('div', { class: 'results-head' }, [
       el('h2', { text: 'My plan' }),
-      el('p', { text: plan.length === 1 ? 'One thing. Good.' : plan.length + ' saved — do the top one first and ignore the rest until it is done.' })
+      el('p', { text: plan.length + (plan.length === 1 ? ' saved' : ' saved') })
     ]));
 
     plan.forEach(function (item, idx) {

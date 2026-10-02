@@ -110,12 +110,12 @@
       );
     }
     if (p.comfort === 1 && org.gentleness >= 4 && org.solo >= 4) {
-      reasons.push('Low-pressure and easy to attend alone');
+      reasons.push('Drop-in, no partner or group needed');
     } else if (org.solo >= 4) {
-      reasons.push('Turning up alone is normal here');
+      reasons.push('Solo-friendly');
     }
     if (org.cost === 0) reasons.push('Free');
-    else if (org.cost > (p.budget == null ? 2 : p.budget)) reasons.push('Costs more than your budget — listed anyway because it fits well');
+    else if (org.cost > (p.budget == null ? 2 : p.budget)) reasons.push('Over your budget');
     if (parts.schedule === 1 && p.when && p.when.length && p.when.indexOf('flexible') === -1) {
       var labels = (org.when || [])
         .filter(function (w) { return p.when.indexOf(w) !== -1; })
@@ -124,7 +124,7 @@
       if (labels.length) reasons.push('Runs on ' + labels.slice(0, 2).join(' and '));
     }
     if (org.commitment === 'one-off' && (p.commitment === 'one-off' || !p.commitment)) {
-      reasons.push('One-off — you can try it once and never go back');
+      reasons.push('One-off');
     }
     return reasons.slice(0, 4);
   }
@@ -132,9 +132,9 @@
   /** 1–3 "how hard is this to walk into" rating, used for the ease badge. */
   function ease(org) {
     var e = ((org.gentleness || 3) + (org.solo || 3)) / 2;
-    if (e >= 4.5) return { level: 3, label: 'Very easy to walk into' };
-    if (e >= 3.5) return { level: 2, label: 'Easy once you arrive' };
-    return { level: 1, label: 'Worth the nerve' };
+    if (e >= 4.5) return { level: 3, label: 'Walk in' };
+    if (e >= 3.5) return { level: 2, label: 'Low-key' };
+    return { level: 1, label: 'Full-on' };
   }
 
   /** How many of the person's chosen interests this listing actually covers. */
@@ -176,7 +176,7 @@
     };
     // Say so when the learned profile is why something rose.
     if (learned && learned.fit > 0.72 && r.reasons.length < 4) {
-      r.reasons.push('Like the things you keep coming back to');
+      r.reasons.push('Matches your pattern');
     }
     return r;
   }

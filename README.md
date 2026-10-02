@@ -3,12 +3,15 @@
 A small web app for the problem of *"I live here and I don't know anyone."*
 
 Tell it where you live and what you're drawn to. It returns real local groups —
-and for each one, the thing that actually stops people: **what to do first, what
-will happen when you get there, and what to say.**
+and for each one, the information you can't get without ringing round: **the
+concrete first step, what it costs, what the commitment is, and what actually
+happens when you turn up.**
 
-It is deliberately anti-intimidation. Every listing carries a concrete first
-step, a "what to expect" list written for someone who is nervous, and where
-relevant a copy-and-paste message you can send without composing it yourself.
+It assumes you are capable. It does not write your messages for you, reassure
+you, or tell you it's okay to leave early. It tells you that the bird walk lends
+binoculars, that the shelter wants an orientation first, that the league places
+solo sign-ups on a team, and that the dance teaches the steps beforehand — the
+specifics that decide whether something is worth your Saturday.
 
 - **Ten cities are hand-curated** — San Francisco Bay Area, New York City,
   Los Angeles, Chicago, Seattle, Austin, Boston, Philadelphia, Washington DC
@@ -215,10 +218,15 @@ produce measurably different rankings, and the test suite asserts it.
 ### The data
 
 Each listing carries a first step (`drop-in` / `sign up` / `book a shift` /
-`RSVP` / `email`), a `when`, three to four "what to expect" bullets, and often a
-message template with `{interest}` and `{city}` placeholders filled in at render
-time. Ratings for `solo` (how easy to show up alone) and `gentleness` (how
-low-pressure) drive the ease badge and the comfort matching.
+`RSVP` / `email`), a `when`, and two to four factual "what to expect" bullets —
+logistics, cost, what's provided, what's expected of you. Ratings for `solo`
+(can you turn up alone) and `gentleness` (low-key or full-on) drive the badge
+and the matching.
+
+Listings deliberately carry **no** pre-written messages. An earlier version
+shipped a copy-and-paste introduction for each one; it was cut, along with the
+reassurance copy, on the grounds that the audience is perfectly capable of
+writing their own sentence.
 
 ### Learned preferences
 

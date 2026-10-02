@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>community_finder</title>
-<meta name="description" content="Tell it where you live and what you care about. It finds real local communities and gives you one concrete, non-intimidating first step for each.">
+<meta name="description" content="Real local communities by city and interest, with the concrete first step, the cost and the commitment for each.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🫂</text></svg>">
 <link rel="stylesheet" href="assets/styles.css">
 </head>
@@ -32,15 +32,15 @@
     <div class="wrap">
 
       <div class="intro" id="intro">
-        <h1>Find your people, one easy first step at a time.</h1>
-        <p>Real local groups, plus exactly what to do first and what to say.</p>
+        <h1>Find your people.</h1>
+        <p>Real local groups, what they cost, and what actually happens when you turn up.</p>
       </div>
 
       <form class="card" id="finder" novalidate>
 
         <div class="step">
           <h2>1 &middot; Where are you?</h2>
-          <p class="hint">Any city or neighbourhood works.</p>
+          <p class="hint">Any city or neighbourhood.</p>
           <label class="sr-only" for="location">Your city</label>
           <input type="text" id="location" name="location" placeholder="e.g. Oakland, or Brooklyn, or Boise" autocomplete="address-level2">
           <div class="quick" id="city-quick"><span class="lbl">Hand-picked lists:</span></div>
@@ -48,32 +48,32 @@
 
         <div class="step">
           <h2>2 &middot; What pulls at you?</h2>
-          <p class="hint">Pick up to six. Your first pick counts most.</p>
+          <p class="hint">Up to six. First pick weighted highest.</p>
           <div class="groups" id="interest-groups"></div>
         </div>
 
         <div class="step">
-          <h2>3 &middot; How does this feel right now?</h2>
-          <p class="hint">Be honest. It changes what we show you first.</p>
+          <h2>3 &middot; What kind of thing?</h2>
+          <p class="hint">Changes what comes first.</p>
           <div class="choices" id="comfort">
             <button type="button" class="choice" data-value="1" aria-pressed="true">
-              <b>Honestly, daunting</b><span>Show me the gentlest possible options</span>
+              <b>Low-key</b><span>Drop-in, quiet, no commitment</span>
             </button>
             <button type="button" class="choice" data-value="2" aria-pressed="false">
-              <b>A bit nervous</b><span>I can do it, I just need a plan</span>
+              <b>Either</b><span>No strong preference</span>
             </button>
             <button type="button" class="choice" data-value="3" aria-pressed="false">
-              <b>Ready to dive in</b><span>Give me the good stuff, I&rsquo;ll cope</span>
+              <b>Full-on</b><span>Intense, loud, high-commitment</span>
             </button>
           </div>
         </div>
 
         <details class="more" id="more">
-          <summary>A few optional details (they make the results better)</summary>
+          <summary>Optional filters</summary>
           <div class="sub">
             <div>
               <h2 class="sr-only">When are you free?</h2>
-              <p class="hint" style="margin-bottom:8px"><strong>When are you actually free?</strong></p>
+              <p class="hint" style="margin-bottom:8px"><strong>When you&rsquo;re free</strong></p>
               <div class="pills" id="when">
                 <button type="button" class="pill" data-value="weekday-day" aria-pressed="false">Weekday daytimes</button>
                 <button type="button" class="pill" data-value="weekday-eve" aria-pressed="false">Weekday evenings</button>
@@ -82,15 +82,15 @@
               </div>
             </div>
             <div>
-              <p class="hint" style="margin-bottom:8px"><strong>How much are you ready to commit?</strong></p>
+              <p class="hint" style="margin-bottom:8px"><strong>Commitment</strong></p>
               <div class="pills" id="commitment">
-                <button type="button" class="pill" data-value="one-off" aria-pressed="false">Just try one thing</button>
-                <button type="button" class="pill" data-value="weekly" aria-pressed="false">Something regular</button>
-                <button type="button" class="pill" data-value="seasonal" aria-pressed="false">I want to go deep</button>
+                <button type="button" class="pill" data-value="one-off" aria-pressed="false">One-off</button>
+                <button type="button" class="pill" data-value="weekly" aria-pressed="false">Weekly</button>
+                <button type="button" class="pill" data-value="seasonal" aria-pressed="false">Season-long</button>
               </div>
             </div>
             <div>
-              <p class="hint" style="margin-bottom:8px"><strong>Budget?</strong></p>
+              <p class="hint" style="margin-bottom:8px"><strong>Budget</strong></p>
               <div class="pills" id="budget">
                 <button type="button" class="pill" data-value="0" aria-pressed="false">Free only</button>
                 <button type="button" class="pill" data-value="1" aria-pressed="false">Cheap is fine</button>
@@ -98,16 +98,16 @@
               </div>
             </div>
             <div>
-              <p class="hint" style="margin-bottom:8px"><strong>What are you hoping for?</strong></p>
+              <p class="hint" style="margin-bottom:8px"><strong>Looking for</strong></p>
               <div class="pills" id="goals">
-                <button type="button" class="pill" data-value="friends" aria-pressed="false">Actual friends</button>
+                <button type="button" class="pill" data-value="friends" aria-pressed="false">Friends</button>
                 <button type="button" class="pill" data-value="impact" aria-pressed="false">To be useful</button>
                 <button type="button" class="pill" data-value="skill" aria-pressed="false">To learn something</button>
-                <button type="button" class="pill" data-value="routine" aria-pressed="false">A reason to leave the house</button>
+                <button type="button" class="pill" data-value="routine" aria-pressed="false">A routine</button>
               </div>
             </div>
             <div>
-              <label class="hint" for="firstname" style="display:block;margin-bottom:8px"><strong>Your first name</strong> &mdash; only used to fill in the messages we write for you. Nothing leaves your browser.</label>
+              <label class="hint" for="firstname" style="display:block;margin-bottom:8px"><strong>First name</strong> &mdash; optional, stays in this browser.</label>
               <input type="text" id="firstname" name="firstname" placeholder="optional" autocomplete="given-name" style="max-width:260px">
             </div>
           </div>
@@ -149,7 +149,7 @@
 <footer class="site-footer">
   <div class="wrap">
     <p>Everything stays in this browser &mdash; including the record of what you click, which is used to improve your results. There is no account and no server, and nothing is ever sent anywhere. See it, pause it or erase it on the <strong>You</strong> tab.</p>
-    <p>Listings are hand-checked, but groups change &mdash; always check the organisation&rsquo;s own page before you go.</p>
+    <p>Listings are hand-checked and link-checked weekly, but groups change. Verify before you go.</p>
   </div>
 </footer>
 

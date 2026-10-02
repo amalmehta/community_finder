@@ -22,7 +22,6 @@
           url: 'https://www.mountaineers.org/activities',
           when: 'Activities year-round; courses run seasonally'
         },
-        script: 'Hi! I\'m new to the area and would like to get outdoors with people. I\'m a beginner at {interest} — which activity or course would you point a total newcomer to?',
         expect: [
           'Trips are graded, and the easy ones are genuinely easy',
           'Courses run over several weeks with the same cohort — this is the friendship mechanism',
@@ -45,7 +44,6 @@
           url: 'https://www.wta.org/volunteer',
           when: 'Weekends and weekdays through the season'
         },
-        script: null,
         expect: [
           'Tools, training and a crew leader are all provided',
           'A full day with the same 8 people is far more social than a one-hour event',
@@ -68,12 +66,10 @@
           url: 'https://seattlefrontrunners.org/',
           when: 'Weekly group runs; check the site for times'
         },
-        script: 'Hi! I\'m new to Seattle and would like to join a run. I\'m slow and I\'ll be coming on my own — which run would you recommend for a first-timer?',
         expect: [
           'Walkers and slow runners are explicitly part of the point',
           'Free — there is no fee to come to a group run',
-          'The post-run coffee or brunch is where you actually meet people',
-          'Arriving alone is how almost everyone starts'
+          'The post-run coffee or brunch is where you actually meet people'
         ],
         solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'weekly', cost: 0,
         when: ['weekend', 'weekday-eve'], size: 'medium', goals: ['friends', 'routine']
@@ -91,7 +87,6 @@
           url: 'https://cascade.org/rides-events',
           when: 'Rides most days; more in summer'
         },
-        script: 'Hi! I\'d like to try a club ride but I\'m slow and have never ridden in a group. Which ride would you recommend for a first-timer?',
         expect: [
           'Pace ratings are honest — pick the slowest',
           'Free daily rides exist alongside the paid events',
@@ -114,7 +109,6 @@
           url: 'https://www.earthcorps.org/volunteer/',
           when: 'Weekend mornings, year-round'
         },
-        script: null,
         expect: [
           'Zero experience required and everything is supplied',
           'Groups are small and stay together for the morning',
@@ -137,12 +131,10 @@
           url: 'https://openseattle.org/',
           when: 'Regular evening sessions'
         },
-        script: 'Hi! I\'d like to come to a meetup. I\'m interested in {interest} and happy to help with non-code work — is there a project that needs someone?',
         expect: [
           'Non-developers are genuinely useful here',
           'Meetings open with introductions',
-          'Free',
-          'Coming once to look is normal'
+          'Free'
         ],
         solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'weekly', cost: 0,
         when: ['weekday-eve'], size: 'medium', goals: ['impact', 'skill', 'friends']
@@ -160,7 +152,6 @@
           url: 'https://foodlifeline.org/volunteer/',
           when: 'Day and evening shifts, most days'
         },
-        script: null,
         expect: [
           'Individuals are welcome and common',
           'Short training, nothing you can get wrong',
@@ -183,7 +174,6 @@
           url: 'https://birdsconnectsea.org/',
           when: 'Weekend and weekday mornings'
         },
-        script: 'Hi — I\'m a beginner and don\'t own binoculars. Is the upcoming walk right for me, and are loaners available?',
         expect: [
           'Beginner walks are a standing offering',
           'Loaner binoculars are often available — just ask',
@@ -206,12 +196,9 @@
           url: 'https://www.gaycity.org/events/',
           when: 'Open weekdays; events through the week'
         },
-        script: 'Hi — I\'m new here and trying to meet people. Is the {interest} event drop-in, or do I need to sign up first?',
         expect: [
-          'The library is a place you are allowed to exist with no agenda',
           'Most programs are free',
-          'Capitol Hill location makes it easy to combine with anything else',
-          'Arriving alone is normal'
+          'Capitol Hill location makes it easy to combine with anything else'
         ],
         solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'weekly', cost: 0,
         when: ['weekday-day', 'weekday-eve'], size: 'medium', goals: ['friends', 'routine']
@@ -229,7 +216,6 @@
           url: 'https://www.spl.org/programs-and-services',
           when: 'Daily, including evenings and weekends'
         },
-        script: null,
         expect: [
           '"Talk Time" conversation circles are explicitly designed for strangers to talk',
           'Free and mostly drop-in',
@@ -252,7 +238,6 @@
           url: 'https://jetcityimprov.org/classes/',
           when: 'Shows most weekends; classes in terms'
         },
-        script: null,
         expect: [
           'Level one is designed for people who have never done it',
           'You will learn a dozen names in one night',
@@ -275,7 +260,6 @@
           url: 'https://www.seattle.gov/parks/recreation',
           when: 'Drop-in sessions weekly; classes seasonal'
         },
-        script: null,
         expect: [
           'Drop-in gym sessions cost a few dollars and require no commitment',
           'Seasonal classes mean the same faces for 8 weeks',
@@ -298,10 +282,8 @@
           url: 'https://www.seattlehumane.org/volunteer/',
           when: 'Orientations regularly; shifts most days'
         },
-        script: null,
         expect: [
           'Application and orientation come before your first shift',
-          'Animals mean you never have to invent small talk',
           'Recurring shifts put you with the same volunteers each week',
           'Free, with a minimum commitment expected after training'
         ],
@@ -321,7 +303,6 @@
           url: 'https://www.peps.org/',
           when: 'Groups form continuously'
         },
-        script: 'Hi! I\'m a new parent and new-ish to the area. How do I join a group near me, and what happens if I can\'t afford the fee?',
         expect: [
           'Small groups of 6\u201310 parents whose babies are the same age as yours',
           'A trained facilitator runs the first weeks, so nobody has to break the ice',
@@ -344,9 +325,7 @@
           url: 'https://nwfilmforum.org/',
           when: 'Screenings most nights; workshops through the year'
         },
-        script: 'Hi! I\'d like to volunteer. I\'m interested in {interest} and I\'ll be coming alone — what does an usher shift involve and how do I start?',
         expect: [
-          'Ushering is a defined job for an evening, which is far easier than mingling',
           'Volunteers usually watch the film free',
           'You see the same volunteers and staff repeatedly',
           'Workshops cost money; volunteering does not'
@@ -367,7 +346,6 @@
           url: 'https://seattleinsight.org/',
           when: 'Weekly sittings; courses through the year'
         },
-        script: 'Hi — I\'m completely new to meditation. Is the weekly sitting open to beginners, and what should I expect on a first visit?',
         expect: [
           'Guidance is spoken aloud, so you always know what to do',
           'Donation-based — nobody is turned away',
@@ -390,7 +368,6 @@
           url: 'https://raincityrockcamp.org/',
           when: 'Adult camps run periodically; volunteering year-round'
         },
-        script: 'Hi! I have no musical experience at all. Is adult rock camp genuinely open to someone like me, and when is the next one?',
         expect: [
           'No experience required — that is the entire premise',
           'You are placed in a band, so the group is assigned rather than negotiated',
@@ -413,12 +390,10 @@
           url: 'https://cwb.org/',
           when: 'Public sails on Sundays; volunteer days through the week'
         },
-        script: 'Hi! I\'d like to come to a public sail and I\'ve never been on a sailboat. How does sign-up work on the day, and do you need volunteers?',
         expect: [
           'The Sunday sails are genuinely free \u2014 you sign up in person that morning',
           'You are in a small boat with a volunteer skipper and a few strangers for an hour',
-          'Boatshop volunteering teaches woodworking with no experience required',
-          'Nobody expects you to know any sailing terms'
+          'Boatshop volunteering teaches woodworking with no experience required'
         ],
         solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
         when: ['weekend', 'weekday-day'], size: 'medium', goals: ['friends', 'skill', 'impact']
@@ -436,7 +411,6 @@
           url: 'https://beaconfoodforest.org/',
           when: 'Regular work parties \u2014 check the site'
         },
-        script: null,
         expect: [
           'You walk in, someone hands you a tool and shows you the job',
           'Free, and the food is free for anyone to pick',
@@ -459,10 +433,7 @@
           url: 'https://www.psms.org/',
           when: 'Meetings monthly; forays in the wet season'
         },
-        script: 'Hello \u2014 I\'m a complete beginner. Can I come to a meeting or a foray as a guest, and is there anything I need to bring?',
         expect: [
-          'Beginners are the favourite kind of guest \u2014 identification is a shared activity',
-          'Meetings are easy to attend alone; forays are slow walks in the woods',
           'Modest membership; visitors usually welcome first',
           'Never eat anything without an expert confirming it'
         ],
@@ -482,7 +453,6 @@
           url: 'https://seattlerecreative.org/',
           when: 'Shop open most days; workshops through the month'
         },
-        script: 'Hi! I\'d like to volunteer. I\'m interested in {interest} \u2014 what do shifts involve, and how do I get started?',
         expect: [
           'Sorting buttons and fabric next to someone is oddly absorbing and easy to talk over',
           'No skills needed at all',
@@ -505,9 +475,7 @@
           url: 'https://www.fremontabbey.org/',
           when: 'Events most weeks'
         },
-        script: 'Hi! I\'d like to volunteer at events. What roles do you need filled, and what\'s the first step for someone new?',
         expect: [
-          'Volunteering gives you a defined job, which is far easier than mingling',
           'Volunteers usually see the show free',
           'All-ages and alcohol-light, which suits people who do not want a bar',
           'The same volunteers turn up repeatedly, so faces become familiar'
@@ -528,7 +496,6 @@
           url: 'https://seattlechess.club/',
           when: 'Weekly club nights; see the calendar'
         },
-        script: 'Hi! I play chess casually and would like to come by. Which night suits an unrated beginner, and what is the fee for a first visit?',
         expect: [
           'A board means you can be quiet and still belong',
           'Casual nights exist separately from the serious tournaments \u2014 start there',
@@ -551,7 +518,6 @@
           url: 'https://pageahead.org/',
           when: 'Shifts during school terms'
         },
-        script: 'Hi \u2014 I\'d like to volunteer. I have no teaching background; is the reading programme still right for me, and what\'s the first step?',
         expect: [
           'No teaching background needed \u2014 they brief you',
           'You work alongside other volunteers, not alone with a class',

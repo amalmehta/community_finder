@@ -40,7 +40,9 @@ group('curated data integrity', function () {
     });
     ok(!!o.firstStep && !!o.firstStep.label, n + ': has a first step label');
     ok(/^https:\/\//.test(o.firstStep.url || ''), n + ': first step has an https url');
-    ok(Array.isArray(o.expect) && o.expect.length >= 3, n + ': at least 3 what-to-expect bullets');
+    // Two is the floor: some listings simply have fewer logistics worth stating,
+    // and padding them back out would mean reintroducing filler.
+    ok(Array.isArray(o.expect) && o.expect.length >= 2, n + ': at least 2 what-to-expect bullets');
     ok(o.cost === 0 || o.cost === 1 || o.cost === 2, n + ': cost is 0/1/2');
     ok(o.solo >= 1 && o.solo <= 5, n + ': solo rating in range');
     ok(o.gentleness >= 1 && o.gentleness <= 5, n + ': gentleness rating in range');
@@ -48,7 +50,8 @@ group('curated data integrity', function () {
     ok(FYC.COMMITMENT.indexOf(o.commitment) !== -1, n + ': commitment "' + o.commitment + '" is known');
     (o.when || []).forEach(function (w) { ok(FYC.WHEN.indexOf(w) !== -1, n + ': when "' + w + '" is known'); });
     (o.goals || []).forEach(function (gl) { ok(FYC.GOALS.indexOf(gl) !== -1, n + ': goal "' + gl + '" is known'); });
-    if (o.script) ok(o.script.length > 20, n + ': script is a real message');
+    // Listings no longer ship pre-written messages for people to send.
+    ok(!o.script, n + ': carries no pre-written message');
   });
 
   // Every interest in the taxonomy should be reachable somewhere, or the UI
@@ -99,8 +102,9 @@ group('universal fallback', function () {
   ok(r.length >= 5, 'builds several routes for an uncurated city (' + r.length + ')');
   r.forEach(function (o) {
     ok(/^https:\/\//.test(o.url), o.id + ': generated https url');
-    ok(o.expect.length >= 3, o.id + ': has what-to-expect bullets');
+    ok(o.expect.length >= 2, o.id + ': has what-to-expect bullets');
     ok(!!o.firstStep.label, o.id + ': has a first step');
+    ok(!o.script, o.id + ': carries no pre-written message');
   });
   var urls = r.map(function (o) { return o.url; });
   ok(urls.some(function (u) { return u.indexOf('Boise') !== -1; }), 'city name is interpolated into at least one link');

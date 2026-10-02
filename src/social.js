@@ -117,8 +117,8 @@
     } }, [
       el('h2', { class: 'gate-title', text: signup ? 'Create your profile' : 'Welcome back' }),
       el('p', { class: 'hint', text: signup
-        ? 'A username and a password. No email address, because there is no reason for us to hold one.'
-        : 'Sign in to pick up where you left off.' }),
+        ? 'Username and password. No email stored, so there is no password reset.'
+        : 'Sign in.' }),
 
       el('label', { class: 'field' }, [
         el('span', { text: 'Username' }),
@@ -142,7 +142,7 @@
 
       signup ? el('div', { class: 'field' }, [
         el('span', { text: 'What are you into?' }),
-        el('p', { class: 'hint', text: 'Used to find people with something in common. You can hide any of these later, so an interest can guide your results without being visible to anyone.' }),
+        el('p', { class: 'hint', text: 'Used for discovery. Any of these can be hidden later while still shaping your results.' }),
         interestPicker(pre)
       ]) : null,
 
@@ -161,8 +161,8 @@
 
     gate.appendChild(el('div', { class: 'wrap' }, [
       el('div', { class: 'intro' }, [
-        el('h1', { text: 'Find your people, one easy first step at a time.' }),
-        el('p', { text: 'Real local groups, plus the people near you looking for the same things.' })
+        el('h1', { text: 'Find your people.' }),
+        el('p', { text: 'Real local groups, and the people near you with the same interests.' })
       ]),
       form
     ]));
@@ -203,7 +203,7 @@
     host.innerHTML = '';
     host.appendChild(el('div', { class: 'results-head' }, [
       el('h2', { text: 'People with something in common' }),
-      el('p', { text: 'Matched on interests you have chosen to show. Nobody can message you until you accept.' })
+      el('p', { text: 'Shared visible interests. Contact requires your acceptance.' })
     ]));
 
     var data;
@@ -213,8 +213,8 @@
 
     if (!S.people.length) {
       host.appendChild(el('div', { class: 'card empty' }, [
-        el('h2', { text: 'Nobody yet.' }),
-        el('p', { text: 'Either nobody else shares your visible interests, or you have none showing. Add a few on the You tab.' })
+        el('h2', { text: 'Nobody matches.' }),
+        el('p', { text: 'No one shares your visible interests, or you have none showing. Set them on the You tab.' })
       ]));
       return;
     }
@@ -228,7 +228,7 @@
 
       var intro = el('textarea', {
         class: 'intro-box', hidden: true, maxlength: '300',
-        placeholder: 'Say hello. Mention the thing you have in common and suggest something specific — it is much more likely to get a reply.'
+        placeholder: 'Your introduction (300 characters)'
       });
       var err = el('p', { class: 'err', hidden: true });
 
@@ -298,7 +298,7 @@
     if (reqs.incoming.length) {
       host.appendChild(el('div', { class: 'results-head' }, [
         el('h2', { text: 'Introductions for you' }),
-        el('p', { text: 'Nothing else arrives from them unless you accept.' })
+        el('p', { text: 'One message each until accepted.' })
       ]));
       reqs.incoming.forEach(function (r) {
         host.appendChild(el('article', { class: 'card' }, [
@@ -337,8 +337,8 @@
     host.appendChild(el('div', { class: 'results-head' }, [el('h2', { text: 'Conversations' })]));
     if (!threads.length) {
       host.appendChild(el('div', { class: 'card empty' }, [
-        el('h2', { text: 'No conversations yet.' }),
-        el('p', { text: 'Find someone on the People tab and send one introduction. One is plenty.' })
+        el('h2', { text: 'No conversations.' }),
+        el('p', { text: 'Send an introduction from the People tab.' })
       ]));
       return;
     }
@@ -456,7 +456,7 @@
       el('label', { class: 'check' }, [disc, el('span', { text: 'Let people with shared interests find me' })]),
       u.interests.length ? el('div', { class: 'field' }, [
         el('span', { text: 'Which interests are visible to others' }),
-        el('p', { class: 'hint', text: 'Unticked interests still shape your results, but nobody can see them or find you through them.' }),
+        el('p', { class: 'hint', text: 'Unticked: still used for your results, never exposed or searchable.' }),
         rows
       ]) : null,
       el('div', { class: 'actions' }, [

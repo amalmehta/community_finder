@@ -36,7 +36,6 @@
         return 'https://www.meetup.com/find/?keywords=' + enc(kw(ctx)) + '&location=' + enc(ctx.city);
       },
       step: 'Open the search, pick ONE group, and RSVP to its next event',
-      script: 'Hi! I just joined the group and I\'m planning to come to the next event. It\'ll be my first one — is there anything I should know, or anyone I should look for when I arrive?',
       expect: [
         'Message the organiser before you go. Organisers love this and will look out for you',
         'Pick an event with 10–30 RSVPs: big enough to hide, small enough to be spoken to',
@@ -56,12 +55,10 @@
         return 'https://duckduckgo.com/?q=' + enc(ctx.city + ' public library events calendar');
       },
       step: 'Find your nearest branch\'s events calendar and pick one thing this month',
-      script: null,
       expect: [
         'Free, and usually no registration at all',
         'Your nearest branch is walkable, so leaving early costs you nothing',
-        'Conversation circles for language learners are literally designed for strangers to talk',
-        'Nobody will ask why you came'
+        'Conversation circles for language learners are literally designed for strangers to talk'
       ],
       solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'weekly', cost: 0,
       when: ['weekday-day', 'weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'skill', 'routine']
@@ -76,11 +73,8 @@
         return 'https://www.volunteermatch.org/search/?l=' + enc(ctx.city) + '&k=' + enc(kw(ctx));
       },
       step: 'Filter to one-time opportunities and sign up for exactly one',
-      script: 'Hi — I\'d like to volunteer for the {interest} opportunity listed on VolunteerMatch. I haven\'t done this before and I\'ll be coming on my own. What should I expect, and is there anything I should bring?',
       expect: [
         'One-time shifts have no ongoing obligation whatsoever',
-        'You are given a specific job, which is much easier than open-ended socialising',
-        'Coming alone is the norm',
         'Free'
       ],
       solo: 5, gentleness: 5, structure: 'shift', commitment: 'one-off', cost: 0,
@@ -95,10 +89,7 @@
         return 'https://www.parkrun.us/';
       },
       step: 'Register once (one form, valid at every parkrun on earth), print the barcode, walk up on Saturday',
-      script: null,
       expect: [
-        'There is a newcomers briefing before the start. Standing there guarantees someone talks to you',
-        'A designated "tail walker" means you cannot finish last alone',
         'Free, every single week, forever',
         'The coffee afterwards is the real event'
       ],
@@ -114,7 +105,6 @@
         return 'https://november-project.com/locations/';
       },
       step: 'Check the locations list for your city, then just turn up — there is nothing to sign or pay',
-      script: null,
       expect: [
         'First-timers are introduced out loud. Mortifying for 20 seconds, then you know people',
         'You can walk the whole workout — nobody is timing you',
@@ -133,11 +123,9 @@
         return 'https://www.rrca.org/for-runners/find-a-running-club';
       },
       step: 'Find the club nearest you and email asking which weekly run suits a beginner',
-      script: 'Hi! I\'m new to the area and looking for a group run. I\'m fairly slow — which of your weekly runs would you recommend, and do I need to be a member to come along?',
       expect: [
         'Nearly every club has a free weekly run open to visitors',
         'Pace groups mean there is someone your speed',
-        'Running beside someone is much easier than talking face to face',
         'Clubs are always trying to recruit — your email will be welcome'
       ],
       solo: 4, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 0,
@@ -152,11 +140,8 @@
         return 'https://www.feedingamerica.org/find-your-local-foodbank';
       },
       step: 'Find your food bank, then book one sorting shift on their site',
-      script: null,
       expect: [
         'Five minutes of training and a task you cannot get wrong',
-        'You stand at a table with 5–10 people — conversation happens by itself',
-        'Solo sign-ups are completely normal',
         'Two to three hours, free, no follow-up'
       ],
       solo: 5, gentleness: 5, structure: 'shift', commitment: 'one-off', cost: 0,
@@ -171,10 +156,8 @@
         return 'https://www.communitygarden.org/garden';
       },
       step: 'Find the nearest garden and email or visit during an open workday',
-      script: 'Hi! I live nearby and I\'d love to help out or join. Are you taking new members or volunteers, and when\'s a good time to come by?',
       expect: [
         'You meet people who live on your actual block, which is rarer than it should be',
-        'A shared task means you never have to invent conversation',
         'Usually free or a small annual plot fee',
         'No gardening knowledge assumed'
       ],
@@ -190,9 +173,7 @@
         return 'https://www.audubon.org/audubon-near-you';
       },
       step: 'Find your chapter, then sign up for a beginner walk and ask to borrow binoculars',
-      script: 'Hello — I\'m a complete beginner and don\'t own binoculars. Is your next walk suitable for someone with no experience, and do you have loaner pairs?',
       expect: [
-        'Beginner walks are a standing category — you are the intended guest',
         'Loaner binoculars are often available if you ask in advance',
         'It is mostly standing still, not hiking',
         'Most walks are free and open to non-members'
@@ -209,7 +190,6 @@
         return 'https://wiki.hackerspaces.org/List_of_hackerspaces';
       },
       step: 'Find the nearest space and email asking when the next open night is',
-      script: 'Hi — I\'d like to visit for the first time. I\'m interested in {interest} and I\'m a beginner. When\'s a good open night, and is it OK to come without a project?',
       expect: [
         'Open nights exist precisely so strangers can wander in',
         '"Can you show me around?" is a sentence these spaces hear constantly',
@@ -228,12 +208,10 @@
         return 'https://www.repaircafe.org/en/visit/';
       },
       step: 'Find the nearest Repair Café and bring one broken object to the next session',
-      script: null,
       expect: [
         'You arrive with an object and a problem — instant conversation starter',
         'No skills required; you work next to someone who knows more',
-        'Free or donation-based',
-        'Nobody minds if the thing stays broken'
+        'Free or donation-based'
       ],
       solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
       when: ['weekend'], size: 'small', goals: ['skill', 'friends', 'impact']
@@ -247,11 +225,9 @@
         return 'https://www.lgbtqcenters.org/LGBTCenters';
       },
       step: 'Find your nearest center, then pick one free drop-in group from its calendar',
-      script: 'Hi — I\'m new to the area and looking for community. Is the {interest} group open to drop-ins, or do I need to register first?',
       expect: [
         'Most programs are free and drop-in',
         'Front-desk staff are used to "I don\'t know anyone here"',
-        'You are allowed to come, sit, and leave without joining anything',
         'A large share of people there arrived alone'
       ],
       solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'weekly', cost: 0,
@@ -266,7 +242,6 @@
         return 'https://www.nami.org/Support-Education/Support-Groups/';
       },
       step: 'Find your local affiliate and check the schedule for a group that fits',
-      script: null,
       expect: [
         'Free and confidential',
         'Peer-led, not clinical — the facilitator has been through it too',
@@ -285,7 +260,6 @@
         return 'https://www.toastmasters.org/find-a-club?t=' + enc(ctx.city);
       },
       step: 'Find a nearby club and email the VP of Membership to visit as a guest',
-      script: 'Hi! I\'d like to visit your club as a guest. I\'ve never done anything like this before — which meeting should I come to, and do I need to do anything on my first visit?',
       expect: [
         'Guests can attend free and are not required to speak',
         'The meeting has an agenda, which removes all unstructured social anxiety',
@@ -304,7 +278,6 @@
         return 'https://buynothingproject.org/find-a-group';
       },
       step: 'Join your neighbourhood group and give one thing away this week',
-      script: 'Hi! I\'m fairly new to the neighbourhood. Happy to pass this along — I\'m on {interest} street, let me know what time suits you.',
       expect: [
         'Doorstep handovers are a two-minute, perfectly scripted interaction',
         'You accumulate familiar faces without attending anything',
@@ -323,7 +296,6 @@
         return 'https://citizensclimatelobby.org/chapters/';
       },
       step: 'Find your chapter and come to one monthly meeting',
-      script: 'Hi! I\'d like to come to the next chapter meeting. I\'ve never done any advocacy before — is the meeting open to newcomers, and should I prepare anything?',
       expect: [
         'Monthly meetings are a very low-commitment rhythm',
         'New people are formally welcomed and given an onboarding call if they want one',
@@ -342,7 +314,6 @@
         return 'https://www.habitat.org/volunteer';
       },
       step: 'Find your local affiliate and sign up for one build day',
-      script: null,
       expect: [
         'No construction experience needed — most volunteers have none',
         'A full day with the same small crew beats a one-hour event for actually meeting people',
@@ -361,7 +332,6 @@
         return 'https://www.petfinder.com/animal-shelters-and-rescues/search/?location=' + enc(ctx.city);
       },
       step: 'Find a shelter near you and ask about their volunteer orientation',
-      script: 'Hi! I\'d like to volunteer. I\'m interested in dog walking or animal care — what\'s the process to get started, and when are your orientations?',
       expect: [
         'Expect an orientation and often a minimum commitment — shelters invest in training you',
         'You work alongside regular volunteers who see each other weekly',
@@ -380,7 +350,6 @@
         return 'https://www.bbbs.org/get-involved/';
       },
       step: 'Start an enquiry with your local agency',
-      script: null,
       expect: [
         'Expect a real application, background check and interview — this is a serious commitment',
         'Agencies support the match with a caseworker, so you are never on your own',
@@ -399,7 +368,6 @@
         return 'https://www.redcross.org/volunteer/become-a-volunteer.html';
       },
       step: 'Browse local roles and apply for one',
-      script: null,
       expect: [
         'Training is provided for every role',
         'Roles range from a few hours at a blood drive to on-call response teams',
@@ -418,7 +386,6 @@
         return 'https://www.sierraclub.org/outings/local';
       },
       step: 'Find your chapter\'s outings list and sign up for an easy one',
-      script: 'Hi! I\'d like to join an upcoming outing. I\'m a beginner and I\'ll be coming alone — which trip would you recommend to start with?',
       expect: [
         'Outings are led by volunteers who state the difficulty honestly',
         'Coming alone is standard',
@@ -437,9 +404,7 @@
         return 'https://www.eventbrite.com/d/' + slug(ctx.city) + '/' + slug(kw(ctx)) + '/';
       },
       step: 'Buy one ticket for something with a clear start and end time',
-      script: null,
       expect: [
-        'A workshop gives you a task, which is much easier than a party',
         'Recurring series are worth more than one-off events — go back a second time',
         'Costs vary; filter by free if budget matters',
         'A defined end time means you always have an exit'
@@ -456,12 +421,10 @@
         return 'https://www.conversationexchange.com/?city=' + enc(ctx.city);
       },
       step: 'Set up a profile and message two people offering to meet for coffee',
-      script: 'Hi! I saw your profile — I\'m learning {interest} and I\'m a native English speaker. Would you like to meet for a coffee and do half an hour in each language?',
       expect: [
         'The half-and-half format means neither person has to carry the conversation',
         'Meeting in a cafe is a naturally time-limited first meeting',
-        'Free',
-        'Message several people — most exchanges fizzle, which is normal and not personal'
+        'Free'
       ],
       solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'one-off', cost: 1,
       when: ['flexible'], size: 'small', goals: ['friends', 'skill']
@@ -475,7 +438,6 @@
         return 'https://www.reddit.com/search/?q=' + enc(ctx.city) + '&type=sr';
       },
       step: 'Find your city subreddit, read the weekly social thread, and reply to one post',
-      script: 'Hey — I\'m fairly new here and looking to meet people who are into {interest}. Is there a regular meetup for this, or would anyone be up for one?',
       expect: [
         'Lurking first is expected and costs nothing',
         'Weekly social threads exist in most large city subreddits',
@@ -494,7 +456,6 @@
         return 'https://duckduckgo.com/?q=' + enc(ctx.city + ' parks and recreation adult classes drop-in');
       },
       step: 'Find your city\'s rec catalogue and register for one seasonal class',
-      script: null,
       expect: [
         'Far cheaper than private studios — often under $100 for a whole term',
         'The same faces every week for 8–10 weeks is the actual mechanism of friendship',
@@ -513,7 +474,6 @@
         return 'https://duckduckgo.com/?q=' + enc(ctx.city + ' congregation newcomers welcome visitors');
       },
       step: 'Pick one, go once, and stay for the coffee afterwards',
-      script: 'Hello — I\'m thinking of visiting for the first time. Is there a service you\'d recommend for a newcomer, and is there somewhere people gather afterwards?',
       expect: [
         'The coffee hour after the service is where the community actually is',
         'Most congregations have someone designated to greet new faces',
@@ -532,7 +492,6 @@
         return 'https://duckduckgo.com/?q=' + enc(ctx.city + ' library storytime playgroup parents group');
       },
       step: 'Go to one library storytime and talk to one other adult there',
-      script: null,
       expect: [
         'Storytimes are free, weekly and drop-in',
         'Other parents are usually just as keen to talk to an adult',
@@ -569,7 +528,6 @@
         interests: r.interests || [],
         url: url,
         firstStep: { kind: 'search', label: r.step, url: url, when: '' },
-        script: r.script,
         expect: r.expect,
         solo: r.solo, gentleness: r.gentleness, structure: r.structure,
         commitment: r.commitment, cost: r.cost, when: r.when,

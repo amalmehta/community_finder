@@ -22,10 +22,8 @@
           url: 'https://www.newyorkcares.org/volunteer',
           when: 'Projects every day, including evenings and weekends'
         },
-        script: null,
         expect: [
           'Every project has a trained team leader — you will be told exactly what to do',
-          'Showing up alone is the norm, not the exception',
           'You pick one project at a time. There is no ongoing obligation',
           'Free, and there is something within a subway ride of wherever you live'
         ],
@@ -45,7 +43,6 @@
           url: 'https://www.nyrr.org/openrun',
           when: 'Saturday mornings, year-round'
         },
-        script: null,
         expect: [
           'Walkers are explicitly welcome and finish last on purpose',
           'It is run by neighbours, not by a club — the vibe is local, not competitive',
@@ -68,12 +65,10 @@
           url: 'https://brooklynbrainery.com/',
           when: 'Evenings and weekends, new classes monthly'
         },
-        script: null,
         expect: [
           'Everyone in the room signed up alone to learn something they know nothing about',
           'One evening, one class — no term, no cohort, no commitment',
-          'Cheap enough that bailing costs you almost nothing',
-          'The shared subject means you never have to invent conversation'
+          'Cheap enough that bailing costs you almost nothing'
         ],
         solo: 5, gentleness: 5, structure: 'register', commitment: 'one-off', cost: 1,
         when: ['weekday-eve', 'weekend'], size: 'small', goals: ['skill', 'friends']
@@ -91,12 +86,10 @@
           url: 'https://greenthumb.nycgovparks.org/gardensearch.php',
           when: 'Open hours vary by garden; weekends are safest'
         },
-        script: 'Hi! I live nearby and I\'d love to get involved with the garden. Are you taking new members or volunteers, and when is a good time to stop by?',
         expect: [
           'Gardens are run by neighbours, so you meet people who live on your actual block',
           'Many have a posted open-hours sign — turning up then is expected',
-          'Usually free or a nominal membership; workdays are open to anyone',
-          'A shared task removes the awkwardness of introductions'
+          'Usually free or a nominal membership; workdays are open to anyone'
         ],
         solo: 4, gentleness: 4, structure: 'drop-in', commitment: 'seasonal', cost: 0,
         when: ['weekend', 'weekday-eve'], size: 'small', goals: ['friends', 'impact', 'skill']
@@ -114,7 +107,6 @@
           url: 'https://www.nycresistor.com/',
           when: 'Regular open evenings — check the calendar'
         },
-        script: 'Hi — I\'d like to come to an open night. I\'m interested in {interest} and I\'m a beginner. Is there anything I should bring, and is it OK to just turn up?',
         expect: [
           'Open nights exist specifically so strangers can come in',
           'Bring a project or bring nothing — both are fine',
@@ -137,7 +129,6 @@
           url: 'https://www.prospectpark.org/get-involved/volunteer/',
           when: 'Weekend mornings, seasonal'
         },
-        script: null,
         expect: [
           'Tools, gloves and instructions are handed to you on arrival',
           'Groups are small enough that you end up talking to the same 3 people all morning',
@@ -160,7 +151,6 @@
           url: 'https://www.transalt.org/volunteer',
           when: 'Monthly, usually weekday evenings'
         },
-        script: 'Hi! I live in {city} and I\'d like to get involved with the local committee. Is the next meeting open to someone brand new, and do I need to prepare anything?',
         expect: [
           'Monthly meetings mean low commitment and a predictable rhythm',
           'New people are usually asked to introduce themselves — one sentence is fine',
@@ -183,7 +173,6 @@
           url: 'https://www.housingworks.org/volunteer',
           when: 'Weekly shifts; events most evenings'
         },
-        script: 'Hi — I\'m interested in volunteering at the bookstore. What does the sign-up process look like, and what kind of time commitment are you looking for?',
         expect: [
           'Shelving books is a genuinely calming first volunteer job',
           'You see the same volunteers weekly, which is how acquaintances become friends',
@@ -206,10 +195,8 @@
           url: 'https://gaycenter.org/community/',
           when: 'Groups daily, mostly evenings'
         },
-        script: 'Hi — I\'m new to the Center. Is the {interest} group open to drop-ins, and do I need to register beforehand?',
         expect: [
           'Most groups are free and drop-in',
-          'You are allowed to sit in the lobby and leave without going to anything',
           'Staff expect people to arrive knowing nobody',
           'Groups are small enough that you will be spoken to'
         ],
@@ -229,7 +216,6 @@
           url: 'https://www.bklynlibrary.org/calendar',
           when: 'Daily, including evenings and weekends'
         },
-        script: null,
         expect: [
           'Free, and usually no registration',
           'Branches are walkable, so bailing costs you nothing',
@@ -252,7 +238,6 @@
           url: 'https://www.magnettheater.com/classes/',
           when: 'Terms start regularly; shows most nights'
         },
-        script: null,
         expect: [
           'Level one assumes zero experience and no performance at the end for a while',
           'You will learn 12 names in one evening, which is more than most New Yorkers manage in a month',
@@ -275,7 +260,6 @@
           url: 'https://www.cityharvest.org/volunteer/',
           when: 'Weekday and weekend shifts'
         },
-        script: null,
         expect: [
           'One shift, fully self-contained',
           'Simple physical tasks with clear instructions',
@@ -298,9 +282,7 @@
           url: 'https://www.5bbc.org/rides',
           when: 'Weekends, mostly mornings'
         },
-        script: 'Hi! I\'d like to join a ride but I\'m not fast. Which upcoming ride would you recommend for someone who hasn\'t ridden with a group before?',
         expect: [
-          'Rides are graded by pace — pick the slowest one and you will be fine',
           'A leader and a sweep mean you cannot get lost or left behind',
           'Most rides are free or nearly free for non-members to try',
           'Four hours side by side on a bike is a lot of conversation'
@@ -321,11 +303,9 @@
           url: 'https://www.nycbirdalliance.org/events',
           when: 'Weekend and weekday mornings, strongest in spring and fall migration'
         },
-        script: 'Hello — I\'m completely new to birding and don\'t have binoculars. Is the upcoming walk OK for beginners, and do you have loaners?',
         expect: [
           'Beginner walks are a standing category — you are the target audience',
           'Loaner binoculars are often available if you ask',
-          'A lot of standing still, which is much easier than it sounds',
           'Many walks are free; some have a small fee'
         ],
         solo: 5, gentleness: 5, structure: 'register', commitment: 'one-off', cost: 0,
@@ -344,7 +324,6 @@
           url: 'https://www.marshallchessclub.org/',
           when: 'Most evenings; see the calendar'
         },
-        script: 'Hi — I play chess casually and would like to visit. Is there an evening that suits an unrated player, and what\'s the fee for a first visit?',
         expect: [
           'There are entry fees and memberships — ask before you go',
           'Unrated beginners do show up; the club has run beginner nights for decades',
@@ -367,7 +346,6 @@
           url: 'https://beta.nyc/events/',
           when: 'Regular evening sessions'
         },
-        script: 'Hi! I\'d like to come to an upcoming session. I\'m interested in {interest} — is it OK to come with no specific project and mostly listen the first time?',
         expect: [
           'Sessions usually start with newcomer introductions',
           'You do not need to code — research and writing help is short-handed',
@@ -390,9 +368,7 @@
           url: 'https://fixerscollective.org/',
           when: 'Check the site for the current session schedule'
         },
-        script: 'Hi — I have a broken {interest} item I\'d like to try fixing. Is the next session open to newcomers, and should I bring anything besides the object?',
         expect: [
-          'You arrive with an object and a problem, which does all the social work for you',
           'No skills required — you work alongside someone who knows more',
           'Usually free or donation-based',
           'There is no expectation that the thing gets fixed'
@@ -413,7 +389,6 @@
           url: 'https://www.nycgovparks.org/facilities/recreationcenters',
           when: 'Open daily; class schedules posted per center'
         },
-        script: 'Hi — I live nearby and I\'m thinking about joining. Could I come look around, and which classes are included with a membership?',
         expect: [
           'Annual membership is a fraction of a private gym, and some centers are free',
           'Recurring classes mean you see the same faces weekly',
@@ -436,7 +411,6 @@
           url: 'https://www.nycacc.org/',
           when: 'Orientations run regularly; shifts daily'
         },
-        script: null,
         expect: [
           'Expect an application and an orientation — shelters invest in training you',
           'Dog walking and cat socialising are solo-friendly by design',
@@ -459,7 +433,6 @@
           url: 'https://parkslopeparents.com/',
           when: 'Groups form continuously'
         },
-        script: 'Hi! I\'m a new parent in Brooklyn and would like to join a group. How do the birth-month groups work, and is there one forming now?',
         expect: [
           'Birth-month groups mean everyone is dealing with the same week of chaos you are',
           'There is a membership fee — check the current rate',
@@ -482,7 +455,6 @@
           url: 'https://www.bronxdoc.org/',
           when: 'Exhibitions and classes through the year'
         },
-        script: 'Hi — I\'m interested in {interest} and I\'m a beginner. Are your classes open to adults with no background, and when does the next one start?',
         expect: [
           'Free classes exist and are aimed at the community, not professionals',
           'Openings are free and you can look at photographs instead of making conversation',
@@ -505,11 +477,9 @@
           url: 'https://www.nyimc.org/',
           when: 'Sittings most weeks; courses through the year'
         },
-        script: 'Hi — I\'ve never meditated in a group. Is the drop-in sitting suitable for a complete beginner, and is there anything I should know before coming?',
         expect: [
           'Instructions are given out loud — you are told exactly what to do',
           'Silence means you are not required to talk to anyone',
-          'Most sittings are by donation and nobody checks what you give',
           'Courses run in blocks, so you see the same faces repeatedly'
         ],
         solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'weekly', cost: 0,
@@ -528,7 +498,6 @@
           url: 'https://www.bkcm.org/',
           when: 'Terms start a few times a year'
         },
-        script: 'Hi — I\'m an adult beginner interested in {interest}. Which group classes or ensembles are open to someone with no background, and is there financial aid?',
         expect: [
           'Adult beginner groups exist and are not full of former prodigies',
           'A chorus or ensemble is a weekly commitment with the same people — the thing that builds friendships',
@@ -551,12 +520,10 @@
           url: 'https://cityreliquary.org/',
           when: 'Weekend open hours plus events'
         },
-        script: 'Hi! I love what you do and I\'d like to get involved. Do you take volunteers, and is there an event coming up that\'s good for someone who hasn\'t been before?',
         expect: [
           'Tiny admission, and the whole place takes twenty minutes',
           'It is run by volunteers, so asking how to help is a normal thing to do',
-          'The backyard events are low-key and full of people who like odd things',
-          'Nobody there is trying to be cool, which is restful'
+          'The backyard events are low-key and full of people who like odd things'
         ],
         solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 1,
         when: ['weekend', 'weekday-eve'], size: 'small', goals: ['friends', 'skill']
@@ -574,10 +541,8 @@
           url: 'https://www.brooklyngrangefarm.com/',
           when: 'Volunteer days in the growing season'
         },
-        script: null,
         expect: [
           'No farming experience assumed at all',
-          'Working with your hands beside someone makes conversation easy',
           'Volunteer days are free; some events are ticketed',
           'The view is the reason to come back'
         ],
@@ -597,12 +562,10 @@
           url: 'https://earthmatter.org/',
           when: 'Volunteer days in the warmer months'
         },
-        script: 'Hi! I\'d like to come volunteer. I\'ve never composted anything in my life \u2014 is that fine, and which ferry should I aim for?',
         expect: [
           'The ferry ride means the trip feels like an outing rather than an errand',
           'No experience needed; it is mostly turning piles and moving material',
-          'Free',
-          'There are chickens, which lowers everyone\'s guard'
+          'Free'
         ],
         solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
         when: ['weekend', 'weekday-day'], size: 'small', goals: ['impact', 'friends', 'skill']
@@ -620,7 +583,6 @@
           url: 'https://www.caveat.nyc/',
           when: 'Shows most nights'
         },
-        script: null,
         expect: [
           'The show gives you something to say to whoever is next to you',
           'Going alone is entirely normal here',
@@ -643,10 +605,8 @@
           url: 'https://newyorkmyc.org/',
           when: 'Weekend forays through the season'
         },
-        script: null,
         expect: [
           'Free, and no membership needed to join a walk',
-          'Beginners are welcome \u2014 experts genuinely enjoy explaining',
           'Slow walking and a lot of crouching. It is not a hike',
           'Never eat anything without an expert confirming it'
         ],
@@ -666,10 +626,8 @@
           url: 'https://www.green-wood.com/',
           when: 'Tours and volunteer days year-round'
         },
-        script: null,
         expect: [
           'Free to walk in, and it is enormous and quiet',
-          'Tours give you a guide and a group, which is easier than wandering alone',
           'Volunteer days involve gardening and restoration with a small crew',
           'The view from the top is one of the best in the city'
         ],
