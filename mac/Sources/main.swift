@@ -10,31 +10,71 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private var window: NSWindow!
     private var webView: WKWebView!
     private var server: StaticServer!
+    private var usingBackend = false
+
+    /// Where the account server lives. Editable from the Server menu so the app
+    /// can point at a deployed instance instead of a local one.
+    private var backendURL: URL {
+        let raw = UserDefaults.standard.string(forKey: "BackendURL") ?? "http://127.0.0.1:4000"
+        return URL(string: raw) ?? URL(string: "http://127.0.0.1:4000")!
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        buildMenu()
+        buildWindow()
+
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
+        connect()
+    }
+
+    /// Prefer the account server; fall back to the copy inside the app bundle
+    /// so the app still works with nothing else running.
+    private func connect() {
+        probeBackend { [weak self] reachable in
+            guard let self else { return }
+            if reachable {
+                self.usingBackend = true
+                self.window.subtitle = self.backendURL.host ?? ""
+                self.webView.load(URLRequest(url: self.backendURL))
+            } else {
+                self.usingBackend = false
+                self.window.subtitle = "offline copy"
+                self.loadBundled()
+            }
+        }
+    }
+
+    private func loadBundled() {
         guard let webRoot = Bundle.main.resourceURL?.appendingPathComponent("web") else {
             fail("The app bundle is missing its web resources.")
             return
         }
-
-        server = StaticServer(root: webRoot)
-        let port: UInt16
-        do {
-            port = try server.start()
-        } catch {
-            fail(error.localizedDescription)
-            return
+        if server == nil {
+            server = StaticServer(root: webRoot)
+            do {
+                _ = try server.start()
+            } catch {
+                fail(error.localizedDescription)
+                return
+            }
         }
-
-        buildMenu()
-        buildWindow()
-
-        if let url = URL(string: "http://127.0.0.1:\(port)/") {
+        if let url = URL(string: "http://127.0.0.1:\(server.port)/") {
             webView.load(URLRequest(url: url))
         }
+    }
 
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+    /// A short HEAD-ish probe of /api/me. Anything that answers is good enough;
+    /// the web app itself decides what to do with the response.
+    private func probeBackend(_ done: @escaping (Bool) -> Void) {
+        var req = URLRequest(url: backendURL.appendingPathComponent("api/me"))
+        req.timeoutInterval = 2
+        req.httpMethod = "GET"
+        URLSession.shared.dataTask(with: req) { _, response, _ in
+            let ok = (response as? HTTPURLResponse)?.statusCode == 200
+            DispatchQueue.main.async { done(ok) }
+        }.resume()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
@@ -60,6 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             defer: false
         )
         window.title = "community_finder"
+        window.subtitle = ""
         window.minSize = NSSize(width: 380, height: 520)
         window.contentView = webView
         window.setFrameAutosaveName("CommunityFinderMainWindow")
@@ -94,7 +135,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let viewItem = NSMenuItem()
         let view = NSMenu(title: "View")
         view.addItem(withTitle: "Reload", action: #selector(reload), keyEquivalent: "r")
-        view.addItem(withTitle: "Start Over", action: #selector(startOver), keyEquivalent: "R")
+        view.addItem(withTitle: "Reconnect to Server", action: #selector(reconnect), keyEquivalent: "R")
+        view.addItem(withTitle: "Server\u{2026}", action: #selector(editServer), keyEquivalent: ",")
+        view.addItem(.separator())
+        view.addItem(withTitle: "Clear Local Data", action: #selector(startOver), keyEquivalent: "")
         view.addItem(.separator())
         view.addItem(withTitle: "Enter Full Screen",
                      action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
@@ -105,6 +149,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     }
 
     @objc private func reload() { webView.reload() }
+
+    @objc private func reconnect() { connect() }
+
+    @objc private func editServer() {
+        let alert = NSAlert()
+        alert.messageText = "Account server"
+        alert.informativeText = "The app uses this server for profiles and messages. If it is unreachable, the bundled offline copy is used instead (finder only, no account)."
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        field.stringValue = backendURL.absoluteString
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Connect")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.isEmpty, URL(string: text) != nil {
+            UserDefaults.standard.set(text, forKey: "BackendURL")
+            connect()
+        }
+    }
 
     /// Clears the saved search, plan and feedback, then reloads.
     @objc private func startOver() {
@@ -161,7 +224,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             decisionHandler(.allow)
             return
         }
-        if url.host == "127.0.0.1" {
+        // Our own pages: the bundled server, or whichever backend is configured.
+        let ourHosts: Set<String> = ["127.0.0.1", "localhost", backendURL.host ?? ""]
+        if let host = url.host, ourHosts.contains(host) {
             decisionHandler(.allow)
         } else {
             NSWorkspace.shared.open(url)

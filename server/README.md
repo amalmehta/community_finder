@@ -12,6 +12,12 @@ SECURE=1  node server/app.js  # behind HTTPS: marks the session cookie Secure
 The database is created at `server/data/community.db` on first run and is
 gitignored. Delete that file to start over.
 
+## The Mac app
+
+`community_finder.app` probes this server on launch and uses it if it answers,
+falling back to its own bundled copy of the front end when it does not. Point it
+at a different instance with View → Server… inside the app.
+
 ## What it serves
 
 The same static app, plus an API. The front end calls `GET /api/me` on load:

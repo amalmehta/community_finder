@@ -81,6 +81,18 @@ Drag it to `/Applications` to keep it. It's ad-hoc signed for local use, so if
 you ever move it to another Mac, Gatekeeper will ask you to confirm the first
 launch (right-click → Open).
 
+**It uses the account server when one is running.** On launch the app probes
+`http://127.0.0.1:4000/api/me` (2-second timeout). If that answers it loads the
+backend, so the Mac app gets profiles, People and Messages. If it does not, the
+app falls back to the copy bundled inside it and runs as the finder alone —
+still fully offline, just without accounts. The title bar says which mode you
+are in: the server's host, or "offline copy".
+
+**View → Server…** (⌘,) points it somewhere else, including a deployed
+instance. **View → Reconnect to Server** (⇧⌘R) retries after you start the
+server. Sign-in persists between launches; the Mac app keeps its own cookie
+store, separate from your browser.
+
 **How it works.** `mac/Sources/main.swift` is a Cocoa app hosting a `WKWebView`;
 `mac/Sources/StaticServer.swift` is a small read-only HTTP server bound to
 loopback on a random port, serving `Contents/Resources/web`. The server exists
@@ -88,7 +100,7 @@ because WKWebView gives `file://` pages an opaque origin, which disables
 `localStorage` and would break your saved plan. Serving from `127.0.0.1` gives
 the page a normal web origin, so the app behaves exactly like the browser build.
 Links to real organisations open in your default browser rather than inside the
-app window. ⌘R reloads; ⇧⌘R clears your saved search, plan and feedback.
+app window. ⌘R reloads. View → Clear Local Data erases your saved search, plan and learned preferences on this device.
 
 ### With accounts and messaging
 
