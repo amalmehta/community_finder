@@ -456,3 +456,5 @@ footer.site-footer p { margin: 0 0 6px; }
 .question .actions { margin-top: 18px; }
 .intake-done { margin: 8px 0 4px; gap: 12px; }
 .intake-done .hint { margin: 0; }
+
+.share-wrap { display: inline-flex; align-items: center; gap: 6px; }

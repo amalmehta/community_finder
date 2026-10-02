@@ -268,6 +268,17 @@ shipped a copy-and-paste introduction for each one; it was cut, along with the
 reassurance copy, on the grounds that the audience is perfectly capable of
 writing their own sentence.
 
+### Sharing
+
+Every listing has a **Share** button. It sends the name, where it is, the
+concrete first step and the link — enough for someone to act on without opening
+the app. On a phone it opens the native share sheet; everywhere else it copies
+to the clipboard, with a `document.execCommand` fallback for browsers that block
+the async clipboard API.
+
+Sharing is also recorded as a preference signal, weighted like opening the page
+but below saving it: sending something to a friend says you meant it.
+
 ### Learned preferences
 
 The app watches what you actually do — which first steps you expand, which

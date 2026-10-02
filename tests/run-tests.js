@@ -335,6 +335,14 @@ group('preference tracker', function () {
   FYC.prefs.record('expand', org('sf-fuf'));
   ok(!FYC.prefs.profile().ready, 'a single action is not enough to draw conclusions');
 
+  // Sharing is a strong signal, and must be weighted like one.
+  ok(FYC.prefs.ACTION_WEIGHTS.share > 0, 'sharing counts as interest');
+  ok(FYC.prefs.ACTION_WEIGHTS.share >= FYC.prefs.ACTION_WEIGHTS.open,
+     'and counts for at least as much as merely opening the page');
+  ok(FYC.prefs.ACTION_WEIGHTS.share < FYC.prefs.ACTION_WEIGHTS.plan,
+     'but less than actually saving it');
+  FYC.prefs.clear();
+
   // Repeated engagement with outdoor, free, gentle listings.
   ['sf-fuf', 'sf-alemany', 'sf-ggba'].forEach(function (id) {
     ['expand', 'open', 'plan', 'step'].forEach(function (t) { FYC.prefs.record(t, org(id)); });
@@ -435,6 +443,11 @@ group('front-end wiring', function () {
   ok(html.indexOf('fb-tab') !== -1, 'feedback tab is present');
   ok(html.indexOf('id="view-plan"') !== -1, 'plan view is present');
   ok(html.indexOf('id="view-you"') !== -1, 'preferences dashboard is present');
+
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+  ok(app.indexOf('navigator.share') !== -1, 'share uses the native sheet where there is one');
+  ok(app.indexOf('legacyCopy') !== -1, 'with a clipboard fallback');
+  ok(app.indexOf("track('share'") !== -1, 'and sharing is recorded as a preference signal');
 });
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');

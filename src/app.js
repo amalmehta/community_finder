@@ -233,6 +233,56 @@
     };
   }
 
+  /** What gets sent: the name, where, the first step, and the link. */
+  function shareText(org) {
+    var where = [org.neighborhood, org.cityName].filter(Boolean).join(', ');
+    return [
+      org.name + (where ? ' — ' + where : ''),
+      org.firstStep.label + (org.firstStep.when ? ' (' + org.firstStep.when + ')' : ''),
+      org.firstStep.url || org.url
+    ].join('\n');
+  }
+
+  /**
+   * Native share sheet where there is one (phones), clipboard everywhere else.
+   * Returns a promise for 'shared' | 'copied' | 'failed'.
+   */
+  function shareOrg(org) {
+    var text = shareText(org);
+    var url = org.firstStep.url || org.url;
+    if (navigator.share) {
+      return navigator.share({ title: org.name, text: text, url: url })
+        .then(function () { return 'shared'; })
+        .catch(function (e) {
+          // A cancelled share is not a failure; say nothing.
+          return (e && e.name === 'AbortError') ? 'cancelled' : copyText(text);
+        });
+    }
+    return Promise.resolve(copyText(text));
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(function () { return 'copied'; })
+        .catch(function () { return legacyCopy(text); });
+    }
+    return Promise.resolve(legacyCopy(text));
+  }
+
+  function legacyCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok ? 'copied' : 'failed';
+  }
+
   var STRUCTURE_LABEL = {
     'drop-in': 'Drop-in', 'register': 'Sign up first', 'course': 'Runs as a course',
     'shift': 'Book a shift', 'rsvp': 'RSVP first', 'search': 'Directory'
@@ -275,7 +325,23 @@
         el('button', {
           class: 'btn ghost sm', type: 'button',
           onclick: function (e) { addToPlan(org, e.currentTarget); }
-        }, ['Add to my plan'])
+        }, ['Add to my plan']),
+        (function () {
+          var note = el('span', { class: 'copied', hidden: true });
+          var btn = el('button', {
+            class: 'btn ghost sm', type: 'button',
+            onclick: function () {
+              shareOrg(org).then(function (how) {
+                if (how === 'cancelled') return;
+                track('share', org);
+                note.textContent = how === 'shared' ? 'Shared' : how === 'copied' ? 'Copied' : 'Could not copy';
+                note.hidden = false;
+                setTimeout(function () { note.hidden = true; }, 2000);
+              });
+            }
+          }, ['Share']);
+          return el('span', { class: 'share-wrap' }, [btn, note]);
+        })()
       ]),
       el('ul', { class: 'expect' }, org.expect.map(function (t) { return el('li', { text: t }); }))
     ]);

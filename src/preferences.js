@@ -20,7 +20,7 @@
   var WEIGHTS = {
     expand: 1,      // opened the first-step panel
     open: 2,        // followed the link to the organisation
-    copy: 3,        // copied the message to send — real intent
+    share: 3,       // sent it to someone — real intent
     plan: 4,        // saved it
     step: 3,        // ticked off one of the plan steps
     unplan: -3,     // removed it again

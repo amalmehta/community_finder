@@ -39,11 +39,23 @@
       id: 'pull', kind: 'many', max: 3, base: 95,
       prompt: 'Which of these pulls hardest right now?',
       hint: 'Up to three. Everything after this adapts to what you choose.',
-      options: FYC.GROUPS.map(function (grp) {
-        var eff = { group: {} };
-        eff.group[grp.id] = 3;
-        return pick(grp.id, grp.label, eff, grp.interests.slice(0, 4).map(function (x) { return x.label; }).join(' · '));
-      })
+      // Each group also seeds its two most representative interests, lightly.
+      // Without this, answering only this question and pressing "enough" gives
+      // the matcher nothing to work with.
+      options: (function () {
+        var SEED = {
+          move: ['outdoors', 'fitness'], make: ['art', 'crafts'],
+          think: ['books', 'games'], grow: ['gardening', 'nature'],
+          give: ['volunteering', 'civic'], belong: ['social', 'newcomer']
+        };
+        return FYC.GROUPS.map(function (grp) {
+          var eff = { group: {}, interests: {} };
+          eff.group[grp.id] = 3;
+          (SEED[grp.id] || []).forEach(function (id) { eff.interests[id] = 1; });
+          return pick(grp.id, grp.label, eff,
+            grp.interests.slice(0, 4).map(function (x) { return x.label; }).join(' · '));
+        });
+      })()
     },
 
     {
