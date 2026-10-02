@@ -468,6 +468,52 @@
         ],
         solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
         when: ['weekday-day', 'weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'impact']
+      },
+      {
+        id: 'sd-chessclub',
+        name: 'San Diego Chess Club',
+        neighborhood: 'North Park',
+        blurb: 'A long-running club with casual play nights alongside rated events, in a city where chess is also played outdoors in Balboa Park.',
+        interests: ['games', 'social'],
+        url: 'https://sandiegochessclub.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come to a casual club night',
+          url: 'https://sandiegochessclub.org/',
+          when: 'Club nights weekly; see the calendar'
+        },
+        script: 'Hi! I play chess casually and would like to come by. Which night suits an unrated beginner, and what is the fee for a first visit?',
+        expect: [
+          'A board means you can be quiet and still be part of things',
+          'Casual nights come before the rated tournaments \u2014 start there',
+          'Small drop-in fee',
+          'The outdoor chess tables in Balboa Park are the free alternative'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'routine', 'skill']
+      },
+      {
+        id: 'sd-realitychangers',
+        name: 'Reality Changers',
+        neighborhood: 'City Heights',
+        blurb: 'Helps first-generation students become the first in their families to attend college, with volunteers acting as tutors and mentors on weekly programme nights.',
+        interests: ['mentoring', 'volunteering', 'books'],
+        url: 'https://realitychangers.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Apply to volunteer as a tutor or mentor',
+          url: 'https://realitychangers.org/',
+          when: 'Weekly programme evenings during term'
+        },
+        script: 'Hi! I\'d like to volunteer as a tutor. I don\'t have a teaching background \u2014 is that alright, and what does getting started involve?',
+        expect: [
+          'No teaching background required; they brief volunteers',
+          'You work in a room alongside other volunteers, not alone',
+          'Expect an application and a background check',
+          'Free, and the weekly rhythm means you see the same students'
+        ],
+        solo: 5, gentleness: 4, structure: 'register', commitment: 'seasonal', cost: 0,
+        when: ['weekday-eve'], size: 'medium', goals: ['impact', 'skill']
       }
     ]
   });

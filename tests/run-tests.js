@@ -70,6 +70,16 @@ group('curated data integrity', function () {
     ok((curatedByInterest[i] || 0) >= 1,
        'interest "' + i + '" has at least one curated listing (' + (curatedByInterest[i] || 0) + ')');
   });
+
+  // Every city covers every interest, so no chip ever falls through to the
+  // national routes in a curated city. Keeping this green is the standard a
+  // newly added city has to meet.
+  FYC.cities.forEach(function (c) {
+    Object.keys(FYC.INTERESTS).forEach(function (i) {
+      ok(c.orgs.some(function (o) { return o.interests.indexOf(i) !== -1; }),
+         c.name + ' covers "' + i + '"');
+    });
+  });
 });
 
 // ---------------------------------------------------------------- city match
@@ -144,21 +154,36 @@ group('matcher behaviour', function () {
   // Previously, picking an interest with no curated listing returned a
   // confident list of unrelated groups with no matching reason on any card.
 
-  // Chicago has no curated board-games listing; the app must say so rather
-  // than pad the page out.
-  var gap = FYC.match({ location: 'Chicago', interests: ['games'], comfort: 2 });
+  // Use a synthetic city so this test cannot be invalidated by later curation.
+  FYC.addCity({
+    id: '__gaptest', name: 'Gaptestia', aliases: [], region: 'ZZ',
+    orgs: [{
+      id: '__gaptest-books', name: 'Gaptestia Reading Room', neighborhood: 'Centre',
+      blurb: 'A synthetic listing used only by the test suite to simulate a city that covers one interest and not another.',
+      interests: ['books'], url: 'https://example.invalid/',
+      firstStep: { kind: 'visit', label: 'Visit', url: 'https://example.invalid/', when: '' },
+      script: null, expect: ['a', 'b', 'c'],
+      solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+      when: ['weekend'], size: 'small', goals: ['friends']
+    }]
+  });
+
+  var gap = FYC.match({ location: 'Gaptestia', interests: ['games'], comfort: 2 });
   eq(gap.cityMatched, true, 'uncovered interest: city still recognised');
   eq(gap.results.length, 0, 'uncovered interest returns no curated results');
   ok(gap.uncovered.indexOf('games') !== -1, 'uncovered interest is reported');
   ok(gap.universal.length > 0, 'uncovered interest still gets national routes');
 
   // A mix of covered and uncovered: keep the real matches, flag the rest.
-  var mixed = FYC.match({ location: 'Chicago', interests: ['books', 'games'], comfort: 2 });
+  var mixed = FYC.match({ location: 'Gaptestia', interests: ['books', 'games'], comfort: 2 });
   ok(mixed.results.length > 0, 'mixed coverage still returns the covered matches');
   ok(mixed.results.every(function (r) { return r.overlap > 0; }),
      'every curated result matches at least one chosen interest');
   ok(mixed.covered.indexOf('books') !== -1, 'covered interest reported as covered');
   ok(mixed.uncovered.indexOf('games') !== -1, 'uncovered interest reported as uncovered');
+
+  // Drop the synthetic city again so it cannot affect anything below.
+  FYC.cities = FYC.cities.filter(function (c) { return c.id !== '__gaptest'; });
 
   // Across every city and every interest: never present a non-match as a match.
   var leaked = 0, reasonless = 0;

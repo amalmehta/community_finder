@@ -491,6 +491,29 @@
         ],
         solo: 5, gentleness: 5, structure: 'rsvp', commitment: 'one-off', cost: 1,
         when: ['weekday-day', 'weekday-eve'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'bos-boylston',
+        name: 'Boylston Chess Club',
+        neighborhood: 'Somerville',
+        blurb: 'One of the oldest chess clubs in the country, running casual play alongside tournaments in its own dedicated space.',
+        interests: ['games', 'social'],
+        url: 'https://boylstonchess.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come to a casual club night',
+          url: 'https://boylstonchess.org/',
+          when: 'Club nights through the week'
+        },
+        script: 'Hi! I play chess casually and would like to come by. Which night suits an unrated beginner, and what is the fee for a first visit?',
+        expect: [
+          'A board is a conversation you do not have to start',
+          'Casual nights are separate from the rated tournaments \u2014 start there',
+          'Small entry fee or membership',
+          'Unrated beginners do turn up, and have for a century'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'routine', 'skill']
       }
     ]
   });

@@ -514,6 +514,52 @@
         ],
         solo: 5, gentleness: 4, structure: 'register', commitment: 'one-off', cost: 0,
         when: ['flexible'], size: 'small', goals: ['impact', 'skill']
+      },
+      {
+        id: 'atx-emeraldtavern',
+        name: 'Emerald Tavern Games & Cafe',
+        neighborhood: 'North Austin',
+        blurb: 'A board game cafe with a large lending library of games, open play tables and regular game nights where staff will match you into a group.',
+        interests: ['games', 'social'],
+        url: 'https://emeraldtavern.com/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come to an open game night and ask to be put in a game',
+          url: 'https://emeraldtavern.com/',
+          when: 'Open play daily; game nights through the week'
+        },
+        script: 'Hi! I\'d like to come to an open game night on my own. How does it work if you arrive without a group \u2014 do people get matched into games?',
+        expect: [
+          'Staff will seat you with other people \u2014 you do not need to bring a group',
+          'A game gives everyone a script for the first hour',
+          'Small table fee plus whatever you drink',
+          'Turning up alone is common and nobody finds it odd'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['friends', 'routine', 'skill']
+      },
+      {
+        id: 'atx-partners',
+        name: 'Austin Partners in Education',
+        neighborhood: 'AISD schools',
+        blurb: 'Places volunteers in classrooms as reading and maths coaches, working with the same small group of students through the school year.',
+        interests: ['mentoring', 'volunteering', 'books'],
+        url: 'https://austinpartners.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Apply as a classroom coach and attend the training',
+          url: 'https://austinpartners.org/',
+          when: 'School-year commitment, weekday mornings'
+        },
+        script: 'Hi! I\'d like to volunteer as a coach. I\'ve never taught anything \u2014 is the training enough for someone like me, and when does the next cohort start?',
+        expect: [
+          'Training is provided and assumes no teaching experience',
+          'You see the same students weekly, which is the point',
+          'Expect a background check and a school-year commitment',
+          'Free, and sessions are usually an hour a week'
+        ],
+        solo: 5, gentleness: 4, structure: 'register', commitment: 'seasonal', cost: 0,
+        when: ['weekday-day'], size: 'medium', goals: ['impact', 'skill']
       }
     ]
   });

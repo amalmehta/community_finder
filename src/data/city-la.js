@@ -514,6 +514,29 @@
         ],
         solo: 4, gentleness: 4, structure: 'register', commitment: 'seasonal', cost: 0,
         when: ['weekend', 'weekday-day'], size: 'small', goals: ['friends', 'impact', 'skill']
+      },
+      {
+        id: 'la-gamehaus',
+        name: 'The Game Haus Cafe',
+        neighborhood: 'Glendale',
+        blurb: 'A board game cafe with a library of well over a thousand games and staff whose job is to teach them to you and seat you with other people.',
+        interests: ['games', 'social'],
+        url: 'https://gamehauscafe.com/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come in alone and ask to be seated with a group',
+          url: 'https://gamehauscafe.com/',
+          when: 'Open daily, afternoons and evenings'
+        },
+        script: 'Hi! I\'d like to come to an open game night on my own. How does it work if you arrive without a group \u2014 do people get matched into games?',
+        expect: [
+          'Staff teach the rules and will put solo visitors into a game',
+          'A board game is the easiest possible structure for talking to strangers',
+          'Small cover charge for unlimited play',
+          'In a city where everything requires a plan, this requires none'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['friends', 'routine', 'skill']
       }
     ]
   });

@@ -491,6 +491,29 @@
         ],
         solo: 5, gentleness: 5, structure: 'register', commitment: 'one-off', cost: 1,
         when: ['weekend'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'chi-chesscenter',
+        name: 'Chicago Chess Center',
+        neighborhood: 'Rogers Park',
+        blurb: 'A nonprofit chess club with open play, lessons and tournaments, set up specifically so the city has a permanent place to just turn up and play.',
+        interests: ['games', 'social'],
+        url: 'https://chicagochesscenter.com/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come to an open play session',
+          url: 'https://chicagochesscenter.com/',
+          when: 'Open play most evenings; check the calendar'
+        },
+        script: 'Hi! I play chess casually and would like to come by. Which night suits an unrated beginner, and what is the fee for a first visit?',
+        expect: [
+          'A board is a conversation you do not have to start',
+          'Open play exists for people who arrive alone \u2014 someone will play you',
+          'Small drop-in fee or membership',
+          'Being clearly worse than everyone there is a normal way to begin'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['friends', 'routine', 'skill']
       }
     ]
   });

@@ -514,6 +514,52 @@
         ],
         solo: 5, gentleness: 5, structure: 'shift', commitment: 'one-off', cost: 1,
         when: ['weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'impact', 'skill']
+      },
+      {
+        id: 'sea-chessclub',
+        name: 'Seattle Chess Club',
+        neighborhood: 'North Seattle',
+        blurb: 'A long-running club with casual play nights alongside rated tournaments, in a dedicated room rather than the back of a cafe.',
+        interests: ['games', 'social'],
+        url: 'https://seattlechess.club/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come to a casual play night',
+          url: 'https://seattlechess.club/',
+          when: 'Weekly club nights; see the calendar'
+        },
+        script: 'Hi! I play chess casually and would like to come by. Which night suits an unrated beginner, and what is the fee for a first visit?',
+        expect: [
+          'A board means you can be quiet and still belong',
+          'Casual nights exist separately from the serious tournaments \u2014 start there',
+          'Modest drop-in fee',
+          'Players there are used to teaching beginners'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'routine', 'skill']
+      },
+      {
+        id: 'sea-pageahead',
+        name: 'Page Ahead',
+        neighborhood: 'Schools across the region',
+        blurb: 'Puts books into the hands of children who own none, with volunteers reading alongside kids in schools and at book-selection events.',
+        interests: ['mentoring', 'volunteering', 'books'],
+        url: 'https://pageahead.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Sign up for a volunteer reading or book-event shift',
+          url: 'https://pageahead.org/',
+          when: 'Shifts during school terms'
+        },
+        script: 'Hi \u2014 I\'d like to volunteer. I have no teaching background; is the reading programme still right for me, and what\'s the first step?',
+        expect: [
+          'No teaching background needed \u2014 they brief you',
+          'You work alongside other volunteers, not alone with a class',
+          'Expect a background check before you start',
+          'Free, and shifts are during the school day'
+        ],
+        solo: 5, gentleness: 4, structure: 'register', commitment: 'seasonal', cost: 0,
+        when: ['weekday-day'], size: 'medium', goals: ['impact', 'skill']
       }
     ]
   });

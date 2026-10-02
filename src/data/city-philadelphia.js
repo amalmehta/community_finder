@@ -491,6 +491,29 @@
         ],
         solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
         when: ['weekend', 'weekday-day'], size: 'small', goals: ['impact', 'friends', 'routine']
+      },
+      {
+        id: 'phl-queenandrook',
+        name: 'Queen & Rook Game Cafe',
+        neighborhood: 'South Street',
+        blurb: 'A board game cafe with hundreds of games, a game guide who recommends and teaches them, and open tables where strangers end up playing together.',
+        interests: ['games', 'social'],
+        url: 'https://queenandrook.com/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come in and ask the game guide to teach you something',
+          url: 'https://queenandrook.com/',
+          when: 'Open most days and evenings'
+        },
+        script: 'Hi! I\'d like to come to an open game night on my own. How does it work if you arrive without a group \u2014 do people get matched into games?',
+        expect: [
+          'The staff teach you the rules, so you never have to read a rulebook alone',
+          'A game gives everyone something to do with their hands and their attention',
+          'Small table fee plus food and drink',
+          'Solo visitors get seated with others if they want to be'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['friends', 'routine', 'skill']
       }
     ]
   });

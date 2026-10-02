@@ -468,6 +468,52 @@
         ],
         solo: 5, gentleness: 5, structure: 'rsvp', commitment: 'one-off', cost: 0,
         when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['friends', 'skill']
+      },
+      {
+        id: 'dc-labyrinth',
+        name: 'Labyrinth Games & Puzzles',
+        neighborhood: 'Capitol Hill',
+        blurb: 'An independent game shop running open play nights, learn-to-play sessions and tournaments \u2014 a neighbourhood institution rather than a chain.',
+        interests: ['games', 'social'],
+        url: 'https://labyrinthgameshop.com/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come to an open play or learn-to-play night',
+          url: 'https://labyrinthgameshop.com/',
+          when: 'Game nights through the week'
+        },
+        script: 'Hi! I\'d like to come to an open game night on my own. How does it work if you arrive without a group \u2014 do people get matched into games?',
+        expect: [
+          'Learn-to-play sessions assume you know nothing about the game',
+          'Open play nights are specifically for people who arrive without a group',
+          'Usually free or the price of a drink',
+          'Staff are used to matching solo players into games'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 0,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'routine', 'skill']
+      },
+      {
+        id: 'dc-hortonskids',
+        name: "Horton's Kids",
+        neighborhood: 'Ward 8, Anacostia',
+        blurb: 'Works intensively with children in one neighbourhood, pairing volunteers as tutors and mentors with the same child over years rather than weeks.',
+        interests: ['mentoring', 'volunteering', 'books'],
+        url: 'https://hortonskids.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Apply to be a tutor or mentor',
+          url: 'https://hortonskids.org/',
+          when: 'Weekly sessions during the school year'
+        },
+        script: 'Hi \u2014 I\'d like to volunteer as a tutor. I don\'t have a teaching background; what does the application involve and what commitment are you looking for?',
+        expect: [
+          'Expect an application, background check and training \u2014 this is a real commitment',
+          'Staff support the match, so you are never left to figure it out alone',
+          'Weekly sessions, usually after school',
+          'Free to you'
+        ],
+        solo: 5, gentleness: 4, structure: 'register', commitment: 'seasonal', cost: 0,
+        when: ['weekday-day', 'weekday-eve'], size: 'medium', goals: ['impact', 'skill']
       }
     ]
   });
