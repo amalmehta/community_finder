@@ -10,9 +10,9 @@ It is deliberately anti-intimidation. Every listing carries a concrete first
 step, a "what to expect" list written for someone who is nervous, and where
 relevant a copy-and-paste message you can send without composing it yourself.
 
-- **Eight cities are hand-curated** — San Francisco Bay Area, New York City,
-  Chicago, Seattle, Austin, Boston, Philadelphia and Washington DC
-  (134 organisations, every link checked).
+- **Ten cities are hand-curated** — San Francisco Bay Area, New York City,
+  Los Angeles, Chicago, Seattle, Austin, Boston, Philadelphia, Washington DC
+  and San Diego (163 organisations, every link checked).
 - **Every other city works too.** A fallback engine builds live, working links
   into national directories (Meetup, VolunteerMatch, parkrun, Feeding America,
   CenterLink, Repair Café, Audubon, RRCA and more), pointed at the city you
@@ -119,7 +119,7 @@ index.html            the whole UI
 assets/styles.css     styling, light + dark, mobile-first breakpoints
 src/
   data/core.js        interest taxonomy (32 interests in 6 groups) + city registry
-  data/city-*.js      the eight hand-curated city datasets
+  data/city-*.js      the ten hand-curated city datasets
   data/universal.js   fallback recipes → real deep links for any city
   match.js            the scoring engine (pure functions, no DOM)
   app.js              DOM rendering, plan, feedback
@@ -170,7 +170,7 @@ and no network request other than the links you choose to click.
 
 ## Known limits
 
-- Curated coverage is eight metros. Everywhere else gets the fallback engine,
+- Curated coverage is ten metros. Everywhere else gets the fallback engine,
   which is genuinely useful but not the same as a hand-picked list.
 - Listings are a point-in-time snapshot. Groups fold, move and change schedules.
   Re-run `node tools/check-links.js` periodically; the app tells users to check
