@@ -704,6 +704,54 @@
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
+  // ---------- theme ----------
+  // Three states, because "follow the system" is a real preference and not the
+  // same as picking light.
+  var THEMES = ['auto', 'light', 'dark'];
+  var THEME_UI = {
+    auto: { icon: '\u25D0', label: 'Auto' },
+    light: { icon: '\u2600', label: 'Light' },
+    dark: { icon: '\u263E', label: 'Dark' }
+  };
+
+  function currentTheme() {
+    var t = null;
+    try { t = localStorage.getItem('fyc.theme.v1'); } catch (e) { t = null; }
+    return THEMES.indexOf(t) !== -1 ? t : 'auto';
+  }
+
+  function applyTheme(t) {
+    if (t === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', t);
+    try {
+      if (t === 'auto') localStorage.removeItem('fyc.theme.v1');
+      else localStorage.setItem('fyc.theme.v1', t);
+    } catch (e) { /* private mode */ }
+    paintTheme();
+  }
+
+  function paintTheme() {
+    var btn = $('#theme-toggle');
+    if (!btn) return;
+    var t = currentTheme();
+    var ui = THEME_UI[t];
+    btn.innerHTML = '';
+    btn.appendChild(el('span', { class: 'theme-icon', 'aria-hidden': 'true', text: ui.icon }));
+    btn.appendChild(el('span', { class: 'theme-label', text: ui.label }));
+    btn.setAttribute('title', 'Theme: ' + ui.label + ' (click to change)');
+    btn.setAttribute('aria-label', 'Colour theme: ' + ui.label);
+  }
+
+  function wireTheme() {
+    var btn = $('#theme-toggle');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var next = THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length];
+      applyTheme(next);
+    });
+    paintTheme();
+  }
+
   // ---------- feedback ----------
   function wireFeedback() {
     var panel = $('#fb-panel'), tab = $('#fb-tab'), thanks = $('#fb-thanks');
@@ -773,6 +821,7 @@
 
   // ---------- boot ----------
   function init() {
+    wireTheme();
     wireFeedback();
     paintPlanCount();
 

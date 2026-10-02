@@ -7,6 +7,13 @@
 <meta name="description" content="Real local communities by city and interest, with the concrete first step, the cost and the commitment for each.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🫂</text></svg>">
 <link rel="stylesheet" href="assets/styles.css">
+<script>
+  // Inline and before the stylesheet renders: avoids a flash of the wrong theme.
+  try {
+    var t = localStorage.getItem('fyc.theme.v1');
+    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+</script>
 </head>
 <body>
 
@@ -20,6 +27,7 @@
       <button class="tab" id="tab-people" role="tab" aria-selected="false" aria-controls="view-people" hidden>People</button>
       <button class="tab" id="tab-messages" role="tab" aria-selected="false" aria-controls="view-messages" hidden>Messages<span class="count" id="msg-count" hidden>0</span></button>
       <button class="tab" id="tab-signout" type="button" hidden>Sign out</button>
+      <button class="theme-btn" id="theme-toggle" type="button" aria-label="Colour theme"></button>
     </nav>
   </div>
 </header>

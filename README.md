@@ -268,6 +268,13 @@ shipped a copy-and-paste introduction for each one; it was cut, along with the
 reassurance copy, on the grounds that the audience is perfectly capable of
 writing their own sentence.
 
+### Theme
+
+The header toggle cycles **Auto → Light → Dark**. Auto follows the operating
+system; the other two override it and persist. The saved choice is applied by an
+inline script before the stylesheet renders, so there is no flash of the wrong
+theme on load.
+
 ### Sharing
 
 Every listing has a **Share** button. It sends the name, where it is, the

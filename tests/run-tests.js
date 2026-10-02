@@ -448,6 +448,18 @@ group('front-end wiring', function () {
   ok(app.indexOf('navigator.share') !== -1, 'share uses the native sheet where there is one');
   ok(app.indexOf('legacyCopy') !== -1, 'with a clipboard fallback');
   ok(app.indexOf("track('share'") !== -1, 'and sharing is recorded as a preference signal');
+
+  // Theme: a manual choice has to beat the system setting, and be applied
+  // before first paint or the page flashes the wrong colours.
+  ok(html.indexOf('id="theme-toggle"') !== -1, 'the theme toggle is in the header');
+  ok(html.indexOf("localStorage.getItem('fyc.theme.v1')") !== -1,
+     'the saved theme is read inline, before the stylesheet renders');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  ok(css.indexOf(':root[data-theme="dark"]') !== -1, 'an explicit dark theme exists');
+  ok(css.indexOf(':root:not([data-theme="light"])') !== -1,
+     'and choosing light overrides a system that prefers dark');
+  ok(app.indexOf("THEMES = ['auto', 'light', 'dark']") !== -1,
+     'the toggle has three states, so following the system stays an option');
 });
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');
