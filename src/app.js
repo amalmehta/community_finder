@@ -707,6 +707,10 @@
 
     paintPicked();
 
+    // social.js owns tab switching when a backend is present, so it needs a way
+    // to run these renderers. Without this the Plan and You tabs show empty.
+    window.FYC_VIEWS = { plan: renderPlan, you: renderYou };
+
     $('#finder').addEventListener('submit', function (e) {
       e.preventDefault();
       var p = profile();

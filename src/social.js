@@ -369,19 +369,32 @@
     var input = el('textarea', { class: 'msg-input', placeholder: 'Write a message…', rows: '2' });
     var err = el('p', { class: 'err', hidden: true });
     var lastId = 0;
+    var seen = Object.create(null);   // message ids already on screen
+    var pulling = false;              // only one request in flight at a time
 
+    // Sending triggers a pull, and so does the 5s timer. Without the guard and
+    // the id check, two overlapping pulls share a cursor and render the same
+    // message twice.
     async function pull() {
+      if (pulling) return;
+      pulling = true;
       try {
         var r = await api('GET', '/api/threads/' + t.id + '/messages?since=' + lastId);
+        var added = 0;
         r.messages.forEach(function (m) {
+          if (seen[m.id]) return;
+          seen[m.id] = true;
           lastId = Math.max(lastId, m.id);
+          added++;
           list.appendChild(el('div', { class: 'msg ' + (m.sender_id === S.user.id ? 'mine' : 'theirs') }, [
             el('p', { text: m.body }),
             el('span', { class: 'msg-time', text: ago(m.created_at) })
           ]));
         });
-        if (r.messages.length) list.scrollTop = list.scrollHeight;
-      } catch (e) { /* transient */ }
+        if (added) list.scrollTop = list.scrollHeight;
+      } catch (e) { /* transient */ } finally {
+        pulling = false;
+      }
     }
 
     async function send() {
@@ -530,6 +543,8 @@
     stopPolling();
     if (which === 'people') renderPeople();
     if (which === 'messages') renderMessages();
+    // The finder's own tabs are rendered by app.js.
+    if (window.FYC_VIEWS && window.FYC_VIEWS[which]) window.FYC_VIEWS[which]();
     window.scrollTo({ top: 0 });
   }
 
