@@ -2,7 +2,14 @@
 
 A small web app for the problem of *"I live here and I don't know anyone."*
 
-Tell it where you live and what you're drawn to. It returns real local groups —
+It asks **twenty questions, chosen one at a time**. What you have already said
+decides what comes next: pick "Give" and it asks what kind of useful; say a room
+of strangers is hard and it asks what would make it easier; say you want friends
+and it asks whether you want the same faces every week. Once your chosen areas
+are drilled out it probes the ones you skipped, at half weight — which is where
+the surprises come from.
+
+Then it returns real local groups —
 and for each one, the information you can't get without ringing round: **the
 concrete first step, what it costs, what the commitment is, and what actually
 happens when you turn up.**
@@ -189,6 +196,12 @@ threads, blocking, reporting, rate limits, and that the server serves only the
 front end — not its own source, the database, or anything reachable by path
 traversal.
 
+The intake has its own tests: that a run is exactly twenty questions, that
+different answers produce measurably different questions, that choosing an area
+asks its drill-downs and skips the others, that deliberate answers outrank
+probes, that negative answers push things down, and that it terminates however
+it is answered.
+
 Manual check: open the app, type `Brooklyn`, pick a few interests, and confirm
 you get New York listings with a "Start here" card. Then type `Boise, Idaho` and
 confirm you get the national-routes view instead.
@@ -204,6 +217,7 @@ src/
   data/core.js        interest taxonomy (32 interests in 6 groups) + city registry
   data/city-*.js      the ten hand-curated city datasets
   data/universal.js   fallback recipes → real deep links for any city
+  intake.js           the adaptive 20-question engine (pure functions, no DOM)
   preferences.js      on-device preference tracker (pure functions, injectable storage)
   social.js           accounts, people and messaging UI (inert without a backend)
   match.js            the scoring engine (pure functions, no DOM)

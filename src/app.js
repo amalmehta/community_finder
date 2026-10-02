@@ -44,7 +44,7 @@
   function $$(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
 
   // ---------- storage ----------
-  var KEY = { plan: 'fyc.plan.v1', profile: 'fyc.profile.v1', feedback: 'fyc.feedback.v1' };
+  var KEY = { plan: 'fyc.plan.v1', profile: 'fyc.profile.v1', feedback: 'fyc.feedback.v1', intake: 'fyc.intake.v1' };
   function load(key, fallback) {
     try {
       var raw = localStorage.getItem(key);
@@ -67,112 +67,156 @@
   var MAX_INTERESTS = 6;
   var plan = load(KEY.plan, []);
 
-  // ---------- build the form ----------
-  function buildCityChips() {
-    var host = $('#city-quick');
-    FYC.cities.forEach(function (c) {
-      host.appendChild(el('button', {
-        type: 'button', class: 'chip',
-        onclick: function () { $('#location').value = c.name; paintPicked(); }
-      }, [c.name]));
-    });
+  // ---------- the adaptive intake ----------
+  var I = FYC.intake;
+  var session = null;
+
+  function newSession() {
+    session = I.blankState();
+    save(KEY.intake, session);
+    return session;
   }
 
-  function buildInterests() {
-    var host = $('#interest-groups');
-    FYC.GROUPS.forEach(function (grp) {
+  function resumeSession() {
+    var saved = load(KEY.intake, null);
+    session = (saved && Array.isArray(saved.asked)) ? saved : I.blankState();
+    return session;
+  }
+
+  function questionCard(q) {
+    var prog = I.progress(session);
+    var box = el('article', { class: 'card question' });
+
+    var bar = el('i');
+    bar.style.width = Math.round((prog.asked / prog.total) * 100) + '%';
+    box.appendChild(el('div', { class: 'q-head' }, [
+      el('span', { class: 'q-count', text: 'Question ' + (prog.asked + 1) + ' of ' + prog.total }),
+      el('div', { class: 'progress' }, [bar])
+    ]));
+
+    box.appendChild(el('h2', { class: 'q-prompt', text: q.prompt }));
+    if (q.hint) box.appendChild(el('p', { class: 'hint', text: q.hint }));
+
+    var answer = null;
+
+    if (q.kind === 'text') {
+      var input = el('input', { type: 'text', placeholder: q.placeholder || '', 'aria-label': q.prompt });
+      if (q.id === 'city' && session.city) input.value = session.city;
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); submit(input.value); }
+      });
+      box.appendChild(input);
+      answer = function () { return input.value; };
+      setTimeout(function () { input.focus(); }, 30);
+
+    } else if (q.kind === 'one') {
+      var choices = el('div', { class: 'choices' });
+      q.options.forEach(function (o) {
+        choices.appendChild(el('button', {
+          type: 'button', class: 'choice',
+          onclick: function () { submit(o.id); }
+        }, [el('b', { text: o.label }), o.hint ? el('span', { text: o.hint }) : null]));
+      });
+      box.appendChild(choices);
+
+    } else {
+      var picked = [];
       var pills = el('div', { class: 'pills' });
-      grp.interests.forEach(function (i) {
+      q.options.forEach(function (o) {
         var btn = el('button', {
-          type: 'button', class: 'pill', 'aria-pressed': 'false', 'data-interest': i.id,
-          onclick: function () { toggleInterest(i.id); }
-        }, [
-          el('span', { 'aria-hidden': 'true', text: i.icon }),
-          el('span', { text: i.label }),
-          el('span', { class: 'rank', hidden: true })
-        ]);
+          type: 'button', class: 'pill', 'aria-pressed': 'false',
+          onclick: function () {
+            var at = picked.indexOf(o.id);
+            if (at !== -1) picked.splice(at, 1);
+            else if (picked.length < (q.max || 99)) picked.push(o.id);
+            btn.setAttribute('aria-pressed', picked.indexOf(o.id) !== -1 ? 'true' : 'false');
+          }
+        }, [el('span', { text: o.label })]);
         pills.appendChild(btn);
       });
-      host.appendChild(el('div', { class: 'group' }, [el('h3', { text: grp.label }), pills]));
-    });
+      box.appendChild(pills);
+      answer = function () { return picked; };
+    }
+
+    var actions = el('div', { class: 'actions' }, [
+      (q.kind !== 'one') ? el('button', {
+        class: 'btn', type: 'button', onclick: function () { submit(answer()); }
+      }, ['Next']) : null,
+      el('button', {
+        class: 'btn ghost sm', type: 'button',
+        onclick: function () { submit(q.kind === 'many' ? [] : null); }
+      }, ['Skip']),
+      el('button', {
+        class: 'btn ghost sm', type: 'button',
+        onclick: function () { finish(true); }
+      }, ['Enough — show me results'])
+    ]);
+    box.appendChild(actions);
+    box.appendChild(el('p', { class: 'err', id: 'q-error', hidden: true }));
+    return box;
   }
 
-  function toggleInterest(id) {
-    var at = state.interests.indexOf(id);
-    if (at !== -1) state.interests.splice(at, 1);
-    else if (state.interests.length >= MAX_INTERESTS) {
-      flashError('That&rsquo;s six &mdash; plenty. Unpick one if you&rsquo;d rather swap.');
+  function submit(value) {
+    var q = I.nextQuestion(session);
+    if (!q) return finish(false);
+
+    if (q.id === 'city' && !String(value || '').trim()) {
+      var e = $('#q-error');
+      if (e) { e.textContent = 'A city is needed — everything else depends on it.'; e.hidden = false; }
       return;
-    } else state.interests.push(id);
-    paintInterests();
+    }
+    if (value !== null) I.answer(session, q, value);
+    else session.asked.push(q.id);           // skipped: counts, contributes nothing
+
+    save(KEY.intake, session);
+    paintIntake();
   }
 
-  // One-line readiness hint beside the submit button, so people can see what's
-  // still missing without scrolling back up.
-  function paintPicked() {
-    var box = $('#picked');
-    var city = $('#location').value.trim();
-    var n = state.interests.length;
-    var missing = [];
-    if (!city) missing.push('a city');
-    if (!n) missing.push('at least one interest');
-    box.classList.toggle('ready', !missing.length);
-    box.textContent = missing.length
-      ? missing.join(' and ') + ' needed'
-      : (FYC.findCity(city) ? FYC.findCity(city).name : city) + ' · ' + n + (n === 1 ? ' interest' : ' interests');
+  function paintIntake() {
+    var host = $('#intake');
+    host.innerHTML = '';
+    if (I.done(session)) return finish(false);
+    var q = I.nextQuestion(session);
+    if (!q) return finish(false);
+    host.appendChild(questionCard(q));
   }
 
-  function paintInterests() {
-    paintPicked();
-    $$('[data-interest]').forEach(function (btn) {
-      var idx = state.interests.indexOf(btn.getAttribute('data-interest'));
-      var on = idx !== -1;
-      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-      var rank = btn.querySelector('.rank');
-      rank.hidden = !on;
-      rank.textContent = on ? String(idx + 1) : '';
-    });
-  }
+  /** Build the profile and show results. `early` = they pressed the escape. */
+  function finish(early) {
+    var p = I.toProfile(session);
+    if (!p.location) {
+      $('#intake').innerHTML = '';
+      $('#intake').appendChild(questionCard(I.QUESTIONS[0]));
+      return;
+    }
+    save(KEY.profile, p);
+    if (FYC.prefs && FYC.prefs.isEnabled()) p.learned = FYC.prefs.profile();
 
-  // Generic pill group wiring. `multi` = checkbox-style, else radio-style.
-  function wirePills(sel, key, multi, cast) {
-    $$(sel + ' .pill').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var raw = btn.getAttribute('data-value');
-        var val = cast ? cast(raw) : raw;
-        if (multi) {
-          var arr = state[key];
-          var at = arr.indexOf(val);
-          if (at === -1) arr.push(val); else arr.splice(at, 1);
-        } else {
-          state[key] = state[key] === val ? null : val;
-        }
-        $$(sel + ' .pill').forEach(function (b) {
-          var v = cast ? cast(b.getAttribute('data-value')) : b.getAttribute('data-value');
-          var on = multi ? state[key].indexOf(v) !== -1 : state[key] === v;
-          b.setAttribute('aria-pressed', on ? 'true' : 'false');
-        });
-      });
-    });
-  }
+    var host = $('#intake');
+    host.innerHTML = '';
+    host.appendChild(el('div', { class: 'actions intake-done' }, [
+      el('span', { class: 'hint', text: session.asked.length + ' of ' + I.TOTAL + ' questions answered' +
+        (p.interests.length ? ' · ' + p.interests.map(function (id) { return (FYC.INTERESTS[id] || {}).label || id; }).join(', ') : '') }),
+      el('button', { class: 'btn ghost sm', type: 'button', onclick: function () {
+        newSession(); $('#results').hidden = true; paintIntake();
+      } }, ['Start over']),
+      // Only offered when questions actually remain.
+      (!I.done(session)) ? el('button', { class: 'btn ghost sm', type: 'button', onclick: function () {
+        $('#results').hidden = true;
+        paintIntake();
+      } }, ['Keep answering']) : null
+    ]));
 
-  function wireComfort() {
-    $$('#comfort .choice').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        state.comfort = Number(btn.getAttribute('data-value'));
-        $$('#comfort .choice').forEach(function (b) {
-          b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
-        });
-      });
-    });
-  }
-
-  function flashError(msgHtml) {
-    var box = $('#form-error');
-    box.innerHTML = msgHtml;
-    box.hidden = false;
-    clearTimeout(flashError.t);
-    flashError.t = setTimeout(function () { box.hidden = true; }, 5000);
+    if (!p.interests.length) {
+      $('#results').innerHTML = '';
+      $('#results').appendChild(el('div', { class: 'card empty' }, [
+        el('h2', { text: 'Not enough to go on.' }),
+        el('p', { text: 'Answer a few more questions, or start over.' })
+      ]));
+      $('#results').hidden = false;
+      return;
+    }
+    render(FYC.match(p), p);
   }
 
   // ---------- results ----------
@@ -663,72 +707,18 @@
 
   // ---------- boot ----------
   function init() {
-    buildCityChips();
-    buildInterests();
-    wireComfort();
-    wirePills('#when', 'when', true);
-    wirePills('#goals', 'goals', true);
-    wirePills('#commitment', 'commitment', false);
-    wirePills('#budget', 'budget', false, Number);
     wireFeedback();
     paintPlanCount();
 
     $('#tab-find').addEventListener('click', function () { showTab('find'); });
     $('#tab-plan').addEventListener('click', function () { showTab('plan'); });
     $('#tab-you').addEventListener('click', function () { showTab('you'); });
-    $('#surprise').addEventListener('click', surprise);
-    $('#location').addEventListener('input', paintPicked);
 
-    // Restore the last search so a refresh doesn't punish you.
-    var saved = load(KEY.profile, null);
-    if (saved) {
-      $('#location').value = saved.location || '';
-      $('#firstname').value = saved.name || '';
-      state.interests = (saved.interests || []).slice(0, MAX_INTERESTS);
-      state.comfort = saved.comfort || 1;
-      state.when = saved.when || [];
-      state.goals = saved.goals || [];
-      state.commitment = saved.commitment || null;
-      state.budget = saved.budget == null ? null : saved.budget;
-      paintInterests();
-      $$('#comfort .choice').forEach(function (b) {
-        b.setAttribute('aria-pressed', Number(b.getAttribute('data-value')) === state.comfort ? 'true' : 'false');
-      });
-      [['#when', 'when', true], ['#goals', 'goals', true], ['#commitment', 'commitment', false], ['#budget', 'budget', false]]
-        .forEach(function (cfg) {
-          $$(cfg[0] + ' .pill').forEach(function (b) {
-            var raw = b.getAttribute('data-value');
-            var v = cfg[0] === '#budget' ? Number(raw) : raw;
-            var on = cfg[2] ? state[cfg[1]].indexOf(v) !== -1 : state[cfg[1]] === v;
-            b.setAttribute('aria-pressed', on ? 'true' : 'false');
-          });
-        });
-    }
-
-    paintPicked();
-
-    // social.js owns tab switching when a backend is present, so it needs a way
-    // to run these renderers. Without this the Plan and You tabs show empty.
     window.FYC_VIEWS = { plan: renderPlan, you: renderYou };
 
-    $('#finder').addEventListener('submit', function (e) {
-      e.preventDefault();
-      var p = profile();
-      if (!p.location) {
-        flashError('Where are you? A city name is enough.');
-        $('#location').focus();
-        return;
-      }
-      if (!p.interests.length) {
-        flashError('Pick at least one thing you&rsquo;re drawn to.');
-        return;
-      }
-      save(KEY.profile, p);
-      if (FYC.prefs && FYC.prefs.isEnabled()) p.learned = FYC.prefs.profile();
-      var m = FYC.match(p);
-      render(m, p);
-      $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    resumeSession();
+    if (I.done(session) && session.city) finish(false);
+    else paintIntake();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

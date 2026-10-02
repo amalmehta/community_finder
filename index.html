@@ -33,93 +33,10 @@
 
       <div class="intro" id="intro">
         <h1>Find your people.</h1>
-        <p>Real local groups, what they cost, and what actually happens when you turn up.</p>
+        <p>Twenty questions, adapting as you go. Then real local groups, what they cost, and what actually happens when you turn up.</p>
       </div>
 
-      <form class="card" id="finder" novalidate>
-
-        <div class="step">
-          <h2>1 &middot; Where are you?</h2>
-          <p class="hint">Any city or neighbourhood.</p>
-          <label class="sr-only" for="location">Your city</label>
-          <input type="text" id="location" name="location" placeholder="e.g. Oakland, or Brooklyn, or Boise" autocomplete="address-level2">
-          <div class="quick" id="city-quick"><span class="lbl">Hand-picked lists:</span></div>
-        </div>
-
-        <div class="step">
-          <h2>2 &middot; What pulls at you?</h2>
-          <p class="hint">Up to six. First pick weighted highest.</p>
-          <div class="groups" id="interest-groups"></div>
-        </div>
-
-        <div class="step">
-          <h2>3 &middot; What kind of thing?</h2>
-          <p class="hint">Changes what comes first.</p>
-          <div class="choices" id="comfort">
-            <button type="button" class="choice" data-value="1" aria-pressed="true">
-              <b>Low-key</b><span>Drop-in, quiet, no commitment</span>
-            </button>
-            <button type="button" class="choice" data-value="2" aria-pressed="false">
-              <b>Either</b><span>No strong preference</span>
-            </button>
-            <button type="button" class="choice" data-value="3" aria-pressed="false">
-              <b>Full-on</b><span>Intense, loud, high-commitment</span>
-            </button>
-          </div>
-        </div>
-
-        <details class="more" id="more">
-          <summary>Optional filters</summary>
-          <div class="sub">
-            <div>
-              <h2 class="sr-only">When are you free?</h2>
-              <p class="hint" style="margin-bottom:8px"><strong>When you&rsquo;re free</strong></p>
-              <div class="pills" id="when">
-                <button type="button" class="pill" data-value="weekday-day" aria-pressed="false">Weekday daytimes</button>
-                <button type="button" class="pill" data-value="weekday-eve" aria-pressed="false">Weekday evenings</button>
-                <button type="button" class="pill" data-value="weekend" aria-pressed="false">Weekends</button>
-                <button type="button" class="pill" data-value="flexible" aria-pressed="false">Flexible</button>
-              </div>
-            </div>
-            <div>
-              <p class="hint" style="margin-bottom:8px"><strong>Commitment</strong></p>
-              <div class="pills" id="commitment">
-                <button type="button" class="pill" data-value="one-off" aria-pressed="false">One-off</button>
-                <button type="button" class="pill" data-value="weekly" aria-pressed="false">Weekly</button>
-                <button type="button" class="pill" data-value="seasonal" aria-pressed="false">Season-long</button>
-              </div>
-            </div>
-            <div>
-              <p class="hint" style="margin-bottom:8px"><strong>Budget</strong></p>
-              <div class="pills" id="budget">
-                <button type="button" class="pill" data-value="0" aria-pressed="false">Free only</button>
-                <button type="button" class="pill" data-value="1" aria-pressed="false">Cheap is fine</button>
-                <button type="button" class="pill" data-value="2" aria-pressed="false">Cost isn&rsquo;t the issue</button>
-              </div>
-            </div>
-            <div>
-              <p class="hint" style="margin-bottom:8px"><strong>Looking for</strong></p>
-              <div class="pills" id="goals">
-                <button type="button" class="pill" data-value="friends" aria-pressed="false">Friends</button>
-                <button type="button" class="pill" data-value="impact" aria-pressed="false">To be useful</button>
-                <button type="button" class="pill" data-value="skill" aria-pressed="false">To learn something</button>
-                <button type="button" class="pill" data-value="routine" aria-pressed="false">A routine</button>
-              </div>
-            </div>
-            <div>
-              <label class="hint" for="firstname" style="display:block;margin-bottom:8px"><strong>First name</strong> &mdash; optional, stays in this browser.</label>
-              <input type="text" id="firstname" name="firstname" placeholder="optional" autocomplete="given-name" style="max-width:260px">
-            </div>
-          </div>
-        </details>
-
-        <p class="err" id="form-error" hidden></p>
-        <div class="actions submit-bar">
-          <button class="btn" type="submit">Find my people &rarr;</button>
-          <span class="picked" id="picked" aria-live="polite">Pick a city and at least one interest</span>
-          <button class="btn ghost sm" type="button" id="surprise">Surprise me</button>
-        </div>
-      </form>
+      <div id="intake"></div>
 
       <div class="results" id="results" hidden></div>
     </div>
@@ -187,6 +104,7 @@
 <script src="src/data/city-sandiego.js"></script>
 <script src="src/data/universal.js"></script>
 <script src="src/preferences.js"></script>
+<script src="src/intake.js"></script>
 <script src="src/match.js"></script>
 <script src="src/app.js"></script>
 <script src="src/social.js"></script>

@@ -10,6 +10,7 @@ require(path.join(root, 'src/data/core.js'));
   require(path.join(root, 'src/data/city-' + c + '.js'));
 });
 require(path.join(root, 'src/data/universal.js'));
+require(path.join(root, 'src/intake.js'));
 require(path.join(root, 'src/preferences.js'));
 require(path.join(root, 'src/match.js'));
 var FYC = globalThis.FYC;
@@ -209,6 +210,111 @@ group('matcher behaviour', function () {
   eq(new Set(topIds).size, topIds.length, 'no duplicate organisations in the top results');
 });
 
+// ---------------------------------------------------------- adaptive intake
+group('adaptive intake', function () {
+  var I = FYC.intake;
+
+  /** Walk the whole intake, answering from `script`, else `fallback`. */
+  function walk(script, fallback) {
+    var s = I.blankState(), asked = [];
+    var guard = 0;
+    while (!I.done(s) && guard++ < 60) {
+      var q = I.nextQuestion(s);
+      if (!q) break;
+      var v = script[q.id];
+      if (v === undefined) {
+        var idx = fallback === 'last' ? q.options.length - 1 : 0;
+        v = q.kind === 'text' ? 'Boston' : q.kind === 'many' ? [q.options[idx].id] : q.options[idx].id;
+      }
+      asked.push(q.id);
+      I.answer(s, q, v);
+    }
+    return { state: s, asked: asked, profile: I.toProfile(s) };
+  }
+
+  eq(I.TOTAL, 20, 'the intake is twenty questions');
+  ok(I.QUESTIONS.length > 30, 'the bank is bigger than the run, so it can adapt (' + I.QUESTIONS.length + ')');
+
+  var fresh = I.blankState();
+  eq(I.nextQuestion(fresh).id, 'city', 'it opens by asking where you are');
+  eq(I.done(fresh), false, 'a fresh session is not finished');
+
+  // Every question must be answerable and well formed.
+  I.QUESTIONS.forEach(function (q) {
+    ok(!!q.prompt, q.id + ': has a prompt');
+    ok(['text', 'one', 'many'].indexOf(q.kind) !== -1, q.id + ': known kind');
+    if (q.kind !== 'text') {
+      ok(q.options && q.options.length >= 2, q.id + ': has at least two options');
+      q.options.forEach(function (o) {
+        ok(!!o.label, q.id + '/' + o.id + ': option has a label');
+        if (o.effects && o.effects.interests) {
+          Object.keys(o.effects.interests).forEach(function (iid) {
+            ok(!!FYC.INTERESTS[iid], q.id + '/' + o.id + ': scores a real interest "' + iid + '"');
+          });
+        }
+      });
+    }
+  });
+
+  var giver = walk({ city: 'Boston', pull: ['give', 'grow'], comfort: 'low', commitment: 'one', budget: 'free', when: ['weekend'], goal: ['impact'] }, 'first');
+  var maker = walk({ city: 'Austin', pull: ['make', 'think'], comfort: 'high', commitment: 'season', budget: 'any', when: ['weekday-eve'], goal: ['skill'] }, 'first');
+
+  eq(giver.asked.length, 20, 'a full run asks exactly twenty questions');
+  eq(maker.asked.length, 20, 'and so does a different run');
+
+  // The whole point: different answers produce different questions.
+  var differing = giver.asked.filter(function (q) { return maker.asked.indexOf(q) === -1; });
+  ok(differing.length >= 4, 'different answers lead to different questions (' + differing.length + ' differ)');
+
+  ok(giver.asked.indexOf('give-how') !== -1, 'picking Give asks how you want to be useful');
+  ok(giver.asked.indexOf('make-what') === -1, 'and does not ask the Make drill-downs');
+  ok(maker.asked.indexOf('make-what') !== -1, 'picking Make asks what you want to make');
+  ok(maker.asked.indexOf('give-how') === -1, 'and skips the Give drill-downs');
+
+  // Follow-ups that depend on an earlier answer.
+  ok(giver.asked.indexOf('easier') !== -1, 'saying it is hard asks what would make it easier');
+  ok(maker.asked.indexOf('easier') === -1, 'saying it is easy does not');
+
+  // Profiles must be usable by the matcher.
+  [giver, maker].forEach(function (r, n) {
+    var p = r.profile;
+    ok(!!p.location, 'run ' + n + ': profile has a location');
+    ok(p.interests.length > 0, 'run ' + n + ': profile has interests');
+    ok(p.interests.length <= 6, 'run ' + n + ': at most six interests');
+    p.interests.forEach(function (id) { ok(!!FYC.INTERESTS[id], 'run ' + n + ': "' + id + '" is a real interest'); });
+    ok([1, 2, 3].indexOf(p.comfort) !== -1, 'run ' + n + ': comfort is 1-3');
+    var m = FYC.match(p);
+    ok(m.results.length > 0 || m.universal.length > 0, 'run ' + n + ': the matcher accepts the profile');
+    m.results.forEach(function (x) { ok(x.overlap > 0, 'run ' + n + ': every result matches a chosen interest'); });
+  });
+
+  // Interests are ranked, because the matcher weights the first pick most.
+  var ranked = walk({ city: 'Boston', pull: ['give'], 'give-how': 'shift', comfort: 'mid' }, 'first');
+  ok(ranked.profile.interests.indexOf('volunteering') === 0,
+     'the strongest signal ends up first (' + ranked.profile.interests.join(', ') + ')');
+
+  // Negative answers push things down rather than merely not boosting them.
+  var avoids = walk({ city: 'Boston', pull: ['move'], avoid: ['loud'], comfort: 'mid' }, 'first');
+  ok(avoids.profile.interests.indexOf('fitness') === -1,
+     'saying you avoid loud things keeps fitness out of the profile');
+
+  // Skipping a question still advances the count.
+  var skipper = I.blankState();
+  var q1 = I.nextQuestion(skipper);
+  I.answer(skipper, q1, 'Boston');
+  var before = I.progress(skipper).asked;
+  skipper.asked.push(I.nextQuestion(skipper).id);
+  eq(I.progress(skipper).asked, before + 1, 'a skipped question still counts toward the twenty');
+
+  // It must terminate however it is answered.
+  ['first', 'last'].forEach(function (mode) {
+    var r = walk({ city: 'Boston' }, mode);
+    ok(r.asked.length <= 20, 'never asks more than twenty (' + mode + ')');
+    ok(r.asked.length >= 15, 'and gets a decent way through (' + mode + ': ' + r.asked.length + ')');
+    eq(new Set(r.asked).size, r.asked.length, 'never repeats a question (' + mode + ')');
+  });
+});
+
 // ------------------------------------------------------- preference tracker
 group('preference tracker', function () {
   // An in-memory store stands in for localStorage.
@@ -322,7 +428,7 @@ group('front-end wiring', function () {
    'src/data/city-seattle.js', 'src/data/city-austin.js', 'src/data/city-boston.js',
    'src/data/city-philadelphia.js', 'src/data/city-dc.js', 'src/data/city-la.js',
    'src/data/city-sandiego.js', 'src/data/universal.js',
-   'src/preferences.js', 'src/match.js', 'src/app.js', 'assets/styles.css'].forEach(function (f) {
+   'src/preferences.js', 'src/intake.js', 'src/match.js', 'src/app.js', 'assets/styles.css'].forEach(function (f) {
     ok(html.indexOf(f) !== -1, 'index.html loads ' + f);
     ok(fs.existsSync(path.join(root, f)), f + ' exists on disk');
   });
