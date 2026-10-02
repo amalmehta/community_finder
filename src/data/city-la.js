@@ -353,6 +353,52 @@
         ],
         solo: 4, gentleness: 4, structure: 'course', commitment: 'seasonal', cost: 2,
         when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['skill', 'friends', 'routine']
+      },
+      {
+        id: 'la-lindygroove',
+        name: 'Lindy Groove',
+        neighborhood: 'Pasadena',
+        blurb: 'A long-running weekly swing dance with a beginner lesson beforehand. Partner dancing with rotation is one of the most efficient ways to meet people that exists.',
+        interests: ['dance', 'music', 'social', 'fitness'],
+        url: 'https://www.lindygroove.com/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Arrive early for the beginner lesson, then stay for the dance',
+          url: 'https://www.lindygroove.com/',
+          when: 'Weekly dance night \u2014 check the site'
+        },
+        script: null,
+        expect: [
+          'A beginner lesson runs before the dance — turn up for that and you are taught the basics',
+          'Partners rotate during the lesson, so you do not need to bring one',
+          'Nobody cares that you are bad; everyone there was bad once and remembers it',
+          'One fixed night a week, which is what turns faces into friends'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekday-eve'], size: 'large', goals: ['friends', 'skill', 'routine']
+      },
+      {
+        id: 'la-laout',
+        name: 'LAOUT (Los Angeles Organization of Ultimate Teams)',
+        neighborhood: 'Fields across the county',
+        blurb: 'Ultimate frisbee leagues and pickup across LA, with beginner-friendly divisions and individual sign-ups that place you on a team.',
+        interests: ['sports', 'fitness', 'outdoors', 'social'],
+        url: 'https://laout.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Sign up solo for a beginner-friendly league, or find pickup',
+          url: 'https://laout.org/',
+          when: 'Seasonal leagues; pickup year-round'
+        },
+        script: 'Hi! I\'d like to try ultimate but I\'ve never played. Which league or pickup game is best for a complete beginner turning up alone?',
+        expect: [
+          'Individual sign-ups are placed on teams \u2014 no friends required',
+          'Beginner divisions exist and are where to start',
+          'Pickup is usually free; leagues cost money',
+          'In a city this spread out, a weekly fixture is worth a lot'
+        ],
+        solo: 4, gentleness: 3, structure: 'register', commitment: 'seasonal', cost: 1,
+        when: ['weekend', 'weekday-eve'], size: 'large', goals: ['friends', 'routine', 'skill']
       }
     ]
   });

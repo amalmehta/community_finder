@@ -330,6 +330,52 @@
         ],
         solo: 5, gentleness: 5, structure: 'rsvp', commitment: 'one-off', cost: 1,
         when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['friends', 'skill']
+      },
+      {
+        id: 'dc-glenecho',
+        name: 'Glen Echo Park social dances',
+        neighborhood: 'Glen Echo, MD',
+        blurb: 'Contra, swing and waltz dances in a restored 1930s ballroom, several nights a week, each with a beginner lesson first. One of the best social dance scenes in the country.',
+        interests: ['dance', 'music', 'social', 'fitness'],
+        url: 'https://glenechopark.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Pick one dance night and arrive for the beginner lesson',
+          url: 'https://glenechopark.org/dances',
+          when: 'Several nights a week, year-round'
+        },
+        script: null,
+        expect: [
+          'A beginner lesson runs before every dance \u2014 turn up for that and you will be taught',
+          'Contra in particular rotates partners constantly, so coming alone is the norm',
+          'No partner, no experience, no particular clothes needed',
+          'The ballroom alone is worth the trip'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'large', goals: ['friends', 'skill', 'routine']
+      },
+      {
+        id: 'dc-wafc',
+        name: 'Washington Area Frisbee Club',
+        neighborhood: 'Fields across the DMV',
+        blurb: 'One of the oldest and largest ultimate frisbee clubs in the country, running leagues and pickup with divisions for people who have never played.',
+        interests: ['sports', 'fitness', 'outdoors', 'social'],
+        url: 'https://www.wafc.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Sign up solo for a recreational league, or find pickup',
+          url: 'https://www.wafc.org/',
+          when: 'Seasonal leagues; pickup year-round'
+        },
+        script: 'Hi! I\'d like to try ultimate and I\'ve never played. Which league is right for a beginner, and is signing up alone normal?',
+        expect: [
+          'Individuals get drafted onto teams \u2014 no friends needed',
+          'Recreational divisions genuinely expect beginners',
+          'Leagues cost money; pickup is free',
+          'A weekly team fixture is a standing reason to leave the house'
+        ],
+        solo: 4, gentleness: 3, structure: 'register', commitment: 'seasonal', cost: 1,
+        when: ['weekend', 'weekday-eve'], size: 'large', goals: ['friends', 'routine', 'skill']
       }
     ]
   });

@@ -12,7 +12,9 @@ relevant a copy-and-paste message you can send without composing it yourself.
 
 - **Ten cities are hand-curated** — San Francisco Bay Area, New York City,
   Los Angeles, Chicago, Seattle, Austin, Boston, Philadelphia, Washington DC
-  and San Diego (163 organisations, every link checked).
+  and San Diego (185 organisations, every link checked). Listings mix the big
+  obvious institutions with genuinely obscure ones, on the theory that a
+  hidden four-acre farm is easier to walk into than a famous nonprofit.
 - **Every other city works too.** A fallback engine builds live, working links
   into national directories (Meetup, VolunteerMatch, parkrun, Feeding America,
   CenterLink, Repair Café, Audubon, RRCA and more), pointed at the city you

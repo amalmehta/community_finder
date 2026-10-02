@@ -330,6 +330,29 @@
         ],
         solo: 4, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 0,
         when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['routine', 'friends']
+      },
+      {
+        id: 'sd-parksrec',
+        name: 'San Diego Parks & Recreation',
+        neighborhood: 'Rec centres citywide',
+        blurb: 'City-run recreation centres with cheap adult classes and drop-in sports \u2014 dance, volleyball, basketball, pickleball, fitness \u2014 in nearly every neighbourhood.',
+        interests: ['sports', 'dance', 'fitness', 'social', 'art'],
+        url: 'https://www.sandiego.gov/parks-and-recreation',
+        firstStep: {
+          kind: 'register',
+          label: 'Find your nearest rec centre and register for one class or drop-in session',
+          url: 'https://www.sandiego.gov/parks-and-recreation',
+          when: 'Drop-in sessions weekly; classes run seasonally'
+        },
+        script: null,
+        expect: [
+          'Drop-in sessions cost a few dollars and need no commitment',
+          'Seasonal classes mean the same faces for eight to ten weeks, which is how friendships actually form',
+          'Adult beginner sections exist for most activities',
+          'Your nearest centre is probably closer than you think'
+        ],
+        solo: 4, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekday-eve', 'weekend', 'weekday-day'], size: 'medium', goals: ['routine', 'friends', 'skill']
       }
     ]
   });

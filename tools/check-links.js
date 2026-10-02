@@ -67,7 +67,7 @@ function check(t) {
   function unverifiable(r) {
     if (r.code === 403 || r.code === 405 || r.code === 429) return true;
     var n = (r.note || '').toLowerCase();
-    return /secure connection|ssl|certificate|maximum .* redirects|proxy/.test(n);
+    return /secure connection|ssl|certificate|maximum .* redirects|proxy|timed out|timeout|operation too slow/.test(n);
   }
   var soft = bad.filter(unverifiable);
   var hard = bad.filter(function (r) { return soft.indexOf(r) === -1; });

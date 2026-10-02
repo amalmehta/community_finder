@@ -330,6 +330,52 @@
         ],
         solo: 5, gentleness: 4, structure: 'rsvp', commitment: 'one-off', cost: 1,
         when: ['weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'bos-swing',
+        name: 'Boston Swing Central',
+        neighborhood: 'Cambridge / Somerville',
+        blurb: 'A weekly swing dance with a beginner lesson first and a live band. Partner dancing with rotation means you meet a dozen people in an evening without arranging anything.',
+        interests: ['dance', 'music', 'social', 'fitness'],
+        url: 'https://www.bostonswingcentral.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Come for the beginner lesson before the dance',
+          url: 'https://www.bostonswingcentral.org/',
+          when: 'Weekly dance night \u2014 check the site'
+        },
+        script: null,
+        expect: [
+          'A beginner lesson runs before the dance — turn up for that and you are taught the basics',
+          'Partners rotate during the lesson, so you do not need to bring one',
+          'Nobody cares that you are bad; everyone there was bad once and remembers it',
+          'One fixed night a week, which is what turns faces into friends'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekend', 'weekday-eve'], size: 'medium', goals: ['friends', 'skill', 'routine']
+      },
+      {
+        id: 'bos-buda',
+        name: 'Boston Ultimate Disc Alliance',
+        neighborhood: 'Fields across Greater Boston',
+        blurb: 'Runs the region\'s ultimate frisbee leagues, including beginner and recreational divisions you can join as an individual rather than as a team.',
+        interests: ['sports', 'fitness', 'outdoors', 'social'],
+        url: 'https://www.buda.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Sign up solo for a recreational or beginner league',
+          url: 'https://www.buda.org/',
+          when: 'Seasonal leagues, spring through fall plus indoor winter'
+        },
+        script: 'Hi! I\'d like to try ultimate and I\'ve never played. Which league should someone brand new sign up for, and is signing up alone normal?',
+        expect: [
+          'Individual sign-ups get placed on a team \u2014 no friends required',
+          'Recreational divisions are genuinely recreational',
+          'Leagues cost money; hat leagues are the cheapest way in',
+          'A weekly fixture with the same team is the whole point'
+        ],
+        solo: 4, gentleness: 3, structure: 'register', commitment: 'seasonal', cost: 1,
+        when: ['weekend', 'weekday-eve'], size: 'large', goals: ['friends', 'routine', 'skill']
       }
     ]
   });

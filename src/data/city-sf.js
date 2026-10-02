@@ -491,6 +491,259 @@
         ],
         solo: 5, gentleness: 4, structure: 'shift', commitment: 'seasonal', cost: 0,
         when: ['weekday-eve', 'weekend'], size: 'large', goals: ['friends', 'impact']
+      },
+      {
+        id: 'sf-dancemission',
+        name: 'Dance Mission Theater',
+        neighborhood: 'Mission',
+        blurb: 'A community dance centre running drop-in classes for adults \u2014 Afro-Cuban, hip hop, salsa, contemporary \u2014 where turning up to a single class with no experience is the normal way in.',
+        interests: ['dance', 'fitness', 'art', 'social'],
+        url: 'https://www.dancemission.com/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Take one drop-in class at the absolute beginner level',
+          url: 'https://www.dancemission.com/',
+          when: 'Classes most days, mornings through evenings'
+        },
+        script: 'Hi! I\'d like to try a class. I have no dance background at all \u2014 which drop-in class would you point a complete beginner to?',
+        expect: [
+          'Drop-in means one class, one payment, no term to commit to',
+          'Beginner-level classes assume you have never done it',
+          'You stand at the back and copy people. That is the whole method',
+          'A regular weekly class means the same faces, which is how it stops being strangers'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekday-eve', 'weekend', 'weekday-day'], size: 'medium', goals: ['skill', 'friends', 'routine']
+      },
+      {
+        id: 'sf-alemany',
+        name: 'Alemany Farm',
+        neighborhood: 'Bernal Heights / Alemany',
+        blurb: 'A four-acre farm hidden behind a housing development off the 280, run entirely by volunteers. Most San Franciscans have no idea it exists. Everything grown is given away free.',
+        interests: ['gardening', 'food', 'environment', 'volunteering', 'outdoors'],
+        url: 'https://www.alemanyfarm.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Turn up to a volunteer day \u2014 no signup, no experience',
+          url: 'https://www.alemanyfarm.org/',
+          when: 'Regular volunteer days \u2014 check the site for this week'
+        },
+        script: null,
+        expect: [
+          'No registration: you walk in, someone hands you a tool and explains the job',
+          'Free, and you can take produce home',
+          'Working with your hands beside someone removes the pressure to make eye contact',
+          'Wear shoes you do not mind ruining'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend'], size: 'small', goals: ['impact', 'friends', 'skill']
+      },
+      {
+        id: 'sf-bikekitchen',
+        name: 'The Bike Kitchen',
+        neighborhood: 'Mission',
+        blurb: 'A volunteer-run DIY bike repair co-op where you fix your own bike using their tools, with someone experienced looking over your shoulder when you get stuck.',
+        interests: ['making', 'cycling', 'volunteering', 'social'],
+        url: 'https://bikekitchen.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Bring your bike to an open shop night',
+          url: 'https://bikekitchen.org/',
+          when: 'Open shop hours several evenings a week'
+        },
+        script: 'Hi! I\'d like to come fix my bike but I know nothing about bike mechanics. Is open shop right for a complete beginner, and should I bring anything?',
+        expect: [
+          'Arriving with a broken bike does all the social work for you',
+          'Volunteers teach rather than fix it for you \u2014 that is the whole model',
+          'Small shop fee or membership; far less than a bike shop',
+          'Nobody expects you to know what a bottom bracket is'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'one-off', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['skill', 'friends']
+      },
+      {
+        id: 'sf-mssf',
+        name: 'Mycological Society of San Francisco',
+        neighborhood: 'Forays around the Bay Area',
+        blurb: 'A mushroom-hunting society running forays into the woods, monthly meetings and an annual Fungus Fair. Deeply nerdy, entirely welcoming, and almost nobody knows it exists.',
+        interests: ['nature', 'outdoors', 'food', 'social'],
+        url: 'https://mssf.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Join a foray or come to a monthly meeting',
+          url: 'https://mssf.org/',
+          when: 'Forays in the wet season; meetings monthly'
+        },
+        script: 'Hello \u2014 I\'m a complete beginner and can\'t identify a single mushroom. Is the next foray suitable for someone with no knowledge, and what should I bring?',
+        expect: [
+          'Beginners are the favourite kind of guest \u2014 experts love explaining',
+          'Walking slowly through woods looking at the ground is the entire activity',
+          'Modest membership; meetings are cheap or free to visit',
+          'Never eat anything without an expert confirming it, which is also the social mechanism'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'one-off', cost: 1,
+        when: ['weekend', 'weekday-eve'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'sf-prelinger',
+        name: 'Prelinger Library',
+        neighborhood: 'SoMa',
+        blurb: 'A private, free, appropriation-friendly research library arranged geographically rather than by subject, so browsing it is deliberately serendipitous. You can scan or photograph anything.',
+        interests: ['books', 'writing', 'art', 'filmphoto'],
+        url: 'https://www.prelingerlibrary.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come during open hours and just browse',
+          url: 'https://www.prelingerlibrary.org/',
+          when: 'Limited open hours \u2014 check the site before going'
+        },
+        script: 'Hi \u2014 I\'d like to visit during open hours. I don\'t have a specific research project, I just want to browse. Is that alright?',
+        expect: [
+          'Browsing with no purpose is explicitly encouraged',
+          'Free, and you may photograph or scan whatever you like',
+          'The hours are genuinely limited \u2014 check before you go',
+          'Quiet and small, so the librarians will talk to you'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekday-day'], size: 'small', goals: ['skill', 'friends']
+      },
+      {
+        id: 'sf-oddsalon',
+        name: 'Odd Salon',
+        neighborhood: 'Rotating bars & venues',
+        blurb: 'An evening of short talks by enthusiasts about obscure corners of history, science and misadventure, held in bars. Founded in San Francisco and still at its best here.',
+        interests: ['books', 'social', 'art', 'writing'],
+        url: 'https://oddsalon.com/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Buy a ticket to the next salon',
+          url: 'https://oddsalon.com/',
+          when: 'Monthly-ish evening events'
+        },
+        script: null,
+        expect: [
+          'The talks give you something to say to the stranger beside you',
+          'Going alone is completely normal \u2014 much of the audience does',
+          'Tickets are the price of a couple of drinks',
+          'A fixed start and end time means you always have an exit'
+        ],
+        solo: 5, gentleness: 4, structure: 'rsvp', commitment: 'one-off', cost: 1,
+        when: ['weekday-eve'], size: 'medium', goals: ['friends', 'skill']
+      },
+      {
+        id: 'sf-harveymilkphoto',
+        name: 'Harvey Milk Photo Center',
+        neighborhood: 'Duboce Park',
+        blurb: 'A city-run darkroom \u2014 the largest public one in the country \u2014 with cheap classes, enlargers and a community of people who still shoot film. Hidden in plain sight behind a rec centre.',
+        interests: ['filmphoto', 'art', 'making', 'social'],
+        url: 'https://www.harveymilkphotocenter.org/',
+        firstStep: {
+          kind: 'register',
+          label: 'Sign up for a beginner darkroom class',
+          url: 'https://www.harveymilkphotocenter.org/',
+          when: 'Classes run in terms; open darkroom hours for members'
+        },
+        script: 'Hi! I\'d like to learn darkroom printing and I\'m a complete beginner. Which class should I start with, and do I need my own camera?',
+        expect: [
+          'City-run, so the prices are a fraction of a private studio',
+          'Classes run over several weeks with the same small group',
+          'A darkroom is dark and quiet, which suits people who find socialising tiring',
+          'Beginners are the main audience'
+        ],
+        solo: 5, gentleness: 4, structure: 'course', commitment: 'seasonal', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['skill', 'friends']
+      },
+      {
+        id: 'sf-rubysclay',
+        name: "Ruby's Clay Studio & Gallery",
+        neighborhood: 'Noe Valley',
+        blurb: 'A member-run co-operative pottery studio, running since the 1970s, with beginner classes and open studio time. Clay is the most forgiving possible excuse to stand near people.',
+        interests: ['art', 'crafts', 'making', 'social'],
+        url: 'https://www.rubysclaystudio.org/',
+        firstStep: {
+          kind: 'register',
+          label: 'Book a beginner wheel-throwing class',
+          url: 'https://www.rubysclaystudio.org/',
+          when: 'Classes in terms; one-off workshops too'
+        },
+        script: 'Hi! I\'ve never touched a potter\'s wheel. Which class is right for an absolute beginner, and is everything provided?',
+        expect: [
+          'Beginner classes assume you have never done it',
+          'Several weeks with the same small group is the friendship mechanism',
+          'Classes cost real money; clay and firing are usually included',
+          'Everyone\'s first pot is terrible, which is a great leveller'
+        ],
+        solo: 5, gentleness: 5, structure: 'course', commitment: 'seasonal', cost: 2,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['skill', 'friends', 'routine']
+      },
+      {
+        id: 'sf-nerdnite',
+        name: 'Nerd Nite SF',
+        neighborhood: 'Rotating bars',
+        blurb: 'Three people give entertaining talks about something they know far too much about, in a bar, while you drink. Billed as "it\'s like the Discovery Channel, with beer".',
+        interests: ['tech', 'social', 'books', 'nature'],
+        url: 'https://sf.nerdnite.com/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Get a ticket to the next one',
+          url: 'https://sf.nerdnite.com/',
+          when: 'Monthly, evenings'
+        },
+        script: null,
+        expect: [
+          'The talks mean you never have to start a conversation from nothing',
+          'Attending alone is completely normal',
+          'Cheap ticket, and you can leave whenever you like',
+          'Low stakes in a way that a networking event never is'
+        ],
+        solo: 5, gentleness: 4, structure: 'rsvp', commitment: 'one-off', cost: 1,
+        when: ['weekday-eve'], size: 'medium', goals: ['friends', 'skill']
+      },
+      {
+        id: 'sf-dolphinclub',
+        name: 'Dolphin Club',
+        neighborhood: 'Aquatic Park',
+        blurb: 'An 1877 swimming and rowing club on Aquatic Park where people swim in the open bay without wetsuits, year-round. Day use lets you try it before committing to anything.',
+        interests: ['fitness', 'outdoors', 'social'],
+        url: 'https://dolphinclub.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come on a day-use day and swim or watch',
+          url: 'https://dolphinclub.org/',
+          when: 'Open to the public on alternating days \u2014 check the site'
+        },
+        script: 'Hi! I\'d like to try a bay swim. I\'ve never done cold water before \u2014 which day should I come, what\'s the day-use fee, and is it safe for a beginner?',
+        expect: [
+          'A small day-use fee lets you try before any membership question arises',
+          'The water is roughly 10\u201315\u00b0C. Start with five minutes and build up',
+          'Never swim alone there \u2014 which is exactly why it is social',
+          'The sauna afterwards is where the conversation happens'
+        ],
+        solo: 4, gentleness: 3, structure: 'drop-in', commitment: 'one-off', cost: 1,
+        when: ['weekday-day', 'weekend'], size: 'medium', goals: ['friends', 'routine']
+      },
+      {
+        id: 'sf-ggmrc',
+        name: 'Golden Gate Model Railroad Club',
+        neighborhood: 'Randall Museum, Corona Heights',
+        blurb: 'A vast model railroad in the basement of a free city museum, built and run by a club since 1946. Open to the public on Saturdays, and they are delighted when anyone asks.',
+        interests: ['games', 'making', 'social', 'parents'],
+        url: 'https://ggmrc.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Visit on a Saturday open day and ask how it works',
+          url: 'https://ggmrc.org/',
+          when: 'Saturday open hours at the Randall Museum'
+        },
+        script: 'Hi! I saw the layout is open on Saturdays. I know nothing about model railways \u2014 is it alright to come and look, and do you take new members?',
+        expect: [
+          'Free to visit, inside a free museum with a view over the city',
+          'Members are usually running trains and happy to explain',
+          '"How does this work?" is the only sentence you need',
+          'The Randall Museum around it has live animals and a workshop, so the trip is worth it either way'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend'], size: 'small', goals: ['friends', 'skill']
       }
     ]
   });

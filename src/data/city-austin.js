@@ -353,6 +353,52 @@
         ],
         solo: 5, gentleness: 5, structure: 'register', commitment: 'weekly', cost: 0,
         when: ['weekday-eve', 'weekend'], size: 'small', goals: ['routine', 'friends']
+      },
+      {
+        id: 'atx-swing',
+        name: 'Austin Swing Syndicate',
+        neighborhood: 'Central Austin',
+        blurb: 'Weekly swing dances with a beginner lesson beforehand. Partner dancing is one of the few activities where arriving alone is not just accepted but structurally expected.',
+        interests: ['dance', 'music', 'social', 'fitness'],
+        url: 'https://www.austinswingsyndicate.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Turn up for the beginner lesson before the dance',
+          url: 'https://www.austinswingsyndicate.org/',
+          when: 'Weekly dance night \u2014 check the site for the current night'
+        },
+        script: null,
+        expect: [
+          'A beginner lesson runs before the dance — turn up for that and you are taught the basics',
+          'Partners rotate during the lesson, so you do not need to bring one',
+          'Nobody cares that you are bad; everyone there was bad once and remembers it',
+          'One fixed night a week, which is what turns faces into friends'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['friends', 'skill', 'routine']
+      },
+      {
+        id: 'atx-ultimate',
+        name: 'Austin Ultimate',
+        neighborhood: 'Fields across Austin',
+        blurb: 'Leagues and pickup ultimate frisbee, including beginner divisions. Ultimate is the rare sport whose culture is built around being decent to people who are bad at it.',
+        interests: ['sports', 'fitness', 'outdoors', 'social'],
+        url: 'https://www.austinultimate.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Sign up solo for a beginner league, or find a pickup game',
+          url: 'https://www.austinultimate.org/',
+          when: 'Seasonal leagues; pickup year-round'
+        },
+        script: 'Hi! I\'d like to try ultimate but I\'ve basically never played. Is there a beginner league or a pickup game where turning up alone is normal?',
+        expect: [
+          'Signing up as an individual gets you placed on a team \u2014 you do not need friends first',
+          'Beginner divisions exist and are where you should start',
+          'Pickup is usually free; leagues cost money',
+          'A team is a built-in group of people who expect you every week'
+        ],
+        solo: 4, gentleness: 3, structure: 'register', commitment: 'seasonal', cost: 1,
+        when: ['weekend', 'weekday-eve'], size: 'large', goals: ['friends', 'routine', 'skill']
       }
     ]
   });

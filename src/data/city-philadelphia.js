@@ -330,6 +330,52 @@
         ],
         solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'weekly', cost: 0,
         when: ['weekday-eve', 'weekend'], size: 'small', goals: ['routine', 'friends']
+      },
+      {
+        id: 'phl-swing',
+        name: 'Philly Swing Dance Society',
+        neighborhood: 'Center City',
+        blurb: 'Weekly swing dances with a beginner lesson beforehand. The lesson rotates partners, so you arrive alone and have danced with fifteen people by the end of the night.',
+        interests: ['dance', 'music', 'social', 'fitness'],
+        url: 'https://phillyswing.com/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Turn up for the beginner lesson before the dance',
+          url: 'https://phillyswing.com/',
+          when: 'Weekly dance night \u2014 check the site'
+        },
+        script: null,
+        expect: [
+          'A beginner lesson runs before the dance — turn up for that and you are taught the basics',
+          'Partners rotate during the lesson, so you do not need to bring one',
+          'Nobody cares that you are bad; everyone there was bad once and remembers it',
+          'One fixed night a week, which is what turns faces into friends'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['friends', 'skill', 'routine']
+      },
+      {
+        id: 'phl-pada',
+        name: 'Philadelphia Area Disc Alliance',
+        neighborhood: 'Fields across the city',
+        blurb: 'Ultimate frisbee leagues and pickup across Philadelphia, with recreational divisions built for people who have never played.',
+        interests: ['sports', 'fitness', 'outdoors', 'social'],
+        url: 'https://pada.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Sign up solo for a recreational league, or find pickup',
+          url: 'https://pada.org/',
+          when: 'Seasonal leagues; pickup year-round'
+        },
+        script: 'Hi! I\'ve never played ultimate but I\'d like to try. Which league suits a complete beginner, and can I sign up on my own?',
+        expect: [
+          'Individuals are placed on teams \u2014 you do not need to bring anyone',
+          'Recreational divisions expect beginners',
+          'Pickup is usually free; leagues have a fee',
+          'The same team every week is what makes it stick'
+        ],
+        solo: 4, gentleness: 3, structure: 'register', commitment: 'seasonal', cost: 1,
+        when: ['weekend', 'weekday-eve'], size: 'medium', goals: ['friends', 'routine', 'skill']
       }
     ]
   });
