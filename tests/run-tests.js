@@ -10,6 +10,7 @@ require(path.join(root, 'src/data/core.js'));
   require(path.join(root, 'src/data/city-' + c + '.js'));
 });
 require(path.join(root, 'src/data/universal.js'));
+require(path.join(root, 'src/preferences.js'));
 require(path.join(root, 'src/match.js'));
 var FYC = globalThis.FYC;
 
@@ -204,6 +205,111 @@ group('matcher behaviour', function () {
   eq(new Set(topIds).size, topIds.length, 'no duplicate organisations in the top results');
 });
 
+// ------------------------------------------------------- preference tracker
+group('preference tracker', function () {
+  // An in-memory store stands in for localStorage.
+  var mem = { v: null };
+  FYC.prefs._setStore({ get: function () { return mem.v; }, set: function (v) { mem.v = v; } });
+
+  var sf = FYC.cities.filter(function (c) { return c.id === 'sf'; })[0];
+  function org(id) { return sf.orgs.filter(function (o) { return o.id === id; })[0]; }
+
+  FYC.prefs.clear();
+  var empty = FYC.prefs.profile();
+  eq(empty.count, 0, 'starts with nothing recorded');
+  eq(empty.ready, false, 'not ready with no data');
+  eq(FYC.prefs.fit(org('sf-fuf'), empty), 0.5, 'no opinion before any evidence');
+  eq(FYC.prefs.summary(empty), null, 'no summary before any evidence');
+
+  // One action is not a preference.
+  FYC.prefs.record('expand', org('sf-fuf'));
+  ok(!FYC.prefs.profile().ready, 'a single action is not enough to draw conclusions');
+
+  // Repeated engagement with outdoor, free, gentle listings.
+  ['sf-fuf', 'sf-alemany', 'sf-ggba'].forEach(function (id) {
+    ['expand', 'open', 'plan', 'step'].forEach(function (t) { FYC.prefs.record(t, org(id)); });
+  });
+  var p = FYC.prefs.profile();
+  ok(p.ready, 'becomes ready after enough actions');
+  ok(p.count >= 12, 'records every action (' + p.count + ')');
+  ok(p.top.indexOf('outdoors') !== -1 || p.top.indexOf('environment') !== -1,
+     'learns the interests behind what was engaged with');
+  ok(p.cost < 0.5, 'notices that everything engaged with was free');
+  ok(p.gentleness > 4, 'notices a preference for gentle options');
+  ok(FYC.prefs.summary(p), 'produces a plain-language summary');
+  ok(p.confidence > 0 && p.confidence <= 1, 'confidence is within range');
+
+  // Fit should favour a similar listing over an unrelated one.
+  ok(FYC.prefs.fit(org('sf-urbanadamah'), p) > FYC.prefs.fit(org('sf-bats'), p),
+     'a similar listing fits the learned profile better than an unrelated one');
+
+  // Negative signals pull an interest back down.
+  var beforeTheater = FYC.prefs.profile().affinity['theater'] || 0;
+  FYC.prefs.record('unplan', org('sf-bats'));
+  var afterTheater = FYC.prefs.profile().affinity['theater'] || 0;
+  ok(afterTheater < beforeTheater || afterTheater < 0, 'removing something counts against it');
+
+  // The learned profile nudges the ranking without overriding stated choices.
+  var prof = FYC.prefs.profile();
+  var withLearning = FYC.match({
+    location: 'San Francisco', interests: ['volunteering'], comfort: 2, learned: prof
+  });
+  ok(withLearning.results.every(function (r) { return r.overlap > 0; }),
+     'learning never resurrects a listing that matches no chosen interest');
+  ok(withLearning.results.every(function (r) { return r.score >= 0 && r.score <= 1; }),
+     'scores stay within range once learning is blended in');
+
+  // Where there are plenty of free options, a stated free-only budget holds.
+  // (With almost no affordable matches the matcher deliberately relaxes the
+  // budget rather than show an empty page; that is unrelated to learning.)
+  var budgeted = FYC.match({
+    location: 'San Francisco', interests: ['volunteering', 'outdoors'],
+    comfort: 2, budget: 0, learned: prof
+  });
+  ok(budgeted.results.length >= 4, 'enough free matches to exercise the budget filter');
+  ok(budgeted.results.every(function (r) { return r.org.cost === 0; }),
+     'learning never overrides a stated budget');
+
+  // The sharper property: learning may reorder results, but must never change
+  // which listings qualify in the first place.
+  function idsFor(learned) {
+    return FYC.match({
+      location: 'San Francisco', interests: ['volunteering', 'outdoors'],
+      comfort: 2, budget: 0, learned: learned
+    }).results.map(function (r) { return r.org.id; }).sort().join(',');
+  }
+  eq(idsFor(prof), idsFor(null), 'learning reorders results but never admits different ones');
+
+  // Pausing stops collection; clearing erases it.
+  FYC.prefs.setEnabled(false);
+  var n = FYC.prefs.profile().count;
+  FYC.prefs.record('plan', org('sf-np'));
+  eq(FYC.prefs.profile().count, n, 'nothing is recorded while paused');
+  FYC.prefs.setEnabled(true);
+  FYC.prefs.record('plan', org('sf-np'));
+  eq(FYC.prefs.profile().count, n + 1, 'recording resumes when turned back on');
+  FYC.prefs.clear();
+  eq(FYC.prefs.profile().count, 0, 'erasing removes everything');
+  eq(FYC.prefs.isEnabled(), true, 'erasing does not silently re-enable or disable tracking');
+
+  // Old actions should matter less than recent ones.
+  var now = Date.now();
+  var old = now - 1000 * 60 * 60 * 24 * 180;   // six months ago
+  FYC.prefs.record('plan', org('sf-bats'), old);
+  ['sf-fuf', 'sf-alemany'].forEach(function (id) {
+    ['plan', 'open', 'expand', 'step'].forEach(function (t) { FYC.prefs.record(t, org(id), now); });
+  });
+  var decayed = FYC.prefs.profile(now);
+  ok((decayed.affinity['theater'] || 0) < (decayed.affinity['environment'] || 0),
+     'a six-month-old action counts for less than this week\'s');
+
+  FYC.prefs.clear();
+  // Unknown action types are ignored rather than corrupting the log.
+  eq(FYC.prefs.record('nonsense', org('sf-fuf')), null, 'unknown action types are ignored');
+  eq(FYC.prefs.record('plan', null), null, 'a missing listing is ignored');
+  eq(FYC.prefs.profile().count, 0, 'neither wrote anything');
+});
+
 // ---------------------------------------------------------------- wiring
 group('front-end wiring', function () {
   var fs = require('fs');
@@ -212,12 +318,13 @@ group('front-end wiring', function () {
    'src/data/city-seattle.js', 'src/data/city-austin.js', 'src/data/city-boston.js',
    'src/data/city-philadelphia.js', 'src/data/city-dc.js', 'src/data/city-la.js',
    'src/data/city-sandiego.js', 'src/data/universal.js',
-   'src/match.js', 'src/app.js', 'assets/styles.css'].forEach(function (f) {
+   'src/preferences.js', 'src/match.js', 'src/app.js', 'assets/styles.css'].forEach(function (f) {
     ok(html.indexOf(f) !== -1, 'index.html loads ' + f);
     ok(fs.existsSync(path.join(root, f)), f + ' exists on disk');
   });
   ok(html.indexOf('fb-tab') !== -1, 'feedback tab is present');
   ok(html.indexOf('id="view-plan"') !== -1, 'plan view is present');
+  ok(html.indexOf('id="view-you"') !== -1, 'preferences dashboard is present');
 });
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');

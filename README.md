@@ -124,6 +124,7 @@ src/
   data/core.js        interest taxonomy (32 interests in 6 groups) + city registry
   data/city-*.js      the ten hand-curated city datasets
   data/universal.js   fallback recipes → real deep links for any city
+  preferences.js      on-device preference tracker (pure functions, injectable storage)
   match.js            the scoring engine (pure functions, no DOM)
   app.js              DOM rendering, plan, feedback
 tests/run-tests.js    the test suite
@@ -163,11 +164,33 @@ message template with `{interest}` and `{city}` placeholders filled in at render
 time. Ratings for `solo` (how easy to show up alone) and `gentleness` (how
 low-pressure) drive the ease badge and the comfort matching.
 
+### Learned preferences
+
+The app watches what you actually do — which first steps you expand, which
+links you open, what you copy, save and tick off — and builds a weighted
+profile from it. Recent actions count for more than old ones (they halve in
+influence every 45 days), and removing something from your plan counts against
+it.
+
+That profile nudges the ranking but never drives it: it is capped at 18% of the
+score, scaled by how much evidence there is, and it can never override your
+stated city, interests or budget, nor resurrect a listing that matches nothing
+you asked for. The test suite asserts all of that.
+
+The **You** tab shows exactly what has been inferred — an affinity chart, your
+gentleness, cost and solo leanings, and how heavily the matcher is leaning on
+them — with buttons to pause tracking or erase it.
+
+`src/preferences.js` is the engine; its storage is injectable so it can be
+tested in Node without a browser.
+
 ### Privacy
 
 Everything stays in the browser. `localStorage` holds your last search, your
-plan and any feedback you leave. There is no account, no server, no analytics
-and no network request other than the links you choose to click.
+plan, your feedback and the record of what you have clicked. There is no
+account, no server, no analytics and no network request other than the links
+you choose to click. Nothing is ever transmitted, and the You tab can erase the
+behavioural record completely.
 
 ---
 

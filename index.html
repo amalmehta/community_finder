@@ -16,6 +16,7 @@
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button class="tab" id="tab-find" role="tab" aria-selected="true" aria-controls="view-find">Find</button>
       <button class="tab" id="tab-plan" role="tab" aria-selected="false" aria-controls="view-plan">My plan<span class="count" id="plan-count" hidden>0</span></button>
+      <button class="tab" id="tab-you" role="tab" aria-selected="false" aria-controls="view-you">You</button>
     </nav>
   </div>
 </header>
@@ -119,6 +120,11 @@
     </div>
   </section>
 
+  <!-- ============================ YOU ============================= -->
+  <section id="view-you" role="tabpanel" aria-labelledby="tab-you" hidden>
+    <div class="wrap" id="you-body"></div>
+  </section>
+
   <!-- ============================ PLAN ============================ -->
   <section id="view-plan" role="tabpanel" aria-labelledby="tab-plan" hidden>
     <div class="wrap" id="plan-body"></div>
@@ -127,7 +133,7 @@
 
 <footer class="site-footer">
   <div class="wrap">
-    <p>Everything you enter stays in this browser. There is no account, no server and no tracking.</p>
+    <p>Everything stays in this browser &mdash; including the record of what you click, which is used to improve your results. There is no account and no server, and nothing is ever sent anywhere. See it, pause it or erase it on the <strong>You</strong> tab.</p>
     <p>Listings are hand-checked, but groups change &mdash; always check the organisation&rsquo;s own page before you go.</p>
   </div>
 </footer>
@@ -165,6 +171,7 @@
 <script src="src/data/city-la.js"></script>
 <script src="src/data/city-sandiego.js"></script>
 <script src="src/data/universal.js"></script>
+<script src="src/preferences.js"></script>
 <script src="src/match.js"></script>
 <script src="src/app.js"></script>
 </body>

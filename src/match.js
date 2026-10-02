@@ -6,6 +6,9 @@
   'use strict';
   var FYC = g.FYC || require('./data/core.js');
 
+  // Ceiling on how much the learned profile may move a score.
+  var LEARNED_MAX = 0.18;
+
   var WEIGHTS = {
     interest: 0.44,
     gentleness: 0.20,
@@ -154,11 +157,28 @@
     Object.keys(WEIGHTS).forEach(function (k) {
       total += WEIGHTS[k] * parts[k];
     });
-    return {
+
+    // What someone has actually done nudges the ranking, but never drives it:
+    // the stated interests, budget and comfort still decide. The pull scales
+    // with how much evidence there is, up to a hard ceiling.
+    var learned = null;
+    if (p.learned && p.learned.ready && FYC.prefs) {
+      var fit = FYC.prefs.fit(org, p.learned);
+      var pull = LEARNED_MAX * p.learned.confidence;
+      total = total * (1 - pull) + fit * pull;
+      learned = { fit: fit, pull: pull };
+    }
+    var r = {
       org: org, score: total, parts: parts,
       reasons: explain(org, p, parts), ease: ease(org),
-      overlap: overlapCount(org, p.interests)
+      overlap: overlapCount(org, p.interests),
+      learned: learned
     };
+    // Say so when the learned profile is why something rose.
+    if (learned && learned.fit > 0.72 && r.reasons.length < 4) {
+      r.reasons.push('Like the things you keep coming back to');
+    }
+    return r;
   }
 
   /**
@@ -231,6 +251,7 @@
 
     return {
       city: city,
+      learned: p.learned && p.learned.ready ? p.learned : null,
       cityMatched: !!city,
       locationText: p.location || '',
       results: results,

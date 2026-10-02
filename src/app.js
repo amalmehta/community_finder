@@ -24,6 +24,22 @@
     });
     return n;
   }
+  /** Namespaced element builder, for the charts on the You tab. */
+  function svg(tag, props, kids) {
+    var n = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.keys(props || {}).forEach(function (k) {
+      if (k === 'text') n.textContent = props[k];
+      else n.setAttribute(k, props[k]);
+    });
+    (kids || []).forEach(function (c) { n.appendChild(c); });
+    return n;
+  }
+
+  /** Note an action against a listing, if tracking is on. */
+  function track(type, org) {
+    if (FYC.prefs) FYC.prefs.record(type, org);
+  }
+
   function $(sel) { return document.querySelector(sel); }
   function $$(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
 
@@ -219,7 +235,8 @@
       el('div', { class: 'actions' }, [
         el('a', {
           class: 'btn sm', href: org.firstStep.url || org.url,
-          target: '_blank', rel: 'noopener noreferrer'
+          target: '_blank', rel: 'noopener noreferrer',
+          onclick: function () { track('open', org); }
         }, [org.universal ? 'Open the directory →' : 'Open the page →']),
         el('button', {
           class: 'btn ghost sm', type: 'button',
@@ -248,7 +265,11 @@
                 navigator.clipboard.writeText(ta.value).catch(function () {});
                 ok = true;
               }
-              if (ok) { copied.hidden = false; setTimeout(function () { copied.hidden = true; }, 2000); }
+              if (ok) {
+                track('copy', org);
+                copied.hidden = false;
+                setTimeout(function () { copied.hidden = true; }, 2000);
+              }
             }
           }, ['Copy message']),
           copied
@@ -268,6 +289,7 @@
         class: 'toggle', type: 'button', 'aria-expanded': 'false',
         onclick: function (e) {
           var open = wrapStep.hidden;
+          if (open) track('expand', org);
           wrapStep.hidden = !open;
           e.currentTarget.setAttribute('aria-expanded', open ? 'true' : 'false');
           e.currentTarget.textContent = open ? 'Hide the first step' : 'Show me the first step →';
@@ -377,6 +399,7 @@
       if (btn) btn.textContent = 'Already in your plan';
       return;
     }
+    track('plan', org);
     plan.push({
       id: org.id,
       name: org.name,
@@ -385,7 +408,14 @@
       stepLabel: org.firstStep.label,
       when: org.firstStep.when || '',
       done: [false, false, false, false],
-      added: Date.now()
+      added: Date.now(),
+      // kept so ticking a step or removing it can still be attributed
+      attrs: {
+        id: org.id, interests: org.interests, cost: org.cost,
+        gentleness: org.gentleness, solo: org.solo,
+        structure: org.structure, commitment: org.commitment,
+        universal: !!org.universal
+      }
     });
     save(KEY.plan, plan);
     paintPlanCount();
@@ -428,6 +458,7 @@
         cb.checked = !!item.done[i];
         cb.addEventListener('change', function () {
           item.done[i] = cb.checked;
+          if (cb.checked && item.attrs) track('step', item.attrs);
           save(KEY.plan, plan);
           renderPlan();
         });
@@ -444,6 +475,7 @@
           el('button', {
             class: 'btn ghost sm', type: 'button',
             onclick: function () {
+              if (item.attrs) track('unplan', item.attrs);
               plan.splice(idx, 1);
               save(KEY.plan, plan);
               paintPlanCount();
@@ -455,14 +487,149 @@
     });
   }
 
+  // ---------- the You tab: what has been learned, and the controls for it ----
+
+  /** Horizontal bar chart of interest affinity, -1..1. */
+  function affinityChart(profile) {
+    var ids = profile.top.concat(profile.avoided);
+    if (!ids.length) return null;
+
+    var rowH = 26, padL = 196, w = 520, h = ids.length * rowH + 8;
+    var mid = padL;
+    var maxBar = w - padL - 20;
+
+    var kids = [
+      svg('line', { x1: mid, y1: 2, x2: mid, y2: h - 6, class: 'axis' })
+    ];
+
+    ids.forEach(function (id, i) {
+      var v = profile.affinity[id] || 0;
+      var y = i * rowH + 6;
+      var len = Math.abs(v) * maxBar * 0.5;
+      var name = (FYC.INTERESTS[id] || {}).label || id;
+      if (name.length > 22) name = name.slice(0, 21) + '\u2026';
+      kids.push(svg('text', {
+        x: mid - 10, y: y + 13, class: 'lbl', 'text-anchor': 'end', text: name
+      }));
+      kids.push(svg('rect', {
+        x: v >= 0 ? mid : mid - len, y: y + 3, width: Math.max(2, len), height: 14,
+        rx: 3, class: v >= 0 ? 'bar pos' : 'bar neg'
+      }));
+    });
+
+    return svg('svg', {
+      viewBox: '0 0 ' + w + ' ' + h, class: 'chart', role: 'img',
+      'aria-label': 'How strongly each interest shows up in what you actually click'
+    }, kids);
+  }
+
+  /** A labelled 0..1 scale with a marker, for the gentleness/cost leanings. */
+  function leaning(label, value, min, max, lowText, highText) {
+    if (value == null) return null;
+    var pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
+    var w = 440, h = 46;
+    return el('div', { class: 'leaning' }, [
+      el('h4', { text: label }),
+      svg('svg', { viewBox: '0 0 ' + w + ' ' + h, class: 'chart', role: 'img',
+                   'aria-label': label + ': ' + lowText + ' to ' + highText }, [
+        svg('line', { x1: 8, y1: 16, x2: w - 8, y2: 16, class: 'track' }),
+        svg('circle', { cx: 8 + pct * (w - 16), cy: 16, r: 7, class: 'dot' }),
+        svg('text', { x: 8, y: 38, class: 'lbl', text: lowText }),
+        svg('text', { x: w - 8, y: 38, class: 'lbl', 'text-anchor': 'end', text: highText })
+      ])
+    ]);
+  }
+
+  function renderYou() {
+    var host = $('#you-body');
+    host.innerHTML = '';
+    if (!FYC.prefs) return;
+
+    var profile = FYC.prefs.profile();
+    var enabled = profile.enabled;
+
+    host.appendChild(el('div', { class: 'results-head' }, [
+      el('h2', { text: 'What this has worked out about you' }),
+      el('p', { text: profile.count + (profile.count === 1 ? ' action' : ' actions') + ' noticed, all of it on this device' })
+    ]));
+
+    if (!profile.ready) {
+      host.appendChild(el('div', { class: 'card empty' }, [
+        el('h2', { text: enabled ? 'Not enough to go on yet.' : 'Tracking is paused.' }),
+        el('p', {
+          text: enabled
+            ? 'Open a few first steps, save something to your plan, and this page will start showing what you are drawn to in practice — which is often not what you ticked in the form.'
+            : 'Turn it back on below if you want results to adapt to what you actually do.'
+        })
+      ]));
+    } else {
+      var summary = FYC.prefs.summary(profile);
+      host.appendChild(el('article', { class: 'card' }, [
+        el('h3', { class: 'you-summary', text: summary ? 'So far: ' + summary + '.' : 'Still forming a picture.' }),
+        el('p', { class: 'hint', text: 'This nudges your results. It never overrides the city, interests or budget you choose.' }),
+        el('div', { class: 'conf' }, [
+          el('span', { class: 'conf-label', text: 'How much it leans on this' }),
+          el('div', { class: 'conf-bar' }, [(function () {
+            var i = el('i');
+            i.style.width = Math.round(profile.confidence * 100) + '%';
+            return i;
+          })()])
+        ])
+      ]));
+
+      var chart = affinityChart(profile);
+      if (chart) {
+        host.appendChild(el('article', { class: 'card' }, [
+          el('h3', { text: 'What you actually click' }),
+          el('p', { class: 'hint', text: 'Bars to the right are things you open and save. To the left, things you back away from.' }),
+          chart
+        ]));
+      }
+
+      var leanings = [
+        leaning('How gentle you like it', profile.gentleness, 1, 5, 'will brave the intense ones', 'the gentlest options'),
+        leaning('What you will pay', profile.cost, 0, 2, 'free only', 'cost is no object'),
+        leaning('Going alone', profile.solo, 1, 5, 'prefers company', 'happy to turn up alone')
+      ].filter(Boolean);
+      if (leanings.length) {
+        host.appendChild(el('article', { class: 'card' }, [
+          el('h3', { text: 'Your leanings' })
+        ].concat(leanings)));
+      }
+    }
+
+    host.appendChild(el('article', { class: 'card' }, [
+      el('h3', { text: 'Your data' }),
+      el('p', { class: 'hint', text: 'This never leaves your browser. There is no account and nothing is sent anywhere. Erasing it here erases it completely.' }),
+      el('div', { class: 'actions' }, [
+        el('button', {
+          class: 'btn ghost sm', type: 'button',
+          onclick: function () {
+            FYC.prefs.setEnabled(!enabled);
+            renderYou();
+          }
+        }, [enabled ? 'Pause tracking' : 'Resume tracking']),
+        el('button', {
+          class: 'btn ghost sm', type: 'button',
+          onclick: function () {
+            if (!profile.count) return;
+            FYC.prefs.clear();
+            renderYou();
+          }
+        }, ['Erase what it has learned'])
+      ])
+    ]));
+  }
+
   // ---------- tabs ----------
   function showTab(which) {
-    var find = which === 'find';
-    $('#view-find').hidden = !find;
-    $('#view-plan').hidden = find;
-    $('#tab-find').setAttribute('aria-selected', find ? 'true' : 'false');
-    $('#tab-plan').setAttribute('aria-selected', find ? 'false' : 'true');
-    if (!find) renderPlan();
+    ['find', 'plan', 'you'].forEach(function (name) {
+      var on = which === name;
+      $('#view-' + name).hidden = !on;
+      $('#tab-' + name).setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    if (which === 'plan') renderPlan();
+    if (which === 'you') renderYou();
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
@@ -547,6 +714,7 @@
 
     $('#tab-find').addEventListener('click', function () { showTab('find'); });
     $('#tab-plan').addEventListener('click', function () { showTab('plan'); });
+    $('#tab-you').addEventListener('click', function () { showTab('you'); });
     $('#surprise').addEventListener('click', surprise);
     $('#location').addEventListener('input', paintPicked);
 
@@ -591,6 +759,7 @@
         return;
       }
       save(KEY.profile, p);
+      if (FYC.prefs && FYC.prefs.isEnabled()) p.learned = FYC.prefs.profile();
       var m = FYC.match(p);
       render(m, p);
       $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' });
