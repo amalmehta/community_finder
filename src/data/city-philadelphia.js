@@ -376,6 +376,121 @@
         ],
         solo: 4, gentleness: 3, structure: 'register', commitment: 'seasonal', cost: 1,
         when: ['weekend', 'weekday-eve'], size: 'medium', goals: ['friends', 'routine', 'skill']
+      },
+      {
+        id: 'phl-bartrams',
+        name: "Bartram's Garden",
+        neighborhood: 'Southwest Philadelphia',
+        blurb: 'The oldest botanic garden in North America, free to enter, with a community farm, volunteer days and free kayaking on the Schuylkill in summer.',
+        interests: ['gardening', 'outdoors', 'environment', 'volunteering', 'nature'],
+        url: 'https://bartramsgarden.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Visit free, or join a community farm volunteer session',
+          url: 'https://bartramsgarden.org/',
+          when: 'Open daily; volunteer sessions and free boating in season'
+        },
+        script: null,
+        expect: [
+          'Free to visit, and the free summer kayaking is genuinely free',
+          'Volunteer sessions need no experience and supply everything',
+          'Small crews mean you talk to the same people all morning',
+          'Most Philadelphians have never been, which is their loss'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-day'], size: 'medium', goals: ['impact', 'friends', 'routine']
+      },
+      {
+        id: 'phl-fleisher',
+        name: 'Fleisher Art Memorial',
+        neighborhood: 'Bella Vista',
+        blurb: 'Has offered free and low-cost art classes to anyone who turns up since 1898, in a building that includes a Romanesque sanctuary full of murals.',
+        interests: ['art', 'crafts', 'making', 'social'],
+        url: 'https://fleisher.org/',
+        firstStep: {
+          kind: 'register',
+          label: 'Register for a tuition-free or low-cost adult class',
+          url: 'https://fleisher.org/',
+          when: 'Terms through the year'
+        },
+        script: 'Hi! I\'d like to take a class and I have no art background. Which classes are tuition-free, and how does registration work for a beginner?',
+        expect: [
+          'Tuition-free adult classes are a core part of what they do, not charity',
+          'Several weeks with the same small group is the friendship mechanism',
+          'Beginners are the intended audience',
+          'The sanctuary alone is worth walking in to see'
+        ],
+        solo: 5, gentleness: 5, structure: 'course', commitment: 'seasonal', cost: 0,
+        when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['skill', 'friends', 'routine']
+      },
+      {
+        id: 'phl-bikeworks',
+        name: 'Neighborhood Bike Works',
+        neighborhood: 'West Philadelphia',
+        blurb: 'A youth bike programme with an adult volunteer night and an earn-a-bike scheme, where you learn repair by doing it under supervision.',
+        interests: ['making', 'cycling', 'volunteering', 'mentoring'],
+        url: 'https://neighborhoodbikeworks.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come to a volunteer or open shop night',
+          url: 'https://neighborhoodbikeworks.org/',
+          when: 'Weekly shop nights'
+        },
+        script: 'Hi! I\'d like to volunteer or use the open shop. I don\'t know much about bike repair \u2014 is that a problem?',
+        expect: [
+          'You are taught rather than expected to know things',
+          'Working on a bike beside someone makes talking easy',
+          'Free or donation-based',
+          'Weekly nights mean the same faces'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 0,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['skill', 'impact', 'friends']
+      },
+      {
+        id: 'phl-woodlands',
+        name: 'The Woodlands',
+        neighborhood: 'West Philadelphia',
+        blurb: 'A 54-acre Georgian estate and Victorian cemetery that locals treat as a park, with volunteer gardening days and a famously relaxed attitude to people wandering around.',
+        interests: ['outdoors', 'gardening', 'volunteering', 'nature', 'social'],
+        url: 'https://www.woodlandsphila.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Walk in free, or join a volunteer gardening day',
+          url: 'https://www.woodlandsphila.org/',
+          when: 'Open daily; volunteer days through the growing season'
+        },
+        script: null,
+        expect: [
+          'Free to walk in, and people run and picnic there',
+          'Volunteer days supply tools and need no experience',
+          'Small crews, so you end up talking to the same few people',
+          'Quiet in a way that is rare in West Philadelphia'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-day'], size: 'small', goals: ['impact', 'friends', 'routine']
+      },
+      {
+        id: 'phl-awbury',
+        name: 'Awbury Arboretum',
+        neighborhood: 'Germantown',
+        blurb: 'Fifty-five acres of free, open landscape in Germantown with volunteer days, a farm and community programmes \u2014 and almost no visitors from outside the neighbourhood.',
+        interests: ['outdoors', 'gardening', 'nature', 'volunteering', 'environment'],
+        url: 'https://awbury.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Visit free, or sign up for a volunteer day',
+          url: 'https://awbury.org/',
+          when: 'Open daily; volunteer days seasonally'
+        },
+        script: null,
+        expect: [
+          'Free and open to anyone, dawn to dusk',
+          'Volunteer days provide tools and assume no experience',
+          'Small enough that staff and regulars notice a new face',
+          'An easy, low-stakes place to go alone and simply be outside'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-day'], size: 'small', goals: ['impact', 'friends', 'routine']
       }
     ]
   });

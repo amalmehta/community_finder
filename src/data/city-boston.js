@@ -376,6 +376,121 @@
         ],
         solo: 4, gentleness: 3, structure: 'register', commitment: 'seasonal', cost: 1,
         when: ['weekend', 'weekday-eve'], size: 'large', goals: ['friends', 'routine', 'skill']
+      },
+      {
+        id: 'bos-myco',
+        name: 'Boston Mycological Club',
+        neighborhood: 'Forays around New England',
+        blurb: 'Founded in 1895, the oldest mushroom club in America, still walking slowly through the woods every autumn looking at the ground.',
+        interests: ['nature', 'outdoors', 'food', 'social'],
+        url: 'https://www.bostonmycologicalclub.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Join a foray as a guest',
+          url: 'https://www.bostonmycologicalclub.org/',
+          when: 'Forays through the season; meetings monthly'
+        },
+        script: 'Hello \u2014 I\'m a complete beginner. Can I come on a foray as a guest, and is there anything I should bring?',
+        expect: [
+          'Beginners are welcome and experts enjoy identifying things for you',
+          'Slow walking and crouching, not hiking',
+          'Modest membership; guests usually welcome first',
+          'Never eat anything without an expert confirming it'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'one-off', cost: 1,
+        when: ['weekend'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'bos-bikesnotbombs',
+        name: 'Bikes Not Bombs',
+        neighborhood: 'Jamaica Plain',
+        blurb: 'A bike shop and youth programme that ships refurbished bicycles overseas, with volunteer wrench nights where you learn repair while doing something useful.',
+        interests: ['making', 'cycling', 'volunteering', 'mentoring'],
+        url: 'https://bikesnotbombs.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come to a volunteer wrench night',
+          url: 'https://bikesnotbombs.org/',
+          when: 'Weekly volunteer nights'
+        },
+        script: 'Hi! I\'d like to come to a volunteer night. I don\'t know much about bike mechanics \u2014 is that alright, and what should I expect?',
+        expect: [
+          'You are taught as you go; no mechanical knowledge assumed',
+          'Working on a bike beside someone makes conversation easy',
+          'Free, and the same people turn up weekly',
+          'The bikes go somewhere, so the work is not busywork'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 0,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['impact', 'skill', 'friends']
+      },
+      {
+        id: 'bos-recordco',
+        name: 'The Record Co.',
+        neighborhood: 'Roxbury',
+        blurb: 'A nonprofit offering absurdly cheap rehearsal and recording rooms, plus community events \u2014 built so that being in a band does not require money.',
+        interests: ['music', 'making', 'social'],
+        url: 'https://therecord.co/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Book a cheap rehearsal hour, or come to a community event',
+          url: 'https://therecord.co/',
+          when: 'Rooms bookable daily; events through the month'
+        },
+        script: 'Hi! I play a bit and I\'m looking to meet other musicians. Do you run community events or anything where people connect with each other?',
+        expect: [
+          'Rates are set low on purpose \u2014 this is a nonprofit, not a studio',
+          'Community events are where people actually meet collaborators',
+          'You do not need to be good',
+          'Rooms are bookable by the hour, so the commitment is tiny'
+        ],
+        solo: 4, gentleness: 4, structure: 'register', commitment: 'one-off', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['skill', 'friends']
+      },
+      {
+        id: 'bos-growingcenter',
+        name: 'Somerville Community Growing Center',
+        neighborhood: 'Somerville',
+        blurb: 'A quarter-acre of garden hidden behind the shops on Somerville Avenue, run by volunteers, with free seasonal festivals and open work sessions.',
+        interests: ['gardening', 'environment', 'volunteering', 'outdoors', 'parents'],
+        url: 'https://thegrowingcenter.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Come to a work session or a free seasonal festival',
+          url: 'https://thegrowingcenter.org/',
+          when: 'Work sessions and festivals through the growing season'
+        },
+        script: null,
+        expect: [
+          'Tiny, volunteer-run and genuinely hidden \u2014 you walk past the entrance without seeing it',
+          'Free, and no gardening knowledge assumed',
+          'Festivals are family-friendly and easy to attend alone',
+          'Small enough that someone will talk to you'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-eve'], size: 'small', goals: ['impact', 'friends']
+      },
+      {
+        id: 'bos-athenaeum',
+        name: 'Boston Athenaeum',
+        neighborhood: 'Beacon Hill',
+        blurb: 'One of the oldest independent libraries in the country, with a reading room overlooking a burying ground, plus public talks, tours and exhibitions.',
+        interests: ['books', 'art', 'writing', 'social'],
+        url: 'https://bostonathenaeum.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Take a public tour or go to one talk',
+          url: 'https://bostonathenaeum.org/',
+          when: 'Tours and events through the week'
+        },
+        script: null,
+        expect: [
+          'Tours are open to non-members and are the easiest way in',
+          'Talks give you a reason to be there and something to discuss afterwards',
+          'Membership is expensive; tours and many events are not',
+          'The fifth-floor reading room is one of the best rooms in the city'
+        ],
+        solo: 5, gentleness: 5, structure: 'rsvp', commitment: 'one-off', cost: 1,
+        when: ['weekday-day', 'weekday-eve'], size: 'small', goals: ['friends', 'skill']
       }
     ]
   });

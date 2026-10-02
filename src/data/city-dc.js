@@ -376,6 +376,98 @@
         ],
         solo: 4, gentleness: 3, structure: 'register', commitment: 'seasonal', cost: 1,
         when: ['weekend', 'weekday-eve'], size: 'large', goals: ['friends', 'routine', 'skill']
+      },
+      {
+        id: 'dc-bikehouse',
+        name: 'The Bike House',
+        neighborhood: 'Petworth & around',
+        blurb: 'A free, volunteer-run bike repair collective that sets up in public parks \u2014 you bring a broken bike, and someone teaches you to fix it rather than fixing it for you.',
+        interests: ['making', 'cycling', 'volunteering', 'social'],
+        url: 'https://thebikehouse.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Bring a bike to a free clinic in the park',
+          url: 'https://thebikehouse.org/',
+          when: 'Weekend clinics \u2014 check the site for locations'
+        },
+        script: null,
+        expect: [
+          'Free, outdoors, and no appointment needed',
+          'Arriving with a broken bike does all the social work for you',
+          'You are taught rather than served; that is the entire model',
+          'Nobody expects you to know any of the jargon'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend'], size: 'small', goals: ['skill', 'friends', 'impact']
+      },
+      {
+        id: 'dc-maw',
+        name: 'Mycological Association of Washington',
+        neighborhood: 'Forays around the DMV',
+        blurb: 'A mushroom club running forays into Rock Creek and beyond, with identification sessions and monthly meetings. Deeply nerdy and glad of beginners.',
+        interests: ['nature', 'outdoors', 'food', 'social'],
+        url: 'https://mawdc.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Come to a foray or a monthly meeting as a guest',
+          url: 'https://mawdc.org/',
+          when: 'Forays through the season; meetings monthly'
+        },
+        script: 'Hello \u2014 I\'m a complete beginner and know nothing about mushrooms. Can I join a foray as a guest, and what should I bring?',
+        expect: [
+          'Beginners are welcome and experts enjoy explaining',
+          'Slow walking and crouching, not hiking',
+          'Modest membership; guests usually welcome first',
+          'Never eat anything without an expert confirming it'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'one-off', cost: 1,
+        when: ['weekend'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'dc-commongood',
+        name: 'Common Good City Farm',
+        neighborhood: 'LeDroit Park',
+        blurb: 'An urban farm tucked between rowhouses, running open volunteer hours and a food-access programme, with produce going to neighbours who need it.',
+        interests: ['gardening', 'food', 'environment', 'volunteering', 'outdoors'],
+        url: 'https://www.commongoodcityfarm.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Come to open volunteer hours',
+          url: 'https://www.commongoodcityfarm.org/',
+          when: 'Volunteer hours through the growing season'
+        },
+        script: null,
+        expect: [
+          'Drop in during volunteer hours; no signup needed',
+          'No gardening knowledge assumed',
+          'Free, and the produce goes to the neighbourhood',
+          'Working with your hands removes the pressure to be interesting'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-day'], size: 'small', goals: ['impact', 'friends', 'skill']
+      },
+      {
+        id: 'dc-hillcenter',
+        name: 'Hill Center at the Old Naval Hospital',
+        neighborhood: 'Capitol Hill',
+        blurb: 'A restored 1860s hospital running a packed calendar of free talks, concerts and cheap classes \u2014 cooking, writing, languages \u2014 in a neighbourhood most people only pass through.',
+        interests: ['books', 'writing', 'art', 'food', 'social', 'language'],
+        url: 'https://hillcenterdc.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Book a free talk, or a cheap evening class',
+          url: 'https://hillcenterdc.org/',
+          when: 'Events most days'
+        },
+        script: null,
+        expect: [
+          'Many events are genuinely free and need only an RSVP',
+          'Classes run over several weeks with the same small group',
+          'A talk has a fixed start and end, so you always have an exit',
+          'The building is beautiful and nobody minds you just looking'
+        ],
+        solo: 5, gentleness: 5, structure: 'rsvp', commitment: 'one-off', cost: 0,
+        when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['friends', 'skill']
       }
     ]
   });

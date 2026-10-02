@@ -537,6 +537,144 @@
         ],
         solo: 4, gentleness: 4, structure: 'course', commitment: 'seasonal', cost: 2,
         when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['skill', 'friends', 'routine']
+      },
+      {
+        id: 'nyc-cityreliquary',
+        name: 'City Reliquary',
+        neighborhood: 'Williamsburg',
+        blurb: 'A tiny volunteer-run museum of New York ephemera \u2014 subway tokens, Statue of Liberty souvenirs, a rock from every borough \u2014 that also throws block parties and runs a backyard bar.',
+        interests: ['art', 'books', 'social', 'volunteering'],
+        url: 'https://cityreliquary.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Visit on an open day, or come to one of their events',
+          url: 'https://cityreliquary.org/',
+          when: 'Weekend open hours plus events'
+        },
+        script: 'Hi! I love what you do and I\'d like to get involved. Do you take volunteers, and is there an event coming up that\'s good for someone who hasn\'t been before?',
+        expect: [
+          'Tiny admission, and the whole place takes twenty minutes',
+          'It is run by volunteers, so asking how to help is a normal thing to do',
+          'The backyard events are low-key and full of people who like odd things',
+          'Nobody there is trying to be cool, which is restful'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 1,
+        when: ['weekend', 'weekday-eve'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'nyc-brooklyngrange',
+        name: 'Brooklyn Grange',
+        neighborhood: 'Brooklyn Navy Yard & Sunset Park rooftops',
+        blurb: 'Rooftop farms on top of industrial buildings, with volunteer days and open hours. Weeding a field of kale with the Manhattan skyline behind it is a strange and excellent way to spend a morning.',
+        interests: ['gardening', 'food', 'environment', 'volunteering', 'outdoors'],
+        url: 'https://www.brooklyngrangefarm.com/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Sign up for a volunteer day',
+          url: 'https://www.brooklyngrangefarm.com/',
+          when: 'Volunteer days in the growing season'
+        },
+        script: null,
+        expect: [
+          'No farming experience assumed at all',
+          'Working with your hands beside someone makes conversation easy',
+          'Volunteer days are free; some events are ticketed',
+          'The view is the reason to come back'
+        ],
+        solo: 5, gentleness: 5, structure: 'shift', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-day'], size: 'medium', goals: ['impact', 'friends', 'skill']
+      },
+      {
+        id: 'nyc-earthmatter',
+        name: 'Earth Matter NY',
+        neighborhood: 'Governors Island',
+        blurb: 'A compost learning centre on Governors Island, reachable only by ferry, where volunteers turn the city\'s food scraps into soil alongside a flock of chickens.',
+        interests: ['environment', 'gardening', 'volunteering', 'outdoors'],
+        url: 'https://earthmatter.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Take the ferry over on a volunteer day',
+          url: 'https://earthmatter.org/',
+          when: 'Volunteer days in the warmer months'
+        },
+        script: 'Hi! I\'d like to come volunteer. I\'ve never composted anything in my life \u2014 is that fine, and which ferry should I aim for?',
+        expect: [
+          'The ferry ride means the trip feels like an outing rather than an errand',
+          'No experience needed; it is mostly turning piles and moving material',
+          'Free',
+          'There are chickens, which lowers everyone\'s guard'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-day'], size: 'small', goals: ['impact', 'friends', 'skill']
+      },
+      {
+        id: 'nyc-caveat',
+        name: 'Caveat',
+        neighborhood: 'Lower East Side',
+        blurb: 'A basement theatre for "intelligent nightlife" \u2014 nerdy live shows where scientists, historians and comedians explain something obscure to an audience holding drinks.',
+        interests: ['social', 'books', 'tech', 'theater'],
+        url: 'https://www.caveat.nyc/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Buy a ticket to whichever show sounds strangest',
+          url: 'https://www.caveat.nyc/',
+          when: 'Shows most nights'
+        },
+        script: null,
+        expect: [
+          'The show gives you something to say to whoever is next to you',
+          'Going alone is entirely normal here',
+          'Tickets are cheap and there is a fixed end time',
+          'Audience participation is optional and never cruel'
+        ],
+        solo: 5, gentleness: 4, structure: 'rsvp', commitment: 'one-off', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'nyc-mycological',
+        name: 'New York Mycological Society',
+        neighborhood: 'Forays in parks across the city',
+        blurb: 'Founded in part by the composer John Cage, this club walks slowly through city parks looking at mushrooms. Free, beginner-friendly, and almost nobody knows it exists.',
+        interests: ['nature', 'outdoors', 'food', 'social'],
+        url: 'https://newyorkmyc.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Join a free foray \u2014 just turn up at the meeting point',
+          url: 'https://newyorkmyc.org/',
+          when: 'Weekend forays through the season'
+        },
+        script: null,
+        expect: [
+          'Free, and no membership needed to join a walk',
+          'Beginners are welcome \u2014 experts genuinely enjoy explaining',
+          'Slow walking and a lot of crouching. It is not a hike',
+          'Never eat anything without an expert confirming it'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'nyc-greenwood',
+        name: 'Green-Wood Cemetery',
+        neighborhood: 'Sunset Park, Brooklyn',
+        blurb: 'A 478-acre Victorian cemetery that doubles as an arboretum, bird sanctuary and events venue, with volunteer days, tours and a resident flock of monk parakeets.',
+        interests: ['nature', 'outdoors', 'volunteering', 'books', 'social'],
+        url: 'https://www.green-wood.com/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Join a tour or a volunteer day',
+          url: 'https://www.green-wood.com/',
+          when: 'Tours and volunteer days year-round'
+        },
+        script: null,
+        expect: [
+          'Free to walk in, and it is enormous and quiet',
+          'Tours give you a guide and a group, which is easier than wandering alone',
+          'Volunteer days involve gardening and restoration with a small crew',
+          'The view from the top is one of the best in the city'
+        ],
+        solo: 5, gentleness: 5, structure: 'rsvp', commitment: 'one-off', cost: 1,
+        when: ['weekend', 'weekday-day'], size: 'medium', goals: ['friends', 'impact']
       }
     ]
   });

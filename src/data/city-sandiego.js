@@ -353,6 +353,121 @@
         ],
         solo: 4, gentleness: 4, structure: 'drop-in', commitment: 'weekly', cost: 1,
         when: ['weekday-eve', 'weekend', 'weekday-day'], size: 'medium', goals: ['routine', 'friends', 'skill']
+      },
+      {
+        id: 'sd-bikesdelpueblo',
+        name: 'Bikes del Pueblo',
+        neighborhood: 'City Heights',
+        blurb: 'A volunteer collective running a free DIY bike repair space where you fix your own bike with help, no money required.',
+        interests: ['making', 'cycling', 'volunteering', 'social'],
+        url: 'https://bikesdelpueblo.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Bring your bike during open shop hours',
+          url: 'https://bikesdelpueblo.org/',
+          when: 'Open shop hours \u2014 check the site'
+        },
+        script: null,
+        expect: [
+          'Free, and donations are optional',
+          'Arriving with a broken bike does all the social work for you',
+          'Volunteers teach rather than fix it for you',
+          'Bilingual and genuinely community-run'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-eve'], size: 'small', goals: ['skill', 'friends', 'impact']
+      },
+      {
+        id: 'sd-myco',
+        name: 'San Diego Mycological Society',
+        neighborhood: 'Forays around the county',
+        blurb: 'A mushroom club running forays after the winter rains, identification sessions and an annual fair \u2014 a surprisingly active scene for a semi-desert.',
+        interests: ['nature', 'outdoors', 'food', 'social'],
+        url: 'https://sdmyco.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Come to a meeting or a foray as a guest',
+          url: 'https://sdmyco.org/',
+          when: 'Forays after rain; meetings through the year'
+        },
+        script: 'Hello \u2014 I\'m a complete beginner. Can I come to a foray or meeting as a guest, and what should I bring?',
+        expect: [
+          'Beginners are welcome and experts like explaining',
+          'Slow walking and crouching rather than hiking',
+          'Small membership; guests usually welcome first',
+          'Never eat anything without an expert confirming it'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'one-off', cost: 1,
+        when: ['weekend'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'sd-olivewood',
+        name: 'Olivewood Gardens',
+        neighborhood: 'National City',
+        blurb: 'A seven-acre organic garden and teaching kitchen in a restored Victorian house, running volunteer days and free cooking programmes for the neighbourhood.',
+        interests: ['gardening', 'food', 'volunteering', 'environment', 'parents'],
+        url: 'https://olivewoodgardens.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Sign up for a volunteer garden day',
+          url: 'https://olivewoodgardens.org/',
+          when: 'Volunteer days most months'
+        },
+        script: 'Hi! I\'d like to volunteer. I\'m interested in {interest} and have no gardening experience \u2014 what would suit someone new?',
+        expect: [
+          'No experience needed; tools and instructions provided',
+          'Small groups mean you talk to the same few people',
+          'Free',
+          'The house and the view make it feel like a day out rather than a chore'
+        ],
+        solo: 5, gentleness: 5, structure: 'shift', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-day'], size: 'small', goals: ['impact', 'friends', 'skill']
+      },
+      {
+        id: 'sd-coastalroots',
+        name: 'Coastal Roots Farm',
+        neighborhood: 'Encinitas',
+        blurb: 'A Jewish community farm that gives away much of what it grows, with free volunteer days, a pay-what-you-can farm stand and seasonal festivals open to everyone.',
+        interests: ['gardening', 'food', 'faith', 'volunteering', 'environment'],
+        url: 'https://coastalrootsfarm.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Join a free volunteer day',
+          url: 'https://coastalrootsfarm.org/',
+          when: 'Volunteer days weekly; festivals seasonally'
+        },
+        script: 'Hi! I\'d like to come to a volunteer day. I have no farming experience and I\'m not Jewish \u2014 is that fine?',
+        expect: [
+          'No experience needed and no religious participation required',
+          'Free, and much of the harvest is given away',
+          'Working beside someone makes conversation easy',
+          'Festivals are a low-pressure way to see the place first'
+        ],
+        solo: 5, gentleness: 5, structure: 'shift', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-day'], size: 'medium', goals: ['impact', 'friends', 'skill']
+      },
+      {
+        id: 'sd-obpeoples',
+        name: "Ocean Beach People's Organic Food Market",
+        neighborhood: 'Ocean Beach',
+        blurb: 'A member-owned co-operative grocery running since 1971, with volunteer shifts, classes and a community noticeboard that is a genuine local institution.',
+        interests: ['food', 'volunteering', 'environment', 'social'],
+        url: 'https://obpeoplesfood.coop/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Visit, read the noticeboard, and ask about volunteering',
+          url: 'https://obpeoplesfood.coop/',
+          when: 'Open daily'
+        },
+        script: 'Hi! I shop here and I\'d like to get more involved. Do you take volunteers, and what does membership actually involve?',
+        expect: [
+          'Member-owned, so asking how to get involved is expected',
+          'The noticeboard is a genuine map of what is happening locally',
+          'Free to visit; membership is modest',
+          'Staff and regulars actually talk to each other, which is rarer than it should be'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekday-day', 'weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'impact']
       }
     ]
   });

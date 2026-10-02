@@ -399,6 +399,121 @@
         ],
         solo: 5, gentleness: 4, structure: 'course', commitment: 'one-off', cost: 2,
         when: ['weekend'], size: 'medium', goals: ['skill', 'friends']
+      },
+      {
+        id: 'sea-cwb',
+        name: 'The Center for Wooden Boats',
+        neighborhood: 'South Lake Union',
+        blurb: 'A free public boatyard on the lake that gives away free rides on historic sailboats every Sunday, and teaches volunteers to build and restore wooden boats.',
+        interests: ['making', 'outdoors', 'volunteering', 'social'],
+        url: 'https://cwb.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Sign up on the day for a free Sunday public sail',
+          url: 'https://cwb.org/',
+          when: 'Public sails on Sundays; volunteer days through the week'
+        },
+        script: 'Hi! I\'d like to come to a public sail and I\'ve never been on a sailboat. How does sign-up work on the day, and do you need volunteers?',
+        expect: [
+          'The Sunday sails are genuinely free \u2014 you sign up in person that morning',
+          'You are in a small boat with a volunteer skipper and a few strangers for an hour',
+          'Boatshop volunteering teaches woodworking with no experience required',
+          'Nobody expects you to know any sailing terms'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-day'], size: 'medium', goals: ['friends', 'skill', 'impact']
+      },
+      {
+        id: 'sea-beaconfoodforest',
+        name: 'Beacon Food Forest',
+        neighborhood: 'Beacon Hill',
+        blurb: 'A seven-acre public food forest on city land where anyone may pick the fruit, maintained by volunteers at open work parties. One of the largest of its kind anywhere.',
+        interests: ['gardening', 'food', 'environment', 'volunteering', 'outdoors'],
+        url: 'https://beaconfoodforest.org/',
+        firstStep: {
+          kind: 'dropin',
+          label: 'Turn up to a work party \u2014 no signup needed',
+          url: 'https://beaconfoodforest.org/',
+          when: 'Regular work parties \u2014 check the site'
+        },
+        script: null,
+        expect: [
+          'You walk in, someone hands you a tool and shows you the job',
+          'Free, and the food is free for anyone to pick',
+          'No gardening knowledge assumed',
+          'Work parties end with people standing around talking, which is the point'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend'], size: 'small', goals: ['impact', 'friends', 'skill']
+      },
+      {
+        id: 'sea-psms',
+        name: 'Puget Sound Mycological Society',
+        neighborhood: 'Forays across the region',
+        blurb: 'One of the biggest mushroom clubs in the country, running forays, identification clinics and an annual exhibit. The Pacific Northwest is the best place on earth for this.',
+        interests: ['nature', 'outdoors', 'food', 'social'],
+        url: 'https://www.psms.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Come to a monthly meeting or join a foray',
+          url: 'https://www.psms.org/',
+          when: 'Meetings monthly; forays in the wet season'
+        },
+        script: 'Hello \u2014 I\'m a complete beginner. Can I come to a meeting or a foray as a guest, and is there anything I need to bring?',
+        expect: [
+          'Beginners are the favourite kind of guest \u2014 identification is a shared activity',
+          'Meetings are easy to attend alone; forays are slow walks in the woods',
+          'Modest membership; visitors usually welcome first',
+          'Never eat anything without an expert confirming it'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'one-off', cost: 1,
+        when: ['weekend', 'weekday-eve'], size: 'medium', goals: ['friends', 'skill']
+      },
+      {
+        id: 'sea-recreative',
+        name: 'Seattle ReCreative',
+        neighborhood: 'Greenwood',
+        blurb: 'A creative reuse shop and art centre selling donated craft materials by the bagful, with drop-in workshops and volunteer shifts sorting the donations.',
+        interests: ['crafts', 'art', 'environment', 'volunteering', 'making'],
+        url: 'https://seattlerecreative.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Visit the shop, or sign up for a volunteer sorting shift',
+          url: 'https://seattlerecreative.org/',
+          when: 'Shop open most days; workshops through the month'
+        },
+        script: 'Hi! I\'d like to volunteer. I\'m interested in {interest} \u2014 what do shifts involve, and how do I get started?',
+        expect: [
+          'Sorting buttons and fabric next to someone is oddly absorbing and easy to talk over',
+          'No skills needed at all',
+          'Free to volunteer; materials are cheap',
+          'Drop-in workshops give you a finished thing to take home'
+        ],
+        solo: 5, gentleness: 5, structure: 'shift', commitment: 'one-off', cost: 0,
+        when: ['weekday-day', 'weekday-eve', 'weekend'], size: 'small', goals: ['impact', 'friends', 'skill']
+      },
+      {
+        id: 'sea-fremontabbey',
+        name: 'Fremont Abbey Arts Center',
+        neighborhood: 'Fremont',
+        blurb: 'A converted church running concerts, open mics and all-ages arts events, with a volunteer programme that gets you in free and gives you a job for the evening.',
+        interests: ['music', 'art', 'social', 'volunteering', 'writing'],
+        url: 'https://www.fremontabbey.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Go to one show, or volunteer at an event',
+          url: 'https://www.fremontabbey.org/',
+          when: 'Events most weeks'
+        },
+        script: 'Hi! I\'d like to volunteer at events. What roles do you need filled, and what\'s the first step for someone new?',
+        expect: [
+          'Volunteering gives you a defined job, which is far easier than mingling',
+          'Volunteers usually see the show free',
+          'All-ages and alcohol-light, which suits people who do not want a bar',
+          'The same volunteers turn up repeatedly, so faces become familiar'
+        ],
+        solo: 5, gentleness: 5, structure: 'shift', commitment: 'one-off', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'impact', 'skill']
       }
     ]
   });

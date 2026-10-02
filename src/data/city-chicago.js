@@ -376,6 +376,121 @@
         ],
         solo: 5, gentleness: 5, structure: 'course', commitment: 'seasonal', cost: 2,
         when: ['weekday-eve', 'weekend'], size: 'large', goals: ['skill', 'friends', 'routine']
+      },
+      {
+        id: 'chi-garfield',
+        name: 'Garfield Park Conservatory',
+        neighborhood: 'East Garfield Park',
+        blurb: 'One of the largest conservatories in the country, free to enter, with volunteer days among the ferns. In February it is the warmest, greenest room in Chicago.',
+        interests: ['gardening', 'nature', 'volunteering', 'social'],
+        url: 'https://garfieldconservatory.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Visit free, then ask about volunteer days',
+          url: 'https://garfieldconservatory.org/',
+          when: 'Open most days; volunteer programmes year-round'
+        },
+        script: 'Hi! I visit often and would like to volunteer. What does getting started involve, and do I need any plant knowledge?',
+        expect: [
+          'Free admission, so a first visit costs you nothing',
+          'Volunteering is indoors and warm, which matters from November to April',
+          'No plant knowledge assumed',
+          'A quiet place where sitting alone is completely normal'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekday-day', 'weekend'], size: 'medium', goals: ['impact', 'friends', 'routine']
+      },
+      {
+        id: 'chi-plant',
+        name: 'Plant Chicago',
+        neighborhood: 'Back of the Yards',
+        blurb: 'A circular-economy nonprofit in a former meatpacking plant, running a farmers market, workshops and volunteer days around closed-loop food systems.',
+        interests: ['environment', 'food', 'volunteering', 'making', 'gardening'],
+        url: 'https://plantchicago.org/',
+        firstStep: {
+          kind: 'signup',
+          label: 'Come to the market, or sign up for a volunteer day',
+          url: 'https://plantchicago.org/',
+          when: 'Markets and volunteer days through the year'
+        },
+        script: 'Hi! I\'d like to volunteer. I\'m interested in {interest} and new to all of this \u2014 what would suit someone starting out?',
+        expect: [
+          'Small organisation, so volunteers get talked to rather than processed',
+          'Workshops give you a task and a small group',
+          'Volunteering is free; workshops have a modest fee',
+          'The building itself is worth the trip'
+        ],
+        solo: 5, gentleness: 5, structure: 'shift', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-day'], size: 'small', goals: ['impact', 'skill', 'friends']
+      },
+      {
+        id: 'chi-experimentalstation',
+        name: 'Experimental Station',
+        neighborhood: 'Woodlawn / Hyde Park',
+        blurb: 'An independent cultural centre housing Blackstone Bicycle Works, a youth bike shop where volunteers teach repair, plus a farmers market and a bookshop.',
+        interests: ['making', 'cycling', 'mentoring', 'volunteering', 'books'],
+        url: 'https://experimentalstation.org/',
+        firstStep: {
+          kind: 'email',
+          label: 'Ask about volunteering at Blackstone Bicycle Works',
+          url: 'https://experimentalstation.org/',
+          when: 'Weekday afternoons and Saturdays'
+        },
+        script: 'Hi! I\'d like to volunteer at the bike shop. I know a bit about bikes but nothing about teaching \u2014 is that a problem, and what\'s the first step?',
+        expect: [
+          'You teach kids bike repair, which gives every interaction an obvious purpose',
+          'Bike knowledge helps but is not required \u2014 they will train you',
+          'Free, with a regular weekly slot expected',
+          'The shop is loud and busy, which is easier than a quiet room'
+        ],
+        solo: 5, gentleness: 4, structure: 'register', commitment: 'weekly', cost: 0,
+        when: ['weekday-day', 'weekend'], size: 'small', goals: ['impact', 'skill', 'friends']
+      },
+      {
+        id: 'chi-sweetwater',
+        name: 'Sweet Water Foundation',
+        neighborhood: 'Englewood / Washington Park',
+        blurb: 'A "regenerative neighbourhood development" project \u2014 an urban farm, a timber-framed barn built by volunteers, and open community workdays on the South Side.',
+        interests: ['gardening', 'making', 'civic', 'volunteering', 'food'],
+        url: 'https://www.sweetwaterfoundation.com/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Come to a community workday or open event',
+          url: 'https://www.sweetwaterfoundation.com/',
+          when: 'Workdays and events through the growing season'
+        },
+        script: 'Hi! I\'d like to come to a workday. I have no farming or building experience \u2014 is that alright, and when is a good time to come?',
+        expect: [
+          'Work is shared and taught rather than assigned to specialists',
+          'Free',
+          'Building and growing things side by side removes the need to make conversation',
+          'The place is genuinely unlike anything else in the city'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-day'], size: 'small', goals: ['impact', 'skill', 'friends']
+      },
+      {
+        id: 'chi-myco',
+        name: 'Illinois Mycological Association',
+        neighborhood: 'Forays around Chicagoland',
+        blurb: 'A mushroom-hunting club running forays into forest preserves, with identification sessions afterwards. Deeply nerdy and very happy to take beginners along.',
+        interests: ['nature', 'outdoors', 'food', 'social'],
+        url: 'https://illinoismyco.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Join a foray as a guest',
+          url: 'https://illinoismyco.org/',
+          when: 'Forays through the warmer months'
+        },
+        script: 'Hello \u2014 I\'m a complete beginner and know nothing about mushrooms. Can I come along to a foray as a guest, and what should I bring?',
+        expect: [
+          'Beginners are the favourite kind of guest',
+          'Slow walking and crouching, not hiking',
+          'Modest membership; guests are usually welcome first',
+          'Never eat anything without an expert confirming it'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'one-off', cost: 1,
+        when: ['weekend'], size: 'small', goals: ['friends', 'skill']
       }
     ]
   });

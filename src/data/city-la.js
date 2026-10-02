@@ -399,6 +399,121 @@
         ],
         solo: 4, gentleness: 3, structure: 'register', commitment: 'seasonal', cost: 1,
         when: ['weekend', 'weekday-eve'], size: 'large', goals: ['friends', 'routine', 'skill']
+      },
+      {
+        id: 'la-bicyclekitchen',
+        name: 'The Bicycle Kitchen',
+        neighborhood: 'East Hollywood',
+        blurb: 'A volunteer-run DIY bike repair co-op where you fix your own bike with their tools and a "cook" looking over your shoulder when you get stuck.',
+        interests: ['making', 'cycling', 'volunteering', 'social'],
+        url: 'https://bicyclekitchen.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Bring your bike during open shop hours',
+          url: 'https://bicyclekitchen.org/',
+          when: 'Open shop several days a week'
+        },
+        script: 'Hi! I\'d like to come in and work on my bike. I know nothing about repair \u2014 is that fine, and what are your open hours?',
+        expect: [
+          'Arriving with a broken bike does all the social work for you',
+          'Volunteers teach rather than fix it for you',
+          'Small hourly donation; far cheaper than a shop',
+          'In a city built for cars, this is a room full of people who chose otherwise'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'one-off', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['skill', 'friends']
+      },
+      {
+        id: 'la-myco',
+        name: 'Los Angeles Mycological Society',
+        neighborhood: 'Forays in the mountains & canyons',
+        blurb: 'A mushroom club running forays into the Angeles National Forest and local canyons after the rains, plus identification meetings.',
+        interests: ['nature', 'outdoors', 'food', 'social'],
+        url: 'https://lamushrooms.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Join a foray or a meeting as a guest',
+          url: 'https://lamushrooms.org/',
+          when: 'Forays after winter rain; meetings through the year'
+        },
+        script: 'Hello \u2014 I\'m a complete beginner and know nothing about mushrooms. Can I come to a foray as a guest, and what should I bring?',
+        expect: [
+          'Beginners are welcome and experts enjoy explaining',
+          'A good excuse to get out of the basin and into the mountains',
+          'Modest membership; guests usually welcome first',
+          'Never eat anything without an expert confirming it'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'one-off', cost: 1,
+        when: ['weekend'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'la-velaslavasay',
+        name: 'Velaslavasay Panorama',
+        neighborhood: 'University Park',
+        blurb: 'A 360-degree painted panorama in a former 1920s cinema, with a garden behind it, run as a deliberately anachronistic exhibition hall. There is nothing else like it.',
+        interests: ['art', 'filmphoto', 'social', 'books'],
+        url: 'https://panoramaonview.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Visit on an open afternoon, or go to one event',
+          url: 'https://panoramaonview.org/',
+          when: 'Weekend open hours plus events'
+        },
+        script: null,
+        expect: [
+          'Tiny admission, and the visit takes under an hour',
+          'The garden behind it is free to sit in',
+          'Events are small, odd and friendly',
+          'An easy place to go alone and then have something to tell people about'
+        ],
+        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 1,
+        when: ['weekend'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'la-clockshop',
+        name: 'Clockshop',
+        neighborhood: 'Frogtown / Elysian Valley',
+        blurb: 'An arts organisation that puts on free readings, talks and performances in odd public places along the LA River, including the former Bowtie rail yard.',
+        interests: ['art', 'books', 'writing', 'social', 'outdoors'],
+        url: 'https://clockshop.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'RSVP to a free event',
+          url: 'https://clockshop.org/',
+          when: 'Events through the year, mostly weekends'
+        },
+        script: null,
+        expect: [
+          'Most events are free with an RSVP',
+          'Outdoor settings are less intense than a gallery opening',
+          'Small crowds, so people actually talk to each other',
+          'It takes you to parts of the river you would never otherwise visit'
+        ],
+        solo: 5, gentleness: 5, structure: 'rsvp', commitment: 'one-off', cost: 0,
+        when: ['weekend', 'weekday-eve'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'la-gardencouncil',
+        name: 'LA Community Garden Council',
+        neighborhood: 'Gardens across the county',
+        blurb: 'Supports more than a hundred community gardens across LA. Most have workdays and waiting lists, and the council can point you at the one nearest you.',
+        interests: ['gardening', 'food', 'environment', 'civic', 'volunteering'],
+        url: 'https://www.lagardencouncil.org/',
+        firstStep: {
+          kind: 'email',
+          label: 'Ask which garden near you is taking volunteers or members',
+          url: 'https://www.lagardencouncil.org/',
+          when: 'Workdays vary by garden'
+        },
+        script: 'Hi! I live in {city} and I\'d like to get involved with a community garden near me. Which one would you suggest, and do they need volunteers?',
+        expect: [
+          'You meet people who live within a few blocks of you, which is rare in LA',
+          'Plots often have waiting lists, but volunteering usually does not',
+          'Free or a small annual plot fee',
+          'A shared task means you never have to invent conversation'
+        ],
+        solo: 4, gentleness: 4, structure: 'register', commitment: 'seasonal', cost: 0,
+        when: ['weekend', 'weekday-day'], size: 'small', goals: ['friends', 'impact', 'skill']
       }
     ]
   });

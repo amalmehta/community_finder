@@ -399,6 +399,121 @@
         ],
         solo: 4, gentleness: 3, structure: 'register', commitment: 'seasonal', cost: 1,
         when: ['weekend', 'weekday-eve'], size: 'large', goals: ['friends', 'routine', 'skill']
+      },
+      {
+        id: 'atx-yellowbike',
+        name: 'Austin Yellow Bike Project',
+        neighborhood: 'East Austin',
+        blurb: 'A volunteer-run community bike shop where you fix your own bike with their tools, and can earn a free bike by putting in volunteer hours.',
+        interests: ['making', 'cycling', 'volunteering', 'social'],
+        url: 'https://austinyellowbike.org/',
+        firstStep: {
+          kind: 'visit',
+          label: 'Bring your bike to an open shop night',
+          url: 'https://austinyellowbike.org/',
+          when: 'Open shop several evenings a week'
+        },
+        script: 'Hi! I\'d like to come to open shop. I know nothing about bike repair \u2014 is that fine, and do I need to bring anything besides the bike?',
+        expect: [
+          'Arriving with a broken bike does all the social work for you',
+          'Volunteers teach you rather than fixing it for you',
+          'Donation-based, and you can earn a bike with volunteer hours',
+          'Nobody expects you to know any of the jargon'
+        ],
+        solo: 5, gentleness: 4, structure: 'drop-in', commitment: 'one-off', cost: 0,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['skill', 'friends', 'impact']
+      },
+      {
+        id: 'atx-myco',
+        name: 'Central Texas Mycological Society',
+        neighborhood: 'Forays around Austin',
+        blurb: 'A mushroom club running forays, cultivation workshops and identification sessions \u2014 a surprisingly large and welcoming scene for a place this dry.',
+        interests: ['nature', 'outdoors', 'food', 'social'],
+        url: 'https://www.centraltexasmycology.org/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Join a foray or a beginner workshop',
+          url: 'https://www.centraltexasmycology.org/',
+          when: 'Forays after rain; workshops through the year'
+        },
+        script: 'Hello \u2014 I\'m a complete beginner and know nothing about mushrooms. Is the next foray suitable for me, and what should I bring?',
+        expect: [
+          'Beginners are welcome and experts enjoy explaining',
+          'Slow walking and crouching rather than hiking',
+          'Small membership or event fee',
+          'Never eat anything without an expert confirming it'
+        ],
+        solo: 5, gentleness: 5, structure: 'register', commitment: 'one-off', cost: 1,
+        when: ['weekend'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'atx-moha',
+        name: 'Museum of Human Achievement',
+        neighborhood: 'East Austin',
+        blurb: 'An artist-run warehouse space hosting experimental performance, weird parties and community events. Less a museum than a place where odd things are allowed to happen.',
+        interests: ['art', 'theater', 'music', 'social'],
+        url: 'https://www.themuseumofhumanachievement.com/',
+        firstStep: {
+          kind: 'rsvp',
+          label: 'Go to whichever upcoming event sounds strangest',
+          url: 'https://www.themuseumofhumanachievement.com/',
+          when: 'Events through the month'
+        },
+        script: null,
+        expect: [
+          'Artist-run, so the crowd is friendlier and less polished than a club',
+          'Tickets are usually cheap or sliding scale',
+          'An event with a defined start and end means you always have an exit',
+          'Nobody there is trying to look like they belong, which helps'
+        ],
+        solo: 5, gentleness: 4, structure: 'rsvp', commitment: 'one-off', cost: 1,
+        when: ['weekday-eve', 'weekend'], size: 'small', goals: ['friends', 'skill']
+      },
+      {
+        id: 'atx-recycledreads',
+        name: 'Recycled Reads',
+        neighborhood: 'North Austin',
+        blurb: 'The public library\'s own second-hand bookstore, where withdrawn books cost a dollar or two and volunteers sort donations in the back.',
+        interests: ['books', 'volunteering', 'environment', 'social'],
+        url: 'https://library.austintexas.gov/recycled-reads',
+        firstStep: {
+          kind: 'visit',
+          label: 'Visit the shop, or ask about a volunteer shift',
+          url: 'https://library.austintexas.gov/recycled-reads',
+          when: 'Open several days a week'
+        },
+        script: 'Hi! I\'d love to volunteer at Recycled Reads. What do shifts involve, and how do I sign up?',
+        expect: [
+          'Sorting and shelving books is a genuinely calming first volunteer job',
+          'Free to volunteer, and the books cost almost nothing',
+          'You see the same volunteers each week',
+          'Quiet work, which suits people who find events draining'
+        ],
+        solo: 5, gentleness: 5, structure: 'shift', commitment: 'weekly', cost: 0,
+        when: ['weekday-day', 'weekend'], size: 'small', goals: ['impact', 'friends', 'routine']
+      },
+      {
+        id: 'atx-batrefuge',
+        name: 'Austin Bat Refuge',
+        neighborhood: 'East Austin',
+        blurb: 'A small bat rescue and rehabilitation operation run out of a private home, with educational events and the occasional volunteer opportunity.',
+        interests: ['animals', 'nature', 'volunteering', 'environment'],
+        url: 'https://austinbatrefuge.org/',
+        firstStep: {
+          kind: 'email',
+          label: 'Email to ask about volunteering or an educational visit',
+          url: 'https://austinbatrefuge.org/',
+          when: 'Varies \u2014 ask what they need'
+        },
+        script: 'Hi! I\'m interested in what you do and would like to help or learn more. Do you take volunteers, and is there an event where I could come and see the work?',
+        expect: [
+          'A tiny operation, so expect a real conversation rather than a volunteer portal',
+          'Bats are the entire conversation starter',
+          'Free',
+          'In a city that watches bats every evening, almost nobody knows this exists'
+        ],
+        solo: 5, gentleness: 4, structure: 'register', commitment: 'one-off', cost: 0,
+        when: ['flexible'], size: 'small', goals: ['impact', 'skill']
       }
     ]
   });
