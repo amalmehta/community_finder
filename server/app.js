@@ -401,6 +401,23 @@ module.exports = { createApp, hashPassword, verifyPassword, DEFAULT_LIMITS };
 if (require.main === module) {
   const port = Number(process.env.PORT || 4000);
   const { server } = createApp({ secure: process.env.SECURE === '1' });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(
+        `\nPort ${port} is already in use — community_finder is probably already running.\n` +
+        `  Open it:        http://localhost:${port}\n` +
+        `  Use another:    PORT=4001 npm start\n` +
+        `  Stop the other: lsof -ti :${port} | xargs kill\n`
+      );
+    } else if (err.code === 'EACCES') {
+      console.error(`\nNot allowed to listen on port ${port}. Try PORT=4000 npm start.\n`);
+    } else {
+      console.error('\nCould not start: ' + err.message + '\n');
+    }
+    process.exit(1);
+  });
+
   server.listen(port, () => {
     console.log('community_finder running at http://localhost:' + port);
   });
