@@ -1,0 +1,15 @@
+{
+  "name": "community_finder",
+  "version": "1.0.0",
+  "description": "Find real local communities and the one concrete first step into each.",
+  "private": true,
+  "scripts": {
+    "start": "node server/app.js",
+    "test": "node tests/run-tests.js && node tests/run-server-tests.js",
+    "test:app": "node tests/run-tests.js",
+    "test:server": "node tests/run-server-tests.js",
+    "links": "node tools/check-links.js",
+    "mac": "./mac/build.sh"
+  },
+  "engines": { "node": ">=22" }
+}

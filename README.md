@@ -23,6 +23,23 @@ relevant a copy-and-paste message you can send without composing it yourself.
 
 ---
 
+## Two builds, one codebase
+
+The app runs in either of two modes, decided at load time by whether an API is
+reachable:
+
+| | Static (GitHub Pages) | With the server |
+|---|---|---|
+| Accounts | none | required |
+| Finder, plan, learned preferences | yes | yes |
+| People and messaging | no | yes |
+| Data leaves your device | never | your profile and messages only |
+
+The published site at <https://amalmehta.github.io/community_finder/> is the
+static one: no account, no server, nothing transmitted. Running `npm start`
+gives you the account build on localhost. Nothing needs rebuilding to switch —
+the front end calls `GET /api/me`, and falls back to solo mode if that fails.
+
 ## Run it
 
 No build step, no dependencies, no server required.
@@ -70,6 +87,25 @@ the page a normal web origin, so the app behaves exactly like the browser build.
 Links to real organisations open in your default browser rather than inside the
 app window. ⌘R reloads; ⇧⌘R clears your saved search, plan and feedback.
 
+### With accounts and messaging
+
+```bash
+npm start          # http://localhost:4000
+```
+
+Node 22+ only — it uses the built-in `node:sqlite`. Still no dependencies and
+nothing to install. The database appears at `server/data/community.db`.
+
+See [server/README.md](server/README.md) for the API, the safety rules and how
+to change the rate limits. In short: contact is request-then-accept, a new
+account gets three introductions a day, interests can be hidden from discovery
+while still shaping your own results, and reporting someone blocks them.
+
+**Before putting this on the public internet**, you would want at minimum: TLS
+(then run with `SECURE=1` so the session cookie is marked Secure), a backup of
+the SQLite file, and someone actually reading the `reports` table. The safety
+mechanics are built; the operational side is not something code can supply.
+
 ### Deploying
 
 It is a static site. Push the repo and point GitHub Pages at the root, or drop
@@ -80,6 +116,10 @@ the folder on any static host. There is no backend to run.
 ## Verify it works
 
 Two checks, both zero-dependency:
+
+```bash
+npm test        # both suites
+```
 
 ```bash
 node tests/run-tests.js
@@ -109,6 +149,17 @@ every Monday on GitHub Actions, and opens an issue if a listing's link breaks.
 It keeps a single open issue and comments on it rather than filing a new one
 each week. You can also run it on demand from the Actions tab.
 
+```bash
+node tests/run-server-tests.js
+```
+
+65 assertions against a real HTTP server on a throwaway database: signup and
+sign-in, session isolation, that a hidden interest cannot be used to find you,
+the request/accept/message flow, outsiders being locked out of other people's
+threads, blocking, reporting, rate limits, and that the server serves only the
+front end — not its own source, the database, or anything reachable by path
+traversal.
+
 Manual check: open the app, type `Brooklyn`, pick a few interests, and confirm
 you get New York listings with a "Start here" card. Then type `Boise, Idaho` and
 confirm you get the national-routes view instead.
@@ -125,10 +176,15 @@ src/
   data/city-*.js      the ten hand-curated city datasets
   data/universal.js   fallback recipes → real deep links for any city
   preferences.js      on-device preference tracker (pure functions, injectable storage)
+  social.js           accounts, people and messaging UI (inert without a backend)
   match.js            the scoring engine (pure functions, no DOM)
   app.js              DOM rendering, plan, feedback
 tests/run-tests.js    the test suite
 tools/check-links.js  the link checker
+server/
+  db.js               SQLite schema and queries
+  app.js              HTTP server, auth, API, rate limits
+  README.md           API and safety notes
 mac/
   Sources/main.swift        Cocoa + WKWebView shell, menus, link handling
   Sources/StaticServer.swift  loopback static server (so localStorage works)

@@ -17,9 +17,14 @@
       <button class="tab" id="tab-find" role="tab" aria-selected="true" aria-controls="view-find">Find</button>
       <button class="tab" id="tab-plan" role="tab" aria-selected="false" aria-controls="view-plan">My plan<span class="count" id="plan-count" hidden>0</span></button>
       <button class="tab" id="tab-you" role="tab" aria-selected="false" aria-controls="view-you">You</button>
+      <button class="tab" id="tab-people" role="tab" aria-selected="false" aria-controls="view-people" hidden>People</button>
+      <button class="tab" id="tab-messages" role="tab" aria-selected="false" aria-controls="view-messages" hidden>Messages<span class="count" id="msg-count" hidden>0</span></button>
+      <button class="tab" id="tab-signout" type="button" hidden>Sign out</button>
     </nav>
   </div>
 </header>
+
+<div id="auth-gate" hidden></div>
 
 <main>
   <!-- ============================ FIND ============================ -->
@@ -125,6 +130,16 @@
     <div class="wrap" id="you-body"></div>
   </section>
 
+  <!-- =========================== PEOPLE =========================== -->
+  <section id="view-people" role="tabpanel" aria-labelledby="tab-people" hidden>
+    <div class="wrap" id="people-body"></div>
+  </section>
+
+  <!-- ========================== MESSAGES ========================== -->
+  <section id="view-messages" role="tabpanel" aria-labelledby="tab-messages" hidden>
+    <div class="wrap" id="messages-body"></div>
+  </section>
+
   <!-- ============================ PLAN ============================ -->
   <section id="view-plan" role="tabpanel" aria-labelledby="tab-plan" hidden>
     <div class="wrap" id="plan-body"></div>
@@ -174,5 +189,6 @@
 <script src="src/preferences.js"></script>
 <script src="src/match.js"></script>
 <script src="src/app.js"></script>
+<script src="src/social.js"></script>
 </body>
 </html>

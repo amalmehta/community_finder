@@ -598,6 +598,12 @@
       }
     }
 
+    // When signed in, the profile editor belongs here too.
+    if (window.FYC_SOCIAL && window.FYC_SOCIAL.profileCard) {
+      var pc = window.FYC_SOCIAL.profileCard();
+      if (pc) host.appendChild(pc);
+    }
+
     host.appendChild(el('article', { class: 'card' }, [
       el('h3', { text: 'Your data' }),
       el('p', { class: 'hint', text: 'This never leaves your browser. There is no account and nothing is sent anywhere. Erasing it here erases it completely.' }),
@@ -623,6 +629,9 @@
 
   // ---------- tabs ----------
   function showTab(which) {
+    // With a backend there are more tabs than these three; social.js owns the
+    // switching in that case so every view is hidden correctly.
+    if (window.FYC_SHOW) return window.FYC_SHOW(which);
     ['find', 'plan', 'you'].forEach(function (name) {
       var on = which === name;
       $('#view-' + name).hidden = !on;

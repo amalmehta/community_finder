@@ -5,3 +5,4 @@ node_modules/
 mac/build/
 mac/dist/
 community_finder.md
+server/data/
