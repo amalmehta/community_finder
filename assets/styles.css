@@ -18,6 +18,21 @@
   --radius-sm: 9px;
   --shadow: 0 1px 2px rgba(34, 31, 27, .05), 0 6px 20px -12px rgba(34, 31, 27, .25);
   --maxw: 880px;
+
+  /* Type scale, 1.25 ratio. Named by role so the steps stay deliberate
+     rather than drifting into a dozen arbitrary sizes. */
+  --t-micro: 11.5px;
+  --t-small: 13px;
+  --t-meta:  14px;
+  --t-body:  15.5px;
+  --t-lead:  17px;
+  --t-h3:    19px;
+  --t-h2:    clamp(22px, 2.6vw, 27px);
+  --t-h1:    clamp(27px, 4vw, 38px);
+
+  /* Spacing rhythm. Everything vertical should land on one of these. */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
   --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
 }
@@ -114,18 +129,21 @@ a { color: var(--accent-ink); }
 :root[data-theme="dark"] .tab .count { color: #171512; }
 
 /* ---------- intro ---------- */
-.intro { padding: 30px 0 20px; }
+.intro { padding: var(--s7) 0 var(--s5); }
 .intro h1 {
-  font-family: var(--serif); font-size: clamp(25px, 3.6vw, 33px);
-  line-height: 1.2; margin: 0 0 8px; letter-spacing: -.015em; font-weight: 600;
-  max-width: 24ch; text-wrap: balance;
+  font-family: var(--serif); font-size: var(--t-h1);
+  line-height: 1.08; margin: 0 0 var(--s3); letter-spacing: -.025em; font-weight: 600;
+  max-width: 18ch; text-wrap: balance;
 }
-.intro p { margin: 0; color: var(--ink-soft); max-width: 52ch; font-size: 16.5px; text-wrap: pretty; }
+.intro p {
+  margin: 0; color: var(--ink-soft); max-width: 46ch;
+  font-size: var(--t-lead); line-height: 1.5; text-wrap: pretty;
+}
 
 /* ---------- form ---------- */
 .card {
   background: var(--bg-raised); border: 1px solid var(--line);
-  border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow);
+  border-radius: var(--radius); padding: var(--s5); box-shadow: var(--shadow);
 }
 .step { margin: 0 0 28px; }
 .step:first-child { margin-top: 2px; }
@@ -199,8 +217,10 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
   padding: 12px 22px; border-radius: 999px;
 }
 .btn:hover { filter: brightness(1.06); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn { color: #171512; } }
-:root[data-theme="dark"] .btn { color: #171512; }
+/* Only the filled button flips to dark text. Scoping this to .btn alone
+   out-specifies .btn.ghost and makes ghost text invisible on dark cards. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn:not(.ghost) { color: #171512; } }
+:root[data-theme="dark"] .btn:not(.ghost) { color: #171512; }
 .btn.ghost { background: none; color: var(--ink-soft); border-color: var(--line-strong); font-weight: 500; }
 .btn.ghost:hover { border-color: var(--accent); color: var(--accent-ink); filter: none; }
 .btn.sm { font-size: 14px; padding: 7px 14px; }
@@ -220,9 +240,18 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 
 /* ---------- results ---------- */
 .results { padding-bottom: 60px; }
-.results-head { margin: 26px 0 8px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.results-head h2 { font-family: var(--serif); font-size: 25px; margin: 0; font-weight: 600; letter-spacing: -.01em; }
-.results-head p { margin: 0; color: var(--ink-soft); font-size: 14.5px; }
+.results-head {
+  margin: var(--s7) 0 var(--s4);
+  display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
+}
+.results-head h2 {
+  font-family: var(--serif); font-size: var(--t-h2); margin: 0;
+  font-weight: 600; letter-spacing: -.02em; line-height: 1.15;
+}
+.results-head p {
+  margin: 0; color: var(--ink-faint); font-size: var(--t-small);
+  letter-spacing: .02em;
+}
 
 .notice {
   background: var(--moss-soft); border: 1px solid transparent; border-left: 3px solid var(--moss);
@@ -230,43 +259,55 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 }
 .notice b { color: var(--moss); }
 
-.starter { border-color: var(--accent); border-width: 2px; }
+/* The first result should look like the answer, not like item one of eight. */
+.starter {
+  border-color: var(--accent); border-width: 1px;
+  padding: var(--s6) var(--s5);
+  box-shadow: 0 1px 2px rgba(34,31,27,.05), 0 18px 44px -28px rgba(177,80,42,.55);
+}
+.starter h3 { font-size: calc(var(--t-h3) * 1.26); letter-spacing: -.02em; }
+.starter .blurb { font-size: var(--t-lead); line-height: 1.55; }
 .starter-flag {
-  display: inline-block; font-size: 11.5px; font-weight: 800; letter-spacing: .08em;
+  display: inline-block; font-size: var(--t-micro); font-weight: 800; letter-spacing: .1em;
   text-transform: uppercase; color: var(--accent-ink); background: var(--accent-soft);
-  padding: 3px 9px; border-radius: 999px; margin-bottom: 10px;
+  padding: 4px 10px; border-radius: 999px; margin-bottom: var(--s3);
 }
 
-.org { margin: 14px 0; }
-.org-top { display: flex; gap: 14px; align-items: flex-start; }
-.org h3 { margin: 0 0 3px; font-size: 19px; letter-spacing: -.01em; }
+.org { margin: var(--s3) 0; }
+.org-top { display: flex; gap: var(--s4); align-items: flex-start; }
+.org h3 { margin: 0 0 var(--s1); font-size: var(--t-h3); letter-spacing: -.015em; line-height: 1.25; }
 .org h3 a { color: inherit; text-decoration: none; border-bottom: 1.5px solid var(--line-strong); }
 .org h3 a:hover { border-color: var(--accent); color: var(--accent-ink); }
-.org .where { font-size: 13px; color: var(--ink-faint); margin: 0 0 9px; }
-.org .blurb { margin: 0 0 12px; color: var(--ink-soft); font-size: 15px; }
+.org .where {
+  font-size: var(--t-small); color: var(--ink-faint); margin: 0 0 var(--s3);
+  letter-spacing: .01em;
+}
+.org .blurb { margin: 0 0 var(--s4); color: var(--ink-soft); font-size: var(--t-body); line-height: 1.55; }
 
-.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.badges { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s4); }
 .badge {
-  font-size: 12.5px; padding: 3px 9px; border-radius: 999px;
-  background: var(--bg-sunk); color: var(--ink-soft); border: 1px solid var(--line);
+  font-size: var(--t-small); padding: 3px 10px; border-radius: 999px;
+  background: transparent; color: var(--ink-faint); border: 1px solid var(--line);
+  line-height: 1.6;
 }
 .badge.ease3 { background: var(--moss-soft); color: var(--moss); border-color: transparent; font-weight: 600; }
 .badge.ease2 { background: var(--bg-sunk); color: var(--ink-soft); }
 .badge.ease1 { background: var(--accent-soft); color: var(--accent-ink); }
 
-.why { margin: 0 0 14px; padding: 0; list-style: none; display: grid; gap: 3px; }
-.why li { font-size: 13.5px; color: var(--ink-soft); padding-left: 17px; position: relative; }
+.why { margin: 0 0 var(--s4); padding: 0; list-style: none; display: grid; gap: var(--s1); }
+.why li { font-size: var(--t-meta); color: var(--ink-soft); padding-left: 18px; position: relative; }
 .why li::before { content: "✓"; position: absolute; left: 0; color: var(--moss); font-weight: 700; }
 
 .first-step {
-  background: var(--bg-sunk); border-radius: var(--radius-sm); padding: 15px 16px; margin-top: 4px;
+  background: var(--bg-sunk); border-radius: var(--radius-sm);
+  padding: var(--s4) var(--s5); margin-top: var(--s2);
 }
 .first-step h4 {
-  margin: 0 0 4px; font-size: 12.5px; text-transform: uppercase;
-  letter-spacing: .07em; color: var(--ink-faint); font-weight: 700;
+  margin: 0 0 var(--s2); font-size: var(--t-micro); text-transform: uppercase;
+  letter-spacing: .1em; color: var(--ink-faint); font-weight: 700;
 }
-.first-step .do { margin: 0 0 3px; font-size: 16px; font-weight: 600; }
-.first-step .when { margin: 0 0 13px; font-size: 13.5px; color: var(--ink-faint); }
+.first-step .do { margin: 0 0 var(--s1); font-size: var(--t-lead); font-weight: 600; letter-spacing: -.01em; }
+.first-step .when { margin: 0 0 var(--s4); font-size: var(--t-small); color: var(--ink-faint); }
 .expect { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 5px; }
 .expect li { font-size: 14px; color: var(--ink-soft); padding-left: 18px; position: relative; }
 .expect li::before { content: "·"; position: absolute; left: 4px; font-weight: 800; color: var(--ink-faint); }
@@ -494,4 +535,96 @@ footer.site-footer p { margin: 0 0 6px; }
   .theme-btn { padding: 5px 8px; font-size: 12.5px; }
   .theme-btn .theme-label { display: none; }
   .theme-btn .theme-icon { margin-right: 0; }
+}
+
+/* ---------- editorial pass: rhythm, motion, restraint ---------- */
+
+/* Body copy sits on the scale too, not at an arbitrary 16px. */
+body { font-size: var(--t-body); }
+.hint { font-size: var(--t-meta); line-height: 1.5; }
+
+/* Section spacing: let results breathe away from the form above them. */
+.results { padding-bottom: var(--s8); }
+.notice { margin: var(--s4) 0; padding: var(--s3) var(--s4); font-size: var(--t-meta); }
+
+/* The expand control should read as a quiet affordance, not a button. */
+.toggle {
+  font-size: var(--t-meta); letter-spacing: .01em;
+  padding: var(--s1) 0; margin-top: var(--s1);
+}
+
+/* What to expect: supporting detail, visibly subordinate to the step itself. */
+.expect { margin: var(--s4) 0 0; gap: var(--s2); }
+.expect li { font-size: var(--t-meta); line-height: 1.5; color: var(--ink-soft); }
+
+/* Intake: give the question room, and stop the summary line overflowing. */
+.question { padding: var(--s6) var(--s5); }
+.q-head { margin-bottom: var(--s5); }
+.q-prompt { font-size: var(--t-h2); line-height: 1.18; margin-bottom: var(--s2); max-width: 24ch; }
+.question .choices { gap: var(--s3); }
+.question .choice { padding: var(--s3) var(--s4); }
+.question .actions { margin-top: var(--s5); }
+.intake-done {
+  margin: 0 0 var(--s2); align-items: center;
+}
+.intake-done .hint {
+  flex: 1 1 100%; min-width: 0; margin: 0 0 var(--s2);
+  font-size: var(--t-small); color: var(--ink-faint);
+}
+
+/* Motion: results arrive rather than appear. Short, staggered, and only for
+   the first few so a long list never feels slow. */
+@keyframes fyc-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.results .org, .results .results-head, .results .notice {
+  animation: fyc-rise .32s cubic-bezier(.2, .7, .3, 1) both;
+}
+.results > *:nth-child(1) { animation-delay: 0ms; }
+.results > *:nth-child(2) { animation-delay: 40ms; }
+.results > *:nth-child(3) { animation-delay: 80ms; }
+.results > *:nth-child(4) { animation-delay: 120ms; }
+.results > *:nth-child(5) { animation-delay: 160ms; }
+.results > *:nth-child(n+6) { animation-delay: 200ms; }
+
+#intake .question { animation: fyc-rise .26s cubic-bezier(.2, .7, .3, 1) both; }
+
+/* Cards lift slightly on hover, so the list feels handled rather than static. */
+.org, .plan-item { transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.org:hover { border-color: var(--line-strong); }
+.starter:hover { border-color: var(--accent); }
+
+/* Buttons: consistent height and a hint of feedback on press. */
+.btn { transition: filter .15s ease, border-color .15s ease, color .15s ease, transform .08s ease; }
+.btn:active { transform: translateY(1px); }
+.pill, .choice, .chip { transition: background .14s ease, border-color .14s ease, color .14s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .results .org, .results .results-head, .results .notice, #intake .question { animation: none; }
+}
+
+@media (max-width: 560px) {
+  .card { padding: var(--s4); }
+  .starter { padding: var(--s5) var(--s4); }
+  .question { padding: var(--s5) var(--s4); }
+  .intro { padding: var(--s5) 0 var(--s4); }
+  .results-head { margin: var(--s5) 0 var(--s3); }
+}
+
+/* With accounts there are six tabs plus the theme control, which wraps onto a
+   second line on a phone and permanently steals height from a sticky header.
+   Scroll it instead. */
+@media (max-width: 620px) {
+  .site-header .wrap { gap: var(--s2); }
+  .tabs {
+    flex: 1 1 auto; min-width: 0;
+    overflow-x: auto; flex-wrap: nowrap;
+    scrollbar-width: none; -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+    mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 0 0 auto; }
+  .brand b { font-size: 16px; }
 }

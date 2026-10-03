@@ -206,6 +206,19 @@ group('matcher behaviour', function () {
   eq(reasonless, 0, 'every returned match explains itself');
 
   // Diversity: the top 4 should not all be the same single organisation type.
+  // Reasons must earn their place: the badges already state cost, commitment
+  // and ease, so a reason that only repeats them is noise.
+  var reasoned = FYC.match({
+    location: 'Boston', interests: ['gardening', 'volunteering'], comfort: 1, budget: 0
+  }).results;
+  reasoned.slice(0, 5).forEach(function (r) {
+    ok(r.reasons.length <= 3, r.org.name + ': at most three reasons');
+    ok(!r.reasons.some(function (x) { return x === 'Free' || x === 'One-off' || x === 'Solo-friendly'; }),
+       r.org.name + ': reasons do not repeat what the badges already say');
+    ok(r.reasons.some(function (x) { return x.indexOf('Matches') === 0; }),
+       r.org.name + ': leads with what it actually matched');
+  });
+
   var diverse = FYC.match({ location: 'nyc', interests: ['volunteering', 'books', 'outdoors'], comfort: 2 }).results;
   var topIds = diverse.slice(0, 4).map(function (r) { return r.org.id; });
   eq(new Set(topIds).size, topIds.length, 'no duplicate organisations in the top results');
@@ -458,6 +471,13 @@ group('front-end wiring', function () {
      'the saved theme is read inline, before the stylesheet renders');
   var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
   ok(css.indexOf(':root[data-theme="dark"]') !== -1, 'an explicit dark theme exists');
+
+  // Regression: the dark-theme rule for .btn out-specified .btn.ghost, leaving
+  // ghost buttons with near-black text on a near-black card (1.09:1).
+  ok(css.indexOf(':root[data-theme="dark"] .btn:not(.ghost)') !== -1,
+     'the dark button colour is scoped away from ghost buttons');
+  ok(css.indexOf('--t-body') !== -1 && css.indexOf('--s4') !== -1,
+     'type and spacing scales are defined as tokens');
   ok(css.indexOf(':root:not([data-theme="light"])') !== -1,
      'and choosing light overrides a system that prefers dark');
   ok(app.indexOf("THEMES = ['auto', 'light', 'dark']") !== -1,

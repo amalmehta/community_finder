@@ -109,13 +109,9 @@
             .join(' + ')
       );
     }
-    if (p.comfort === 1 && org.gentleness >= 4 && org.solo >= 4) {
-      reasons.push('Drop-in, no partner or group needed');
-    } else if (org.solo >= 4) {
-      reasons.push('Solo-friendly');
-    }
-    if (org.cost === 0) reasons.push('Free');
-    else if (org.cost > (p.budget == null ? 2 : p.budget)) reasons.push('Over your budget');
+    // Ease, cost and commitment all have badges. Repeating them here printed
+    // the same three lines under every card and buried the one that differed.
+    if (org.cost > (p.budget == null ? 2 : p.budget)) reasons.push('Over your budget');
     if (parts.schedule === 1 && p.when && p.when.length && p.when.indexOf('flexible') === -1) {
       var labels = (org.when || [])
         .filter(function (w) { return p.when.indexOf(w) !== -1; })
@@ -123,10 +119,9 @@
         .filter(Boolean);
       if (labels.length) reasons.push('Runs on ' + labels.slice(0, 2).join(' and '));
     }
-    if (org.commitment === 'one-off' && (p.commitment === 'one-off' || !p.commitment)) {
-      reasons.push('One-off');
-    }
-    return reasons.slice(0, 4);
+    // Commitment has a badge of its own; saying it twice buried the reason
+    // that actually differed between cards.
+    return reasons.slice(0, 3);
   }
 
   /** 1–3 "how hard is this to walk into" rating, used for the ease badge. */
