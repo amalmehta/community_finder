@@ -550,25 +550,25 @@
         when: ['weekend', 'weekday-day'], size: 'medium', goals: ['impact', 'friends', 'skill']
       },
       {
-        id: 'nyc-earthmatter',
-        name: 'Earth Matter NY',
-        neighborhood: 'Governors Island',
-        blurb: 'A compost learning centre on Governors Island, reachable only by ferry, where volunteers turn the city\'s food scraps into soil alongside a flock of chickens.',
-        interests: ['environment', 'gardening', 'volunteering', 'outdoors'],
-        url: 'https://earthmatter.org/',
+        id: 'nyc-bigreuse',
+        name: 'Big Reuse',
+        neighborhood: 'Gowanus & Astoria',
+        blurb: 'A reuse warehouse selling salvaged building materials, plus one of the city\'s largest community compost sites under the Queensboro Bridge.',
+        interests: ['environment', 'gardening', 'volunteering', 'making', 'outdoors'],
+        url: 'https://www.bigreuse.org/',
         firstStep: {
-          kind: 'dropin',
-          label: 'Take the ferry over on a volunteer day',
-          url: 'https://earthmatter.org/',
-          when: 'Volunteer days in the warmer months'
+          kind: 'signup',
+          label: 'Join a compost volunteer session, or visit the warehouse',
+          url: 'https://www.bigreuse.org/',
+          when: 'Volunteer sessions through the week'
         },
         expect: [
-          'The ferry ride means the trip feels like an outing rather than an errand',
-          'No experience needed; it is mostly turning piles and moving material',
-          'Free'
+          'Turning compost is simple physical work with clear instructions',
+          'Free, and the warehouse is worth a look either way',
+          'Sessions are a couple of hours with no ongoing obligation'
         ],
-        solo: 5, gentleness: 5, structure: 'drop-in', commitment: 'one-off', cost: 0,
-        when: ['weekend', 'weekday-day'], size: 'small', goals: ['impact', 'friends', 'skill']
+        solo: 5, gentleness: 5, structure: 'shift', commitment: 'one-off', cost: 0,
+        when: ['weekday-day', 'weekend'], size: 'small', goals: ['impact', 'friends', 'skill']
       },
       {
         id: 'nyc-caveat',

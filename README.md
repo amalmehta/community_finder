@@ -20,10 +20,11 @@ binoculars, that the shelter wants an orientation first, that the league places
 solo sign-ups on a team, and that the dance teaches the steps beforehand — the
 specifics that decide whether something is worth your Saturday.
 
-- **Ten cities are hand-curated** — San Francisco Bay Area, New York City,
-  Los Angeles, Chicago, Seattle, Austin, Boston, Philadelphia, Washington DC
-  and San Diego (242 organisations, every link checked). Every city covers
-  every one of the 32 interests, and the test suite enforces that. Listings mix the big
+- **Thirteen cities are hand-curated** — San Francisco Bay Area, New York City,
+  Los Angeles, Chicago, Seattle, Austin, Boston, Philadelphia, Washington DC,
+  San Diego, Denver, Portland and Minneapolis (305 organisations, every link
+  checked). Every city covers every one of the 32 interests, and the test suite
+  enforces that. Listings mix the big
   obvious institutions with genuinely obscure ones, on the theory that a
   hidden four-acre farm is easier to walk into than a famous nonprofit.
 - **Every other city works too.** A fallback engine builds live, working links
@@ -215,7 +216,7 @@ index.html            the whole UI
 assets/styles.css     styling, light + dark, mobile-first breakpoints
 src/
   data/core.js        interest taxonomy (32 interests in 6 groups) + city registry
-  data/city-*.js      the ten hand-curated city datasets
+  data/city-*.js      the thirteen hand-curated city datasets
   data/universal.js   fallback recipes → real deep links for any city
   intake.js           the adaptive 20-question engine (pure functions, no DOM)
   preferences.js      on-device preference tracker (pure functions, injectable storage)
@@ -318,7 +319,7 @@ behavioural record completely.
 
 ## Known limits
 
-- Curated coverage is ten metros. Everywhere else gets the fallback engine,
+- Curated coverage is thirteen metros. Everywhere else gets the fallback engine,
   which is genuinely useful but not the same as a hand-picked list.
 - Listings are a point-in-time snapshot. Groups fold, move and change schedules.
   Re-run `node tools/check-links.js` periodically; the app tells users to check
