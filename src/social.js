@@ -310,9 +310,17 @@
   }
 
   // ---------- People ----------
+  function loading(text) {
+    return el('div', { class: 'card loading' }, [
+      el('span', { class: 'spinner', 'aria-hidden': 'true' }),
+      el('span', { text: text })
+    ]);
+  }
+
   async function renderPeople() {
     var host = $('#people-body');
     host.innerHTML = '';
+    host.appendChild(loading('Finding people with something in common…'));
     host.appendChild(el('div', { class: 'results-head' }, [
       el('h2', { text: 'People with something in common' }),
       el('p', { text: 'Shared visible interests. Contact requires your acceptance.' })
@@ -323,7 +331,12 @@
       data = await api('GET', '/api/people');
       graph = await api('GET', '/api/graph');
     }
-    catch (e) { host.appendChild(el('p', { class: 'err', text: e.message })); return; }
+    catch (e) {
+      host.innerHTML = '';
+      host.appendChild(el('p', { class: 'err', text: e.message }));
+      return;
+    }
+    host.innerHTML = '';
     S.people = data.people;
 
     if (!data.meVerified) {
@@ -424,6 +437,7 @@
   async function renderMessages() {
     var host = $('#messages-body');
     host.innerHTML = '';
+    host.appendChild(loading('Loading your conversations…'));
     stopPolling();
 
     var reqs, threads;
@@ -431,9 +445,11 @@
       reqs = await api('GET', '/api/requests');
       threads = (await api('GET', '/api/threads')).threads;
     } catch (e) {
+      host.innerHTML = '';
       host.appendChild(el('p', { class: 'err', text: e.message }));
       return;
     }
+    host.innerHTML = '';
     S.threads = threads;
 
     if (reqs.incoming.length) {

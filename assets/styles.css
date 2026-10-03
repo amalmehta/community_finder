@@ -628,3 +628,47 @@ body { font-size: var(--t-body); }
   .tab { flex: 0 0 auto; }
   .brand b { font-size: 16px; }
 }
+
+/* ---------- friendlier mechanics ---------- */
+
+/* Keyboard hints on options: visible, but never competing with the label. */
+.choice .key, .pill .key {
+  display: inline-grid; place-items: center;
+  width: 18px; height: 18px; margin-right: var(--s2);
+  border-radius: 5px; background: var(--bg-sunk); color: var(--ink-faint);
+  font-size: var(--t-micro); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.choice[aria-pressed="true"] .key, .pill[aria-pressed="true"] .key {
+  background: var(--accent); color: var(--bg-raised);
+}
+.choice { display: flex; align-items: baseline; gap: 0; flex-wrap: wrap; }
+.choice b { flex: 1 1 auto; }
+.choice span:not(.key) { flex: 1 1 100%; }
+@media (hover: none) {
+  /* On a touch device the number is noise. */
+  .choice .key, .pill .key { display: none; }
+}
+
+/* Focusing the question must not draw a box around the heading text. */
+.q-prompt:focus { outline: none; }
+.q-prompt:focus-visible { outline: 2.5px solid var(--focus); outline-offset: 4px; border-radius: 4px; }
+
+/* Loading: something to look at other than an empty column. */
+.loading { display: flex; align-items: center; gap: var(--s3); color: var(--ink-soft); font-size: var(--t-meta); }
+.spinner {
+  width: 15px; height: 15px; border-radius: 50%; flex: 0 0 auto;
+  border: 2px solid var(--line-strong); border-top-color: var(--accent);
+  animation: fyc-spin .7s linear infinite;
+}
+@keyframes fyc-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
+
+/* A quiet line of keyboard help under the question, for people who want it. */
+.q-keys {
+  margin: var(--s3) 0 0; font-size: var(--t-small); color: var(--ink-faint);
+}
+.q-keys kbd {
+  font: inherit; font-size: var(--t-micro); padding: 1px 5px; border-radius: 4px;
+  background: var(--bg-sunk); border: 1px solid var(--line); color: var(--ink-soft);
+}
+@media (hover: none) { .q-keys { display: none; } }

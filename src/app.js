@@ -98,10 +98,12 @@
     if (q.hint) box.appendChild(el('p', { class: 'hint', text: q.hint }));
 
     var answer = null;
+    var previous = session.answers[q.id];      // set when they came back to it
 
     if (q.kind === 'text') {
       var input = el('input', { type: 'text', placeholder: q.placeholder || '', 'aria-label': q.prompt });
-      if (q.id === 'city' && session.city) input.value = session.city;
+      if (typeof previous === 'string') input.value = previous;
+      else if (q.id === 'city' && session.city) input.value = session.city;
       input.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') { e.preventDefault(); submit(input.value); }
       });
@@ -111,27 +113,34 @@
 
     } else if (q.kind === 'one') {
       var choices = el('div', { class: 'choices' });
-      q.options.forEach(function (o) {
+      q.options.forEach(function (o, idx) {
         choices.appendChild(el('button', {
           type: 'button', class: 'choice',
+          'aria-pressed': previous === o.id ? 'true' : 'false',
           onclick: function () { submit(o.id); }
-        }, [el('b', { text: o.label }), o.hint ? el('span', { text: o.hint }) : null]));
+        }, [
+          el('span', { class: 'key', 'aria-hidden': 'true', text: String(idx + 1) }),
+          el('b', { text: o.label }),
+          o.hint ? el('span', { text: o.hint }) : null
+        ]));
       });
       box.appendChild(choices);
 
     } else {
-      var picked = [];
+      var picked = Array.isArray(previous) ? previous.slice() : [];
       var pills = el('div', { class: 'pills' });
-      q.options.forEach(function (o) {
+      q.options.forEach(function (o, idx) {
         var btn = el('button', {
-          type: 'button', class: 'pill', 'aria-pressed': 'false',
+          type: 'button', class: 'pill',
+          'aria-pressed': picked.indexOf(o.id) !== -1 ? 'true' : 'false',
+          'data-idx': String(idx + 1),
           onclick: function () {
             var at = picked.indexOf(o.id);
             if (at !== -1) picked.splice(at, 1);
             else if (picked.length < (q.max || 99)) picked.push(o.id);
             btn.setAttribute('aria-pressed', picked.indexOf(o.id) !== -1 ? 'true' : 'false');
           }
-        }, [el('span', { text: o.label })]);
+        }, [el('span', { class: 'key', 'aria-hidden': 'true', text: String(idx + 1) }), el('span', { text: o.label })]);
         pills.appendChild(btn);
       });
       box.appendChild(pills);
@@ -142,6 +151,9 @@
       (q.kind !== 'one') ? el('button', {
         class: 'btn', type: 'button', onclick: function () { submit(answer()); }
       }, ['Next']) : null,
+      I.canGoBack(session) ? el('button', {
+        class: 'btn ghost sm', type: 'button', onclick: goBack
+      }, ['← Back']) : null,
       el('button', {
         class: 'btn ghost sm', type: 'button',
         onclick: function () { submit(q.kind === 'many' ? [] : null); }
@@ -152,8 +164,50 @@
       }, ['Enough — show me results'])
     ]);
     box.appendChild(actions);
+    box.appendChild(el('p', { class: 'q-keys' }, [
+      q.kind === 'text' ? el('span', {}, [el('kbd', { text: 'Enter' }), ' to continue']) :
+        el('span', {}, [el('kbd', { text: '1' }), '–', el('kbd', { text: String(Math.min(9, q.options.length)) }), ' to choose']),
+      document.createTextNode(' · '),
+      el('kbd', { text: 'Backspace' }),
+      document.createTextNode(' to go back')
+    ]));
     box.appendChild(el('p', { class: 'err', id: 'q-error', hidden: true }));
     return box;
+  }
+
+  function goBack() {
+    session = I.back(session);
+    save(KEY.intake, session);
+    $('#results').hidden = true;
+    paintIntake();
+  }
+
+  /** 1–9 picks an option, Enter advances, Backspace goes back. */
+  function intakeKeys(e) {
+    if ($('#view-find').hidden || !$('#intake') || !$('#intake').firstChild) return;
+    var tag = (e.target.tagName || '').toLowerCase();
+    var typing = tag === 'input' || tag === 'textarea';
+
+    if (e.key === 'Backspace' && !typing && I.canGoBack(session)) {
+      e.preventDefault();
+      return goBack();
+    }
+    if (typing) return;
+
+    if (/^[1-9]$/.test(e.key)) {
+      var n = Number(e.key) - 1;
+      var opts = $('#intake').querySelectorAll('.choice, .pill');
+      if (opts[n]) {
+        e.preventDefault();
+        opts[n].click();
+      }
+      return;
+    }
+    if (e.key === 'Enter') {
+      var next = Array.prototype.slice.call($('#intake').querySelectorAll('button'))
+        .filter(function (b) { return b.textContent === 'Next'; })[0];
+      if (next) { e.preventDefault(); next.click(); }
+    }
   }
 
   function submit(value) {
@@ -179,6 +233,14 @@
     var q = I.nextQuestion(session);
     if (!q) return finish(false);
     host.appendChild(questionCard(q));
+
+    // Move focus to the new question, so keyboard and screen-reader users are
+    // not left behind at the button they just pressed.
+    var heading = host.querySelector('.q-prompt');
+    if (heading && q.kind !== 'text') {
+      heading.setAttribute('tabindex', '-1');
+      heading.focus({ preventScroll: true });
+    }
   }
 
   /** Build the profile and show results. `early` = they pressed the escape. */
@@ -830,6 +892,8 @@
     $('#tab-you').addEventListener('click', function () { showTab('you'); });
 
     window.FYC_VIEWS = { plan: renderPlan, you: renderYou };
+
+    document.addEventListener('keydown', intakeKeys);
 
     resumeSession();
     if (I.done(session) && session.city) finish(false);

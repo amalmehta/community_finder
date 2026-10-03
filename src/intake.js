@@ -513,8 +513,37 @@
     };
   }
 
+  function byId(id) {
+    return QUESTIONS.filter(function (q) { return q.id === id; })[0] || null;
+  }
+
+  /**
+   * Replay every answer except the last, rebuilding state from scratch.
+   * The engine is pure, so replaying is exact — no undo bookkeeping to get
+   * subtly wrong, and the adaptive path recomputes correctly.
+   */
+  function back(state) {
+    if (!state.asked.length) return state;
+    var order = state.asked.slice(0, -1);
+    var answers = state.answers;
+    var fresh = blankState();
+    order.forEach(function (qid) {
+      var q = byId(qid);
+      if (!q) return;
+      if (answers[qid] === undefined) { fresh.asked.push(qid); return; }  // was skipped
+      intake.answer(fresh, q, answers[qid]);
+    });
+    // Keep the dropped answer so going forward again can prefill it.
+    fresh.answers = Object.assign({}, answers);
+    order.forEach(function () {});
+    return fresh;
+  }
+
   var intake = {
     TOTAL: TOTAL,
+    back: back,
+    byId: byId,
+    canGoBack: function (state) { return state.asked.length > 0; },
     QUESTIONS: QUESTIONS,
     blankState: blankState,
     nextQuestion: nextQuestion,

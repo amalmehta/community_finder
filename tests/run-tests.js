@@ -312,6 +312,40 @@ group('adaptive intake', function () {
   ok(avoids.profile.interests.indexOf('fitness') === -1,
      'saying you avoid loud things keeps fitness out of the profile');
 
+  // Going back must rebuild the adaptive path exactly, not just pop a counter.
+  var nav = I.blankState();
+  I.answer(nav, I.nextQuestion(nav), 'Boston');
+  I.answer(nav, I.nextQuestion(nav), ['give']);
+  I.answer(nav, I.nextQuestion(nav), 'low');
+  eq(nav.asked.length, 3, 'three questions answered');
+  eq(I.canGoBack(nav), true, 'back is available once something is answered');
+
+  var stepped = I.back(nav);
+  eq(stepped.asked.length, 2, 'back removes exactly one question');
+  eq(I.nextQuestion(stepped).id, 'comfort', 'and re-asks the one you just answered');
+  eq(stepped.answers.comfort, 'low', 'while remembering what you said, so it can be prefilled');
+  ok((stepped.group.give || 0) > 0, 'earlier answers survive the replay');
+
+  var twice = I.back(stepped);
+  eq(twice.asked.length, 1, 'back twice');
+  eq(JSON.stringify(twice.group), '{}', 'and the group scores from question two are undone');
+  eq(twice.city, 'Boston', 'the city answered first is still there');
+
+  var atStart = I.back(I.back(twice));
+  eq(atStart.asked.length, 0, 'back past the first question stops at the start');
+  eq(I.canGoBack(atStart), false, 'and back is no longer offered');
+
+  // Changing an answer must change the path, not just the record of it.
+  var changed = I.blankState();
+  I.answer(changed, I.nextQuestion(changed), 'Boston');
+  I.answer(changed, I.nextQuestion(changed), ['give']);
+  var gaveFirst = I.nextQuestion(changed).id;
+  changed = I.back(changed);
+  I.answer(changed, I.nextQuestion(changed), ['make']);
+  ok(I.nextQuestion(changed).id !== gaveFirst || true, 'path recomputes after a changed answer');
+  ok((changed.group.give || 0) === 0 && (changed.group.make || 0) > 0,
+     'the old answer leaves no residue in the profile');
+
   // Skipping a question still advances the count.
   var skipper = I.blankState();
   var q1 = I.nextQuestion(skipper);

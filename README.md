@@ -197,6 +197,13 @@ threads, blocking, reporting, rate limits, and that the server serves only the
 front end — not its own source, the database, or anything reachable by path
 traversal.
 
+**Moving around it:** every question has **Back**, which replays your earlier
+answers from scratch rather than keeping undo state — the engine is pure, so the
+adaptive path recomputes exactly and a changed answer leaves no residue. Coming
+back to a question prefills what you said. On a keyboard, **1–9** picks an
+option, **Enter** continues and **Backspace** goes back; focus follows the
+question so screen-reader and keyboard users are not left behind.
+
 The intake has its own tests: that a run is exactly twenty questions, that
 different answers produce measurably different questions, that choosing an area
 asks its drill-downs and skips the others, that deliberate answers outrank
