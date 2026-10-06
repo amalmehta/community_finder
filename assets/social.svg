@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="community_finder">
+  <rect width="1200" height="630" fill="#fbf8f4"/>
+  <g fill="#b1502a">
+    <circle cx="930" cy="250" r="34" opacity=".35"/>
+    <circle cx="1040" cy="250" r="34" opacity=".35"/>
+    <rect x="884" y="296" width="92" height="74" rx="37" opacity=".35"/>
+    <rect x="994" y="296" width="92" height="74" rx="37" opacity=".35"/>
+    <circle cx="985" cy="272" r="44"/>
+    <rect x="917" y="330" width="136" height="102" rx="51"/>
+  </g>
+  <text x="90" y="268" font-family="Georgia, 'Times New Roman', serif" font-size="92" font-weight="600" fill="#221f1b" letter-spacing="-2">Find your people.</text>
+  <text x="90" y="340" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="36" fill="#5c554b">Real local groups, what they cost,</text>
+  <text x="90" y="390" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="36" fill="#5c554b">and what actually happens when you turn up.</text>
+  <text x="90" y="520" font-family="ui-monospace, Menlo, monospace" font-size="30" fill="#8a8176">community_finder</text>
+</svg>

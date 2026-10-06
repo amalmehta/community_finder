@@ -22,7 +22,7 @@ const captureMailer = {
 
 // Signup-per-IP is the one limit that gets in the test's way (every request
 // here comes from one address); the limits under test keep their real values.
-const { server } = createApp({
+const { server, store } = createApp({
   file: path.join(tmp, 'test.db'),
   limits: { signupsPerIpPerHour: 100 },
   mailer: captureMailer
@@ -310,6 +310,54 @@ async function verifyEmail(call, email) {
     ok(personIds.every((id) => discoverable.indexOf(id) !== -1),
        'the graph shows only people discovery already shows');
     eq((await client()('GET', '/api/graph')).status, 401, 'the graph requires a session');
+  });
+
+  await group('production readiness', async () => {
+    const r = await fetch(base + '/api/health');
+    eq(r.status, 200, 'health check answers');
+    const h = await r.json();
+    eq(h.status, 'ok', 'and reports healthy');
+    eq(h.db, 'ok', 'having actually queried the database');
+    ok(typeof h.uptime === 'number', 'with an uptime');
+
+    // Security headers on every response, page and API alike.
+    for (const p of ['/', '/api/health']) {
+      const res = await fetch(base + p);
+      eq(res.headers.get('x-content-type-options'), 'nosniff', `nosniff on ${p}`);
+      eq(res.headers.get('x-frame-options'), 'DENY', `framing denied on ${p}`);
+      ok((res.headers.get('content-security-policy') || '').includes("default-src 'self'"),
+         `content security policy on ${p}`);
+      ok((res.headers.get('content-security-policy') || '').includes("frame-ancestors 'none'"),
+         `frame-ancestors on ${p}`);
+    }
+    // HSTS only over TLS; sending it on plain http would be wrong.
+    eq((await fetch(base + '/')).headers.get('strict-transport-security'), null,
+       'no HSTS when not running behind TLS');
+
+    // Caching: the page must revalidate or a deploy never lands; assets may cache.
+    eq((await fetch(base + '/')).headers.get('cache-control'), 'no-cache', 'the page revalidates');
+    ok((await fetch(base + '/assets/styles.css')).headers.get('cache-control').includes('max-age'),
+       'assets are cacheable');
+    eq((await fetch(base + '/api/me')).headers.get('cache-control'), 'no-store', 'API responses are never cached');
+
+    // The public, non-app files a deployment needs.
+    for (const p of ['/privacy.html', '/terms.html', '/robots.txt', '/site.webmanifest']) {
+      eq((await fetch(base + p)).status, 200, `serves ${p}`);
+    }
+    ok((await (await fetch(base + '/robots.txt')).text()).includes('Disallow: /api/'),
+       'robots keeps crawlers out of the API');
+
+    // Suspension has to end access, not just hide the profile.
+    const victim = client();
+    await victim('POST', '/api/signup', { username: 'badactor', password: 'hunter2hunter', city: 'Boston', ageOk: true, interests: [{ id: 'outdoors' }] });
+    eq((await victim('GET', '/api/me')).data.user.username, 'badactor', 'signed in before suspension');
+    const row = store.userByName('badactor');
+    store.setSuspended(row.id, true);
+    eq((await victim('GET', '/api/me')).data.user, null, 'a suspended account is signed out immediately');
+    eq((await victim('GET', '/api/people')).status, 401, 'and cannot use the API');
+    const seenBy = (await ava('GET', '/api/people')).data.people.map((p) => p.display);
+    ok(seenBy.indexOf('badactor') === -1, 'and disappears from discovery');
+    store.setSuspended(row.id, false);
   });
 
   await group('static files and safety of the server itself', async () => {

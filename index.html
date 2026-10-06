@@ -6,6 +6,16 @@
 <title>community_finder</title>
 <meta name="description" content="Real local communities by city and interest, with the concrete first step, the cost and the commitment for each.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🫂</text></svg>">
+<link rel="canonical" href="https://amalmehta.github.io/community_finder/">
+<meta name="theme-color" content="#fbf8f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="community_finder">
+<meta property="og:description" content="Twenty questions, then real local groups near you \u2014 what they cost, what the commitment is, and the concrete first step into each.">
+<meta property="og:url" content="https://amalmehta.github.io/community_finder/">
+<meta property="og:image" content="https://amalmehta.github.io/community_finder/assets/social.svg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="manifest" href="site.webmanifest">
 <link rel="stylesheet" href="assets/styles.css">
 <script>
   // Inline and before the stylesheet renders: avoids a flash of the wrong theme.
@@ -16,6 +26,8 @@
 </script>
 </head>
 <body>
+
+<a class="skip" href="#main">Skip to content</a>
 
 <header class="site-header">
   <div class="wrap">
@@ -34,7 +46,7 @@
 
 <div id="auth-gate" hidden></div>
 
-<main>
+<main id="main" tabindex="-1">
   <!-- ============================ FIND ============================ -->
   <section id="view-find" role="tabpanel" aria-labelledby="tab-find">
     <div class="wrap">
@@ -46,7 +58,7 @@
 
       <div id="intake"></div>
 
-      <div class="results" id="results" hidden></div>
+      <div class="results" id="results" role="region" aria-live="polite" aria-label="Results" hidden></div>
     </div>
   </section>
 
@@ -75,6 +87,7 @@
   <div class="wrap">
     <p>Everything stays in this browser &mdash; including the record of what you click, which is used to improve your results. There is no account and no server, and nothing is ever sent anywhere. See it, pause it or erase it on the <strong>You</strong> tab.</p>
     <p>Listings are hand-checked and link-checked weekly, but groups change. Verify before you go.</p>
+    <p class="foot-links"><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="https://github.com/amalmehta/community_finder">Source</a></p>
   </div>
 </footer>
 

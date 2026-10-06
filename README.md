@@ -145,6 +145,11 @@ mechanics are built; the operational side is not something code can supply.
 
 ### Deploying
 
+See **[DEPLOY.md](DEPLOY.md)** for the Docker image, the environment variables,
+TLS, and the checklist to work through before letting anyone in.
+
+
+
 It is a static site. Push the repo and point GitHub Pages at the root, or drop
 the folder on any static host. There is no backend to run.
 
@@ -232,6 +237,9 @@ src/
   app.js              DOM rendering, plan, feedback
 tests/run-tests.js    the test suite
 tools/check-links.js  the link checker
+tools/moderate.js     moderation console: reports, suspensions
+tools/backup.js       consistent SQLite snapshots
+tools/server-daemon.js  start/stop the server detached
 server/
   db.js               SQLite schema and queries
   app.js              HTTP server, auth, API, rate limits

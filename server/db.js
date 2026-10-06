@@ -104,7 +104,10 @@ CREATE INDEX IF NOT EXISTS idx_ui_interest ON user_interests(interest, visible);
 const ADDED_COLUMNS = [
   ['users', 'email', "TEXT NOT NULL DEFAULT ''"],
   ['users', 'email_verified', 'INTEGER NOT NULL DEFAULT 0'],
-  ['users', 'open_to_direct', 'INTEGER NOT NULL DEFAULT 1']
+  ['users', 'open_to_direct', 'INTEGER NOT NULL DEFAULT 1'],
+  ['users', 'suspended', 'INTEGER NOT NULL DEFAULT 0'],
+  ['reports', 'resolved_at', 'INTEGER'],
+  ['reports', 'note', "TEXT NOT NULL DEFAULT ''"]
 ];
 
 function migrate(db) {
@@ -192,6 +195,7 @@ function createStore(db) {
           AND ui.visible = 1
           AND u.id != ?
           AND u.discoverable = 1
+          AND u.suspended = 0
           AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = ? AND b.blocked_id = u.id)
           AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = u.id AND b.blocked_id = ?)
           ${city ? 'AND LOWER(u.city) = LOWER(?)' : ''}
@@ -327,6 +331,33 @@ function createStore(db) {
       return Number(info.lastInsertRowid);
     },
 
+    // ---- moderation ----
+    openReports() {
+      return q(`SELECT r.*, a.username AS reporter, b.username AS reported, b.suspended
+                FROM reports r
+                JOIN users a ON a.id = r.reporter_id
+                JOIN users b ON b.id = r.reported_id
+                WHERE r.resolved_at IS NULL
+                ORDER BY r.created_at ASC`).all();
+    },
+    resolveReport(id, note) {
+      q('UPDATE reports SET resolved_at = ?, note = ? WHERE id = ?')
+        .run(now(), String(note || '').slice(0, 500), id);
+    },
+    /** Suspending ends sessions as well as access: a live cookie is access. */
+    setSuspended(userId, on) {
+      q('UPDATE users SET suspended = ?, discoverable = ? WHERE id = ?')
+        .run(on ? 1 : 0, on ? 0 : 1, userId);
+      if (on) q('DELETE FROM sessions WHERE user_id = ?').run(userId);
+    },
+    reportCounts() {
+      return {
+        open: q('SELECT COUNT(*) AS n FROM reports WHERE resolved_at IS NULL').get().n,
+        total: q('SELECT COUNT(*) AS n FROM reports').get().n,
+        suspended: q('SELECT COUNT(*) AS n FROM users WHERE suspended = 1').get().n
+      };
+    },
+
     // ---- sessions ----
     createSession(token, userId, ttlMs) {
       const t = now();
@@ -337,7 +368,8 @@ function createStore(db) {
       if (!token) return null;
       const row = q(`SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id
                      WHERE s.token = ? AND s.expires_at > ?`).get(token, now());
-      return row || null;
+      if (!row || row.suspended) return null;
+      return row;
     },
     destroySession(token) {
       q('DELETE FROM sessions WHERE token = ?').run(token);

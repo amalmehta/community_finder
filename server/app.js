@@ -47,18 +47,47 @@ function directAllowed(from, to, shared) {
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon'
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon',
+  '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json'
 };
+
+// The app loads no third-party scripts, styles, fonts or images, so the policy
+// can be strict. 'unsafe-inline' covers only the theme script in index.html,
+// which has to run before the stylesheet renders.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'none'",
+  "object-src 'none'"
+].join('; ');
+
+function securityHeaders(secure) {
+  const h = {
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'same-origin',
+    'X-Frame-Options': 'DENY',
+    'Content-Security-Policy': CSP,
+    'Permissions-Policy': 'geolocation=(), camera=(), microphone=(), payment=()'
+  };
+  // Only meaningful over TLS, and actively harmful to send otherwise.
+  if (secure) h['Strict-Transport-Security'] = 'max-age=15552000; includeSubDomains';
+  return h;
+}
+
+let SECURE_MODE = false;
 
 function send(res, status, body, headers = {}) {
   const data = typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body);
   res.writeHead(status, Object.assign({
     'Content-Type': typeof body === 'object' && !Buffer.isBuffer(body)
       ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8',
-    'Content-Length': Buffer.byteLength(data),
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'same-origin'
-  }, headers));
+    'Content-Length': Buffer.byteLength(data)
+  }, securityHeaders(SECURE_MODE), headers));
   res.end(data);
 }
 const fail = (res, status, error) => send(res, status, { error });
@@ -135,9 +164,12 @@ const DEFAULT_LIMITS = {
   verificationsPerHour: 5
 };
 
+const VERSION = require('../package.json').version;
+
 function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure = false,
-                    limits = {}, mailer = null, baseUrl = null } = {}) {
+                    limits = {}, mailer = null, baseUrl = null, log = null } = {}) {
   const L = Object.assign({}, DEFAULT_LIMITS, limits);
+  SECURE_MODE = !!secure;
   const store = createStore(open(file));
   const mail = mailer || createMailer();
   setInterval(() => store.prune(), HOUR).unref?.();
@@ -495,7 +527,9 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
   // ---- static files ----
   // Only what the browser actually needs. An allowlist rather than a denylist,
   // so adding a file to the repo can never accidentally publish it.
-  const SERVE_EXACT = new Set(['index.html']);
+  const SERVE_EXACT = new Set([
+    'index.html', 'privacy.html', 'terms.html', 'robots.txt', 'site.webmanifest'
+  ]);
   const SERVE_DIRS = ['assets/', 'src/'];
 
   function serveStatic(req, res, pathname) {
@@ -515,14 +549,43 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
 
     fs.readFile(target, (err, data) => {
       if (err) return fail(res, 404, 'Not found');
-      send(res, 200, data, { 'Content-Type': MIME[path.extname(target)] || 'application/octet-stream' });
+      // The HTML must always be revalidated or a deploy never reaches anyone;
+      // the assets it references are safe to cache for a short while.
+      const isPage = rel.endsWith('.html');
+      send(res, 200, data, {
+        'Content-Type': MIME[path.extname(target)] || 'application/octet-stream',
+        'Cache-Control': isPage ? 'no-cache' : 'public, max-age=300, must-revalidate'
+      });
     });
   }
 
+  // Uptime checks need something cheap that also proves the database answers.
+  route('GET', /^\/api\/health$/, async (req, res) => {
+    let db = 'ok';
+    try { store.db.prepare('SELECT 1').get(); } catch (e) { db = 'error'; }
+    send(res, db === 'ok' ? 200 : 503, {
+      status: db === 'ok' ? 'ok' : 'degraded',
+      db,
+      uptime: Math.round(process.uptime()),
+      version: VERSION
+    });
+  });
+
   const server = http.createServer(async (req, res) => {
+    const started = Date.now();
+    res.on('finish', () => {
+      if (!log) return;
+      // One line per request: method, path, status, ms. No query strings, no
+      // bodies, no cookies — none of that should end up in a log file.
+      const pathOnly = String(req.url || '').split('?')[0];
+      log(`${new Date().toISOString()} ${req.method} ${pathOnly} ${res.statusCode} ${Date.now() - started}ms`);
+    });
     try {
       const pathname = new URL(req.url, 'http://x').pathname;
       if (pathname.startsWith('/api/')) {
+        // Nothing the API returns should ever be cached, by a browser or a
+        // proxy. Set once here rather than per route, where it gets forgotten.
+        res.setHeader('Cache-Control', 'no-store');
         if (req.method !== 'GET' && !sameOrigin(req)) return fail(res, 403, 'Cross-origin requests are not allowed.');
         for (const r of routes) {
           const m = pathname.match(r.pattern);
@@ -539,14 +602,29 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     }
   });
 
-  return { server, store };
+  /** Stop accepting connections, finish what is in flight, close the database. */
+  function shutdown(signal) {
+    if (log) log(`${new Date().toISOString()} shutting down on ${signal}`);
+    server.close(() => {
+      try { store.db.close(); } catch (e) { /* already closed */ }
+      process.exit(0);
+    });
+    // Do not hang forever on a stuck connection.
+    setTimeout(() => process.exit(0), 8000).unref();
+  }
+
+  return { server, store, shutdown };
 }
 
 module.exports = { createApp, hashPassword, verifyPassword, DEFAULT_LIMITS };
 
 if (require.main === module) {
   const port = Number(process.env.PORT || 4000);
-  const { server } = createApp({ secure: process.env.SECURE === '1' });
+  const { server, shutdown } = createApp({
+    secure: process.env.SECURE === '1',
+    log: (line) => console.log(line)
+  });
+  ['SIGTERM', 'SIGINT'].forEach((sig) => process.on(sig, () => shutdown(sig)));
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
