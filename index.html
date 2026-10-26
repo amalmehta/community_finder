@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:title" content="community_finder">
-<meta property="og:description" content="Twenty questions, then real local groups near you \u2014 what they cost, what the commitment is, and the concrete first step into each.">
+<meta property="og:description" content="Real local groups near you, and small vetted circles that chat first and decide to meet up later.">
 <meta property="og:url" content="https://amalmehta.github.io/community_finder/">
 <meta property="og:image" content="https://amalmehta.github.io/community_finder/assets/social.svg">
 <meta name="twitter:card" content="summary_large_image">
@@ -36,6 +36,7 @@
       <button class="tab" id="tab-find" role="tab" aria-selected="true" aria-controls="view-find">Find</button>
       <button class="tab" id="tab-plan" role="tab" aria-selected="false" aria-controls="view-plan">My plan<span class="count" id="plan-count" hidden>0</span></button>
       <button class="tab" id="tab-you" role="tab" aria-selected="false" aria-controls="view-you">You</button>
+      <button class="tab" id="tab-circles" role="tab" aria-selected="false" aria-controls="view-circles" hidden>Circles<span class="count" id="circles-count" hidden>0</span></button>
       <button class="tab" id="tab-people" role="tab" aria-selected="false" aria-controls="view-people" hidden>People</button>
       <button class="tab" id="tab-messages" role="tab" aria-selected="false" aria-controls="view-messages" hidden>Messages<span class="count" id="msg-count" hidden>0</span></button>
       <button class="tab" id="tab-signout" type="button" hidden>Sign out</button>
@@ -53,7 +54,7 @@
 
       <div class="intro" id="intro">
         <h1>Find your people.</h1>
-        <p>Twenty questions, adapting as you go. Then real local groups, what they cost, and what actually happens when you turn up.</p>
+        <p>Twenty questions, adapting as you go. Then real local groups, what they cost, and what actually happens when you turn up &mdash; plus small vetted circles near you that talk first and decide to meet later.</p>
       </div>
 
       <div id="intake"></div>
@@ -65,6 +66,11 @@
   <!-- ============================ YOU ============================= -->
   <section id="view-you" role="tabpanel" aria-labelledby="tab-you" hidden>
     <div class="wrap" id="you-body"></div>
+  </section>
+
+  <!-- =========================== CIRCLES ========================== -->
+  <section id="view-circles" role="tabpanel" aria-labelledby="tab-circles" hidden>
+    <div class="wrap" id="circles-body"></div>
   </section>
 
   <!-- =========================== PEOPLE =========================== -->
@@ -132,5 +138,6 @@
 <script src="src/match.js"></script>
 <script src="src/app.js"></script>
 <script src="src/social.js"></script>
+<script src="src/circles.js"></script>
 </body>
 </html>

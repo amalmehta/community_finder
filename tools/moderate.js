@@ -10,6 +10,9 @@
  *   node tools/moderate.js suspend <username> [reason]
  *   node tools/moderate.js unsuspend <username>
  *   node tools/moderate.js resolve <report-id> [note]
+ *   node tools/moderate.js circles
+ *   node tools/moderate.js circle <id>
+ *   node tools/moderate.js closecircle <id>
  */
 'use strict';
 const path = require('node:path');
@@ -61,6 +64,63 @@ if (cmd === 'user') {
   const msgs = store.db.prepare('SELECT COUNT(*) AS n FROM messages WHERE sender_id = ?').get(u.id).n;
   const against = store.db.prepare('SELECT COUNT(*) AS n FROM reports WHERE reported_id = ?').get(u.id).n;
   console.log(`  ${sent} conversations started, ${msgs} messages sent, ${against} reports against`);
+  const circles = store.db.prepare(`SELECT c.id, c.name, cm.role FROM circle_members cm
+                                    JOIN circles c ON c.id = cm.circle_id WHERE cm.user_id = ?`).all(u.id);
+  const cmsgs = store.db.prepare('SELECT COUNT(*) AS n FROM circle_messages WHERE sender_id = ?').get(u.id).n;
+  console.log(`  circles: ${circles.map((c) => `#${c.id} ${c.name}${c.role === 'host' ? ' (host)' : ''}`).join(', ') || '—'}`);
+  console.log(`  ${cmsgs} circle messages, vouched for by ${store.vouchCount(u.id)}`);
+  process.exit(0);
+}
+
+// A circle can go wrong in ways a single account cannot: a host who vets
+// nobody, or one that quietly became a feed. Both are visible from here.
+if (cmd === 'circles') {
+  const rows = store.circleOverview();
+  if (!rows.length) {
+    console.log('No circles yet.');
+    process.exit(0);
+  }
+  console.log(`${rows.length} circles\n`);
+  rows.forEach((c) => {
+    const quiet = !c.last_at || Date.now() - c.last_at > 14 * 86400000;
+    console.log(`#${c.id}  ${c.name}  (${c.city})${c.status === 'closed' ? '  [closed]' : ''}`);
+    console.log(`  host @${c.host} · ${c.members} members · ${c.messages} messages · last ${when(c.last_at)}${quiet ? '  ← quiet' : ''}`);
+    if (c.pending) console.log(`  ${c.pending} applications waiting on the host`);
+    console.log(`  → node tools/moderate.js circle ${c.id}\n`);
+  });
+  process.exit(0);
+}
+
+if (cmd === 'circle') {
+  const c = store.circleById(Number(arg1));
+  if (!c) { console.error(`No circle #${arg1}.`); process.exit(1); }
+  const stats = store.circleStats(c.id);
+  console.log(`#${c.id} ${c.name} (${c.city})  ${c.status}`);
+  console.log(`  "${c.blurb}"`);
+  console.log(`  asks: "${c.question}"`);
+  console.log(`  cap ${c.cap}, minimum trust tier ${c.min_trust}, started ${when(c.created_at)}`);
+  console.log(`  ${stats.members} members · ${stats.messages} messages from ${stats.speakers} people over ${stats.days} days`);
+  console.log('  members:');
+  store.circleMembers(c.id).forEach((m) => {
+    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    console.log(`    @${m.username}${m.role === 'host' ? ' (host)' : ''} — ${plural(m.said, 'message', 'messages')}, ${plural(m.vouches, 'vouch', 'vouches')}${m.suspended ? '  [SUSPENDED]' : ''}`);
+  });
+  const apps = store.applicationsFor(c.id);
+  if (apps.length) {
+    console.log('  waiting:');
+    apps.forEach((a) => console.log(`    @${a.username} (${a.status}, ${a.seconds} seconded): ${a.answer.slice(0, 120)}`));
+  }
+  store.meetupsFor(c.id).forEach((k) => {
+    console.log(`  meetup #${k.id} ${k.status}: ${k.title} — ${k.place} (${k.yes}/${k.quorum} yes)`);
+  });
+  process.exit(0);
+}
+
+if (cmd === 'closecircle') {
+  const c = store.circleById(Number(arg1));
+  if (!c) { console.error(`No circle #${arg1}.`); process.exit(1); }
+  store.closeCircle(c.id);
+  console.log(`Closed #${c.id} ${c.name} to new people. The conversation is untouched.`);
   process.exit(0);
 }
 
@@ -89,5 +149,8 @@ console.log(`Moderation console
   node tools/moderate.js suspend <username> [reason] end sessions, hide from discovery
   node tools/moderate.js unsuspend <username>
   node tools/moderate.js resolve <id> [note]         close a report
+  node tools/moderate.js circles                     every circle, and which have gone quiet
+  node tools/moderate.js circle <id>                 members, applications, meetups
+  node tools/moderate.js closecircle <id>            stop new people joining
 
 Reads ${path.relative(process.cwd(), FILE)} (override with DB=...).`);

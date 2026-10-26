@@ -25,7 +25,10 @@ const captureMailer = {
 const { server, store } = createApp({
   file: path.join(tmp, 'test.db'),
   limits: { signupsPerIpPerHour: 100 },
-  mailer: captureMailer
+  mailer: captureMailer,
+  // A circle's whole life happens in milliseconds here, so the "separate days
+  // of conversation" rung is the one thing relaxed. The other three are real.
+  ready: { minDays: 1 }
 });
 
 /** Minimal cookie-aware client. */
@@ -260,7 +263,7 @@ async function verifyEmail(call, email) {
     // Every leg of the rule has to hold.
     const far = client();
     await far('POST', '/api/signup', { username: 'far', password: 'hunter2hunter', display: 'Far', city: 'Seattle', ageOk: true, interests: shared });
-    await verifyEmail(far, 'far@example.com');
+    await verifyEmail(far, 'faraway@example.com');
     const farSees = (await far('GET', '/api/people')).data.people.filter((p) => p.display === 'Dana')[0];
     eq(farSees.canDirect, false, 'a different city blocks direct messaging');
     eq((await far('POST', '/api/direct', { toUserId: farSees.id, body: 'Hello from another city entirely' })).status, 403,
@@ -310,6 +313,177 @@ async function verifyEmail(call, email) {
     ok(personIds.every((id) => discoverable.indexOf(id) !== -1),
        'the graph shows only people discovery already shows');
     eq((await client()('GET', '/api/graph')).status, 401, 'the graph requires a session');
+  });
+
+  await group('circles: vetting and the chat-first gate', async () => {
+    const BIO = 'Moved here in the spring and would rather know a few people properly than meet forty once.';
+    const INT = [{ id: 'books' }, { id: 'games' }, { id: 'food' }];
+    const people = {};
+    const CREW = { fay: 'fayc', gus: 'gusc', hal: 'halc', ivy: 'ivyc', jo: 'joec' };
+    for (const [short, username] of Object.entries(CREW)) {
+      const c = client();
+      await c('POST', '/api/signup', {
+        username, password: 'hunter2hunter', display: short[0].toUpperCase() + short.slice(1),
+        city: 'Denver', bio: BIO, ageOk: true, interests: INT
+      });
+      await verifyEmail(c, username + '@example.com');
+      people[short] = c;
+    }
+    const { fay, gus, hal, ivy, jo } = people;
+
+    // ---- trust tiers ----
+    let r = await fay('GET', '/api/circles');
+    eq(r.data.trust.tier, 2, 'a verified, filled-in profile reaches the "Introduced" tier');
+    ok(r.data.trust.missing.some((m) => /vouched/i.test(m)), 'and is told that vouches are what is left');
+
+    const blank = client();
+    await blank('POST', '/api/signup', { username: 'blankslate', password: 'hunter2hunter', city: 'Denver', ageOk: true });
+    eq((await blank('GET', '/api/circles')).data.trust.tier, 0, 'a bare account is tier 0');
+    eq((await blank('POST', '/api/circles', { name: 'Anything', city: 'Denver', blurb: BIO, question: 'Why are you here, in a sentence?', interests: ['books'] })).status,
+       403, 'tier 0 cannot start a circle');
+
+    // ---- starting one, and the vetting question being mandatory ----
+    eq((await fay('POST', '/api/circles', { name: 'Books and dice', city: 'Denver', blurb: 'Too short', question: 'Why are you here, in a sentence?', interests: ['books'] })).status,
+       400, 'a circle needs a real description');
+    eq((await fay('POST', '/api/circles', { name: 'Books and dice', city: 'Denver', blurb: BIO, question: 'hi', interests: ['books'] })).status,
+       400, 'and a real joining question — that is the vetting');
+
+    r = await fay('POST', '/api/circles', {
+      name: 'Books and dice', city: 'Denver', blurb: BIO,
+      question: 'What are you reading or playing at the moment, and what are you after here?',
+      interests: ['books', 'games'], cap: 4
+    });
+    eq(r.status, 201, 'a filled-in host can start a circle');
+    const cid = r.data.circle.id;
+    eq(r.data.circle.myRole, 'host', 'the founder is the host');
+    eq(r.data.circle.cap, 4, 'the cap is kept small');
+
+    // ---- the shopfront: a non-member sees the circle, never the conversation ----
+    r = await gus('GET', '/api/circles/' + cid);
+    eq(r.data.members, null, 'a non-member cannot see who is in a circle');
+    eq((await gus('GET', '/api/circles/' + cid + '/messages')).status, 403,
+       'nor read a word of the conversation');
+
+    // ---- applying is a written answer, not a click ----
+    eq((await gus('POST', '/api/circles/' + cid + '/apply', { answer: 'sounds fun' })).status, 400,
+       'a one-liner is not an application');
+    eq((await gus('POST', '/api/circles/' + cid + '/apply', { answer: 'Reading Piranesi, playing too much Wingspan, and I would like three or four people I can text about either.' })).status,
+       201, 'a real answer applies');
+    eq((await gus('POST', '/api/circles/' + cid + '/apply', { answer: 'Reading Piranesi, playing too much Wingspan, and I would like three or four people I can text about either.' })).status,
+       409, 'and cannot be sent twice');
+
+    // ---- circles are local ----
+    const far = client();
+    await far('POST', '/api/signup', { username: 'faraway', password: 'hunter2hunter', display: 'Faraway', city: 'Miami', bio: BIO, ageOk: true, interests: INT });
+    await verifyEmail(far, 'far@example.com');
+    const seenFar = (await far('GET', '/api/circles')).data.circles.filter((c) => c.id === cid)[0];
+    eq(seenFar.apply.ok, false, 'someone in another city cannot apply');
+    ok(/Denver/.test(seenFar.apply.why), 'and is told which city it is in');
+
+    // ---- the host decides, and the answer is what they read ----
+    r = await fay('GET', '/api/circles/' + cid);
+    eq(r.data.applications.length, 1, 'the host sees the application');
+    ok(/Piranesi/.test(r.data.applications[0].answer), 'with the answer attached');
+    const gusApp = r.data.applications[0].id;
+    eq((await gus('POST', `/api/circles/${cid}/applications/${gusApp}/approve`)).status, 403,
+       'an applicant cannot approve themselves');
+    eq((await fay('POST', `/api/circles/${cid}/applications/${gusApp}/approve`)).status, 201,
+       'the host can let them in');
+    eq((await gus('GET', '/api/circles/' + cid + '/messages')).status, 200,
+       'and then the conversation opens up');
+
+    await hal('POST', '/api/circles/' + cid + '/apply', { answer: 'Mostly non-fiction and a long-running D&D game. Looking for people to actually talk to rather than a weekly event.' });
+    const halApp = (await fay('GET', '/api/circles/' + cid)).data.applications[0].id;
+    await fay('POST', `/api/circles/${cid}/applications/${halApp}/approve`);
+    eq(store.memberCount(cid), 3, 'three in the circle');
+
+    // ---- two members carry an application without the host ----
+    await ivy('POST', '/api/circles/' + cid + '/apply', { answer: 'I run a tiny book swap at work and want something less work-shaped. Happy to be the one who organises.' });
+    const ivyApp = (await gus('GET', '/api/circles/' + cid)).data.applications.filter((a) => a.display === 'Ivy')[0].id;
+    eq((await fay('POST', `/api/circles/${cid}/applications/${ivyApp}/second`)).status, 400,
+       'the host approves outright rather than seconding');
+    r = await gus('POST', `/api/circles/${cid}/applications/${ivyApp}/second`);
+    eq(r.status, 200, 'a member can second an application');
+    eq(r.data.seconds, 1, 'one second so far');
+    eq((await gus('POST', `/api/circles/${cid}/applications/${ivyApp}/second`)).status, 409,
+       'and cannot second twice');
+    eq((await hal('POST', `/api/circles/${cid}/applications/${ivyApp}/second`)).status, 201,
+       'two seconds let someone in without the host');
+    eq(store.memberCount(cid), 4, 'four in the circle');
+
+    // ---- the cap holds, and overflow waits ----
+    r = await jo('POST', '/api/circles/' + cid + '/apply', { answer: 'Would happily be the fifth. I am around most evenings and I bring the snacks nobody asked for.' });
+    eq(r.data.status, 'waitlisted', 'past the cap, an application joins the waiting list');
+
+    // ---- meetups are locked until the circle has actually talked ----
+    r = await fay('POST', '/api/circles/' + cid + '/meetups', { title: 'Coffee on Sunday', place: 'Union Station' });
+    eq(r.status, 409, 'nobody can propose a meetup before the circle has talked');
+    ok(/Talk first/.test(r.data.error), 'and is told why, in those words');
+
+    // Twenty messages, three different people, which is the gate.
+    for (let i = 0; i < 7; i++) {
+      await fay('POST', '/api/circles/' + cid + '/messages', { body: 'Fay message ' + i });
+      await gus('POST', '/api/circles/' + cid + '/messages', { body: 'Gus message ' + i });
+      await hal('POST', '/api/circles/' + cid + '/messages', { body: 'Hal message ' + i });
+    }
+    r = await fay('GET', '/api/circles/' + cid);
+    eq(r.data.circle.readiness.ready, true, 'twenty messages from three people opens the gate');
+    eq(r.data.circle.live.speakers, 3, 'and the liveliness line counts the speakers');
+
+    // ---- a proposal is a proposal until enough people say yes ----
+    r = await gus('POST', '/api/circles/' + cid + '/meetups', {
+      title: 'Sunday morning coffee and a game', place: 'Union Station, main hall',
+      startsAt: Date.now() + 5 * 86400000, orgId: 'den-x', orgName: 'Tattered Cover', orgUrl: 'https://www.tatteredcover.com/'
+    });
+    eq(r.status, 201, 'once ready, any member can propose something');
+    const mid = (await fay('GET', '/api/circles/' + cid)).data.meetups[0].id;
+    let k = (await fay('GET', '/api/circles/' + cid)).data.meetups[0];
+    eq(k.status, 'proposed', 'it starts as a proposal');
+    eq(k.yes, 1, 'with the proposer already in');
+    eq(k.org.name, 'Tattered Cover', 'anchored to a real local listing');
+
+    eq((await far('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes' })).status, 403,
+       'a non-member cannot vote on it');
+    r = await fay('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes' });
+    eq(r.status, 200, 'a member can say yes');
+    eq(r.data.status, 'on', `and at quorum (${k.quorum}) it becomes a plan`);
+
+    // ---- vouching has to mean "we have talked" ----
+    eq((await fay('POST', '/api/circles/' + cid + '/vouch', { userId: r.data.id || 0 })).status, 404,
+       'you cannot vouch for a stranger');
+    const ivyId = (await fay('GET', '/api/circles/' + cid)).data.members.filter((m) => m.display === 'Ivy')[0].id;
+    eq((await fay('POST', '/api/circles/' + cid + '/vouch', { userId: ivyId })).status, 400,
+       'nor for someone who has not said anything yet');
+    const gusId = (await fay('GET', '/api/circles/' + cid)).data.members.filter((m) => m.display === 'Gus')[0].id;
+    r = await fay('POST', '/api/circles/' + cid + '/vouch', { userId: gusId });
+    eq(r.status, 201, 'you can vouch for someone you have talked to');
+    await hal('POST', '/api/circles/' + cid + '/vouch', { userId: gusId });
+    eq((await gus('GET', '/api/circles')).data.trust.tier, 3, 'two vouches reach the "Vouched for" tier');
+
+    // ---- icebreakers, and not too many of them ----
+    r = await fay('POST', '/api/circles/' + cid + '/prompt');
+    eq(r.status, 201, 'a member can post a question for the whole circle');
+    ok(globalThis.FYC.PROMPTS.indexOf(r.data.body) !== -1, 'drawn from the shared list, never invented');
+    eq((await gus('POST', '/api/circles/' + cid + '/prompt')).status, 429, 'one prompt at a time');
+
+    // ---- unread, and the host's queue ----
+    r = await fay('GET', '/api/unread');
+    ok(r.data.circles > 0, 'unread counts what other people said');
+    eq(r.data.pending, 1, 'and the host sees the application still waiting');
+
+    // ---- the host cannot walk out on people ----
+    eq((await fay('POST', '/api/circles/' + cid + '/leave')).status, 409,
+       'the host cannot leave a circle with people in it');
+    eq((await hal('POST', '/api/circles/' + cid + '/leave')).status, 200, 'a member can leave');
+    eq(store.memberCount(cid), 3, 'and is gone');
+
+    // ---- host tools ----
+    eq((await gus('DELETE', `/api/circles/${cid}/members/${ivyId}`)).status, 403,
+       'only the host removes someone');
+    eq((await fay('DELETE', `/api/circles/${cid}/members/${ivyId}`)).status, 200, 'the host can');
+    eq((await fay('POST', '/api/circles/' + cid + '/close')).status, 200, 'and can close it to new people');
+    const closed = (await jo('GET', '/api/circles')).data.circles.filter((c) => c.id === cid)[0];
+    eq(closed, undefined, 'a closed circle leaves discovery');
   });
 
   await group('production readiness', async () => {

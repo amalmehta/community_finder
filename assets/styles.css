@@ -694,3 +694,122 @@ main:focus { outline: none; }
 .legal ul { padding-left: var(--s5); display: grid; gap: var(--s1); }
 .legal code { font-size: .92em; background: var(--bg-sunk); padding: 1px 5px; border-radius: 4px; }
 .legal-foot { margin-top: var(--s7); padding-top: var(--s4); border-top: 1px solid var(--line); font-size: var(--t-meta); }
+
+/* ======================================================================
+   Circles — the chat-first half of the app.
+   ====================================================================== */
+
+/* The trust ladder. Ticked rungs read as earned, not as a checklist. */
+.ladder { list-style: none; margin: 0 0 var(--s3); padding: 0; display: grid; gap: var(--s2); }
+.ladder li {
+  font-size: var(--t-meta); color: var(--ink-soft);
+  padding-left: 22px; position: relative;
+}
+.ladder li::before {
+  content: "○"; position: absolute; left: 0; top: -1px; color: var(--ink-faint);
+}
+.ladder li.done::before { content: "●"; color: var(--moss); }
+.ladder li.done b { color: var(--ink); }
+
+/* The readiness gate. The whole product argument lives in this box, so it
+   gets to look like a thing rather than a paragraph. */
+.ready {
+  margin: var(--s3) 0 0; padding: var(--s3) var(--s4);
+  background: var(--bg-sunk); border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+}
+.ready.is-ready { background: var(--moss-soft); border-color: transparent; }
+.ready-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s3); }
+.ready-head b { font-size: var(--t-meta); }
+.ready.is-ready .ready-head b { color: var(--moss); }
+.ready-list { list-style: none; margin: var(--s2) 0 var(--s2); padding: 0; display: grid; gap: var(--s1); }
+.ready-list li {
+  display: flex; gap: var(--s2); align-items: baseline;
+  font-size: var(--t-small); color: var(--ink-soft);
+}
+.ready-list li.done { color: var(--ink); }
+.ready-list .tick { width: 12px; text-align: center; color: var(--ink-faint); }
+.ready-list li.done .tick { color: var(--moss); }
+.ready .hint { margin: 0; color: var(--ink-faint); font-size: var(--t-small); }
+
+.card.circle { cursor: default; }
+.card.circle.mine { cursor: pointer; }
+.card.circle.mine:hover { border-color: var(--line-strong); }
+.badge.hit { background: var(--moss-soft); color: var(--moss); border-color: transparent; font-weight: 600; }
+.badge.unread { background: var(--accent); color: #fff; border-color: transparent; font-weight: 600; }
+.badges.tight { margin: 0; gap: var(--s1); flex: 0 0 auto; }
+/* On a phone the right-hand badge is the first thing to get squeezed into a
+   column of single characters. It never wraps. */
+.person-top > .badge, .badges.tight > .badge { white-space: nowrap; }
+.hint.nudge { color: var(--accent-ink); }
+.hint.locked { color: var(--ink-faint); }
+
+/* The joining question, quoted the way the applicant will see it. */
+.question {
+  font-family: var(--serif); font-size: var(--t-lead); line-height: 1.4;
+  margin: var(--s3) 0 var(--s2); padding-left: var(--s3);
+  border-left: 3px solid var(--line-strong); color: var(--ink);
+}
+.applybox { margin-top: var(--s3); }
+.applybox textarea, .proposal textarea, .applybox select {
+  width: 100%; box-sizing: border-box;
+}
+
+.applicant, .member, .meetup {
+  padding: var(--s3) 0; border-top: 1px solid var(--line);
+}
+.applicant:first-of-type, .member:first-of-type, .meetup:first-of-type { border-top: none; }
+.applicant h4, .member h4, .meetup h4 { margin: 0; font-size: var(--t-h3); letter-spacing: -.01em; }
+
+/* Quorum. A proposal is a bar that fills; nobody has to read the numbers. */
+.quorum {
+  height: 6px; background: var(--bg-sunk); border-radius: 99px;
+  overflow: hidden; margin: var(--s2) 0;
+}
+.quorum-fill { height: 100%; background: var(--moss); border-radius: 99px; transition: width .2s ease; }
+.meetup.on { background: var(--moss-soft); border-radius: var(--radius-sm); padding: var(--s3) var(--s4); }
+.meetup.on .quorum { background: rgba(0, 0, 0, .08); }
+
+.safety { margin-top: var(--s3); font-size: var(--t-small); color: var(--ink-soft); }
+.safety summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+.safety ul { margin: var(--s2) 0 0; padding-left: 20px; display: grid; gap: var(--s1); }
+
+.proposal { margin-top: var(--s3); }
+.proposal select, .field select {
+  width: 100%; box-sizing: border-box; padding: 9px 11px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  background: var(--bg-raised); color: var(--ink); font: inherit; font-size: var(--t-meta);
+}
+.field input[type="number"], .field input[type="datetime-local"] {
+  width: 100%; box-sizing: border-box; padding: 9px 11px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  background: var(--bg-raised); color: var(--ink); font: inherit; font-size: var(--t-meta);
+}
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); }
+@media (max-width: 560px) { .row2 { grid-template-columns: 1fr; gap: 0; } }
+
+.results-head.sub { margin-top: var(--s6); }
+.results-head.sub h2 { font-size: var(--t-h3); }
+
+/* Group chat: who said it matters more than in a two-person thread. */
+.circle-chat .msg { max-width: 86%; }
+.msg-who {
+  display: block; font-size: var(--t-micro); font-weight: 700;
+  color: var(--ink-faint); margin-bottom: 2px;
+}
+.msg.system {
+  justify-self: center; max-width: 100%; background: none;
+  color: var(--ink-faint); font-size: var(--t-small); text-align: center; padding: 4px 0;
+}
+.msg.system p { font-size: var(--t-small); }
+.msg.prompt {
+  justify-self: stretch; max-width: 100%; background: var(--bg-sunk);
+  border-left: 3px solid var(--moss); border-radius: var(--radius-sm);
+}
+.msg.prompt p { font-family: var(--serif); font-size: var(--t-lead); }
+.prompt-tag {
+  display: block; font-size: var(--t-micro); text-transform: uppercase;
+  letter-spacing: .06em; color: var(--moss); font-weight: 700; margin-bottom: 3px;
+}
+
+.strip { margin-top: var(--s7); padding-top: var(--s2); border-top: 1px solid var(--line); }

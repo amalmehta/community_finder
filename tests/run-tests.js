@@ -485,7 +485,8 @@ group('front-end wiring', function () {
    'src/data/city-philadelphia.js', 'src/data/city-dc.js', 'src/data/city-la.js',
    'src/data/city-sandiego.js', 'src/data/city-denver.js', 'src/data/city-portland.js',
    'src/data/city-minneapolis.js', 'src/data/universal.js',
-   'src/preferences.js', 'src/intake.js', 'src/match.js', 'src/app.js', 'assets/styles.css'].forEach(function (f) {
+   'src/preferences.js', 'src/intake.js', 'src/match.js', 'src/app.js', 'src/social.js',
+   'src/circles.js', 'assets/styles.css'].forEach(function (f) {
     ok(html.indexOf(f) !== -1, 'index.html loads ' + f);
     ok(fs.existsSync(path.join(root, f)), f + ' exists on disk');
   });
@@ -516,6 +517,50 @@ group('front-end wiring', function () {
      'and choosing light overrides a system that prefers dark');
   ok(app.indexOf("THEMES = ['auto', 'light', 'dark']") !== -1,
      'the toggle has three states, so following the system stays an option');
+});
+
+// The chat-first promise is made in several places at once; if any one of them
+// goes missing the product quietly becomes another meet-a-stranger app.
+group('circles: the chat-first wiring', function () {
+  var fs = require('fs');
+  var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  var circles = fs.readFileSync(path.join(root, 'src/circles.js'), 'utf8');
+  var server = fs.readFileSync(path.join(root, 'server/app.js'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var social = fs.readFileSync(path.join(root, 'src/social.js'), 'utf8');
+  var appjs = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+
+  ok(html.indexOf('id="view-circles"') !== -1, 'the circles view is in the page');
+  ok(html.indexOf('id="tab-circles"') !== -1, 'with a tab to reach it');
+  ok(html.indexOf('id="circles-count"') !== -1, 'and an unread badge on that tab');
+
+  ok(FYC.PROMPTS.length >= 10, 'there are enough icebreakers to keep a circle going');
+  FYC.PROMPTS.forEach(function (t) {
+    ok(t.length > 20 && t.indexOf('?') !== -1, 'every prompt asks something: ' + t.slice(0, 30));
+  });
+  ok(FYC.MEETUP_SAFETY.length >= 4, 'the first-meetup checklist has something to say');
+
+  // The gate itself. These four numbers are the product.
+  ok(/minMembers:\s*3/.test(server), 'a circle needs three people before it can plan anything');
+  ok(/minMessages:\s*20/.test(server), 'and twenty messages');
+  ok(/minSpeakers:\s*3/.test(server), 'from three different people');
+  ok(/minDays:\s*2/.test(server), 'across two separate days');
+  ok(server.indexOf("'Not yet — this circle still needs '") !== -1,
+     'and says so rather than hiding the button');
+  ok(/answer\.length < 40/.test(server), 'joining takes a written answer, not a click');
+  ok(server.indexOf('secondsFor(app.id) >= 2') !== -1,
+     'two members can vet someone without the host');
+  ok(/said < 1/.test(server), 'a vouch requires that the two of you have actually talked');
+
+  ok(social.indexOf("window.FYC_CIRCLES.render()") !== -1, 'social.js routes the circles tab');
+  ok(social.indexOf("'circles', 'people', 'messages'") !== -1, 'and shows the tab once signed in');
+  ok(appjs.indexOf('FYC_CIRCLES.resultsStrip') !== -1,
+     'the finder offers circles alongside the places to go alone');
+  ok(circles.indexOf('readinessBlock') !== -1, 'the readiness gate is drawn, not just enforced');
+  ok(circles.indexOf('orgSuggestions') !== -1,
+     'a meetup can be anchored to a hand-checked local listing');
+  ok(css.indexOf('.quorum-fill') !== -1, 'a proposal shows how close it is to happening');
+  ok(css.indexOf('.msg.prompt') !== -1, 'prompts look different from chatter');
 });
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');

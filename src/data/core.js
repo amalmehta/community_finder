@@ -93,7 +93,37 @@
   var STRUCTURE = ['drop-in', 'register', 'course', 'shift', 'rsvp', 'search'];
   var COMMITMENT = ['one-off', 'weekly', 'seasonal'];
 
+  // --- Circles: what a chat-first group needs before it meets ---------------
+  // Shared with the server so the prompt a circle sees and the prompt the
+  // server stores are the same list, and nobody can post an invented one.
+  var PROMPTS = [
+    'What made you look for a group like this one?',
+    'What is something you have done near here lately that you would recommend?',
+    'What does a good weekend look like for you?',
+    'What are you slightly bad at but enjoy anyway?',
+    'What is the last thing you got properly absorbed in?',
+    'Where do you go when you want to be around people without talking to them?',
+    'What would you like to be doing more of six months from now?',
+    'What is a small thing in this city that you think is underrated?',
+    'What time of day are you actually any good?',
+    'What puts you off a group? Useful to know before we plan anything.',
+    'What is something you have changed your mind about recently?',
+    'If we did one thing together this month, what would you want it to be?'
+  ];
+
+  // Shown on every meetup card. Not legal cover — it is the advice you would
+  // give a friend, in the place they would read it.
+  var MEETUP_SAFETY = [
+    'First time: somewhere public, in daylight if you can.',
+    'Tell someone outside the circle where you are going and when.',
+    'Your own way there and back. Nobody needs your address.',
+    'Leaving early is always fine, and needs no reason.',
+    'If someone pushes past a no, report them — the host and we both see it.'
+  ];
+
   var FYC = g.FYC || {};
+  FYC.PROMPTS = PROMPTS;
+  FYC.MEETUP_SAFETY = MEETUP_SAFETY;
   FYC.GROUPS = GROUPS;
   FYC.INTERESTS = INTERESTS;
   FYC.WHEN = WHEN;

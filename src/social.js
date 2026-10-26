@@ -116,6 +116,7 @@
       if (signup) {
         payload.display = $('#au-display').value.trim() || payload.username;
         payload.city = $('#au-city').value.trim();
+        payload.bio = $('#au-bio').value.trim();
         payload.ageOk = $('#au-age').checked;
         payload.interests = pickedInterests(form);
       }
@@ -152,6 +153,12 @@
         el('span', { text: 'Your city' }),
         el('input', { type: 'text', id: 'au-city', placeholder: 'e.g. Boston' })
       ]) : null,
+      signup ? el('label', { class: 'field' }, [
+        el('span', { text: 'A couple of sentences about you' }),
+        el('textarea', { id: 'au-bio', rows: '2', maxlength: '280',
+                         placeholder: 'What you are looking for, and what you are like to be around. Circle hosts read this.' }),
+        el('p', { class: 'hint', text: 'Forty characters or more and a verified email get you into most circles.' })
+      ]) : null,
 
       signup ? el('div', { class: 'field' }, [
         el('span', { text: 'What are you into?' }),
@@ -175,7 +182,7 @@
     gate.appendChild(el('div', { class: 'wrap' }, [
       el('div', { class: 'intro' }, [
         el('h1', { text: 'Find your people.' }),
-        el('p', { text: 'Real local groups, and the people near you with the same interests.' })
+        el('p', { text: 'Real local groups, and small vetted circles near you that chat first and decide to meet up later.' })
       ]),
       form
     ]));
@@ -191,12 +198,13 @@
 
   // ---------- tabs ----------
   function paintAccountTabs() {
-    ['people', 'messages'].forEach(function (name) {
+    ['circles', 'people', 'messages'].forEach(function (name) {
       var t = document.getElementById('tab-' + name);
       if (t) t.hidden = !S.user;
     });
     var out = document.getElementById('tab-signout');
     if (out) out.hidden = !S.user;
+    if (window.FYC_CIRCLES) window.FYC_CIRCLES.enable(S);
   }
 
   async function refreshCounts() {
@@ -207,6 +215,7 @@
       var badge = document.getElementById('msg-count');
       badge.textContent = String(n);
       badge.hidden = n === 0;
+      if (window.FYC_CIRCLES) window.FYC_CIRCLES.refreshBadge();
     } catch (e) { /* offline */ }
   }
 
@@ -725,7 +734,7 @@
     // that is no longer true, so say what is actually happening instead.
     var foot = document.querySelector('.site-footer .wrap p');
     if (foot) {
-      foot.textContent = 'Your searches, plan and what you click stay on this device. Your profile and messages are stored on this server so that other people can reach you — only your city, your shown interests and anything you write are visible to them.';
+      foot.textContent = 'Your searches, plan and what you click stay on this device. Your profile, your messages and your circles are stored on this server so that other people can reach you — only your city, your shown interests and anything you write are visible to them. Everything said in a circle is visible to everyone in that circle.';
     }
 
     document.getElementById('tab-people').addEventListener('click', function () { show('people'); });
@@ -755,7 +764,7 @@
   }
 
   function show(which) {
-    ['find', 'plan', 'you', 'people', 'messages'].forEach(function (name) {
+    ['find', 'plan', 'you', 'circles', 'people', 'messages'].forEach(function (name) {
       var view = document.getElementById('view-' + name);
       var tab = document.getElementById('tab-' + name);
       if (!view || !tab) return;
@@ -764,6 +773,10 @@
       tab.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     stopPolling();
+    if (window.FYC_CIRCLES) {
+      window.FYC_CIRCLES.stop();
+      if (which === 'circles') window.FYC_CIRCLES.render();
+    }
     if (which === 'people') renderPeople();
     if (which === 'messages') renderMessages();
     // The finder's own tabs are rendered by app.js.

@@ -31,6 +31,64 @@ specifics that decide whether something is worth your Saturday.
   into national directories (Meetup, VolunteerMatch, parkrun, Feeding America,
   CenterLink, Repair Café, Audubon, RRCA and more), pointed at the city you
   typed and the interests you picked.
+- **And, with a server behind it, circles** — small vetted local groups that
+  **talk first and decide to meet later**. See below.
+
+---
+
+## Circles: chat first, meet later
+
+Every app in this space makes the first thing you do with a stranger the
+hardest thing: turn up somewhere. Timeleft and 222 seat you at a dinner with
+five people you have never spoken to. The dinner is the product. Whether you
+actually have anything to say to each other is left to chance and to you, on
+the night, in person, with no way out before dessert.
+
+A **circle** inverts that. It is four to twelve people in one city who share
+interests and one group chat. You talk. Only when the circle has genuinely been
+a conversation does the app let anyone propose doing something — and then only
+if enough people say yes.
+
+**Joining is an application, not a click.** Every circle has a question its host
+wrote: *"what are you reading or playing at the moment, and what are you
+actually after here?"* You answer it in your own words. The host reads it; two
+existing members seconding you carries it without the host, so the gate belongs
+to the circle rather than one person. Circles are local: you apply in your own
+city.
+
+**Trust is earned in tiers**, and a circle picks the floor it will accept:
+
+| Tier | Name | Earned by |
+|---|---|---|
+| 0 | New here | an account, and nothing else |
+| 1 | Verified | a confirmed email address |
+| 2 | Introduced | tier 1, plus a city, three interests and a real bio |
+| 3 | Vouched for | tier 2, plus two people who have talked with you in a circle |
+
+A vouch only exists between two people in the same circle, and only once the
+other person has actually said something. That is what keeps it from being a
+follow button. Starting a circle needs tier 2.
+
+**The meetup button is locked until the circle has talked.** Not a nudge, not a
+suggestion — the server returns 409. Four conditions, shown as a checklist that
+fills in as the conversation happens:
+
+- three people in the circle,
+- twenty messages,
+- from three different people,
+- across two separate days.
+
+**A meetup is a proposal until a quorum says yes.** Someone suggests a thing, a
+place and a time; it becomes real when `max(2, ceil(members / 3))` people say
+yes, and not before. It never happens because one person pushed. A proposal can
+be anchored to one of the finder's hand-checked listings for that city, so "let's
+do something" names a real place with a real first step. Every meetup card
+carries the same five-line first-meetup checklist: public place, tell someone,
+your own way home, leaving early is fine, report anyone who pushes past a no.
+
+**Dead group chats are the default**, so the circle can post an icebreaker from
+a shared list — one per twelve hours — and a circle nobody has spoken in for six
+days says so on its card.
 
 ---
 
@@ -132,6 +190,9 @@ bipartite on purpose: it exposes nothing that discovery does not already show.
 **Messaging without a request** is unlocked by strong alignment: 3+ shared
 interests, the same city, and both people verified. The recipient can switch it
 off, blocking always wins, and the daily caps still apply.
+
+**Circles** live on their own tab, and the finder's results offer them
+alongside the places you would go alone — the other door into the same city.
 
 See [server/README.md](server/README.md) for the API, the safety rules and how
 to change the rate limits. In short: contact is request-then-accept, a new
@@ -341,3 +402,10 @@ behavioural record completely.
   the organisation's own page before going.
 - Contact details are organisation contact *pages*, never scraped personal
   email addresses.
+- A circle has to reach three people before it can plan anything, which means a
+  brand-new city starts cold. That is the honest cost of refusing to seat
+  strangers at a table on day one.
+- Vetting is the host's judgement plus two seconds. It is a real filter and not
+  a background check, and nothing here verifies that anyone is who they say.
+- Circle messages are plain text in the database, readable by whoever runs the
+  server. Not end-to-end encrypted, and the privacy page says so.

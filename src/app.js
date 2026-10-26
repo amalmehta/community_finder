@@ -507,6 +507,12 @@
       uni.forEach(function (r) { host.appendChild(orgCard(r, p, {})); });
     }
 
+    // With a backend, the other door: circles near here on the same interests,
+    // where you talk to people before anyone suggests turning up somewhere.
+    if (window.FYC_CIRCLES && window.FYC_CIRCLES.resultsStrip) {
+      window.FYC_CIRCLES.resultsStrip(host, p);
+    }
+
     host.hidden = false;
   }
 

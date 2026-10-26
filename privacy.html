@@ -28,6 +28,7 @@
     <li>Your display name, city, short bio, and which interests you chose — each flagged visible or hidden</li>
     <li>Your email address, only if you add one, and whether it is verified</li>
     <li>Connection requests and the messages in your conversations</li>
+    <li>Circles you host or belong to, what you wrote when applying to one, everything said in a circle&rsquo;s group chat, who you have vouched for, and meetup proposals and your yes/maybe/no on each</li>
     <li>Blocks and reports you make</li>
     <li>A log line per request: method, path, status and duration. No query strings, no bodies, no cookies</li>
   </ul>
@@ -36,8 +37,12 @@
   <h2>What other people can see</h2>
   <p>Your display name, your city, your bio, and only the interests you marked visible. A hidden interest still shapes your own results and is never used to find you, shown to anyone, or searchable. Location is city-level only; the app never asks for or stores anything finer. Turning off discovery removes you from other people's results entirely.</p>
 
+  <h2>Circles</h2>
+  <p>A circle is a group, so everything in it is seen by everyone in it. The answer you write when applying is read by the host and by the members, who can second you; it stays in the database after a decision either way. Your messages in a circle are visible to every member, including people admitted after you wrote them. A vouch is visible to the person you vouched for and counts towards their trust tier. Leaving a circle removes you and your vouches from it; what you already said stays in the conversation, attributed to a name the others can still see.</p>
+  <p>A circle you have not joined shows you its name, city, description, joining question, how many people are in it and how busy it has been. It never shows you the conversation or who is in it.</p>
+
   <h2>Messages</h2>
-  <p>Messages are stored in plain text in the database so they can be shown to you both. They are not end-to-end encrypted. Anyone with access to the server can read them, which in a self-hosted deployment means whoever runs it. Do not use this for anything you would not want an administrator to see.</p>
+  <p>Messages, in a conversation or a circle, are stored in plain text in the database so they can be shown to everyone who should see them. They are not end-to-end encrypted. Anyone with access to the server can read them, which in a self-hosted deployment means whoever runs it. Do not use this for anything you would not want an administrator to see.</p>
 
   <h2>Reports</h2>
   <p>Reporting someone stores your username, theirs, your reason and any detail, and blocks them. Reports are read by whoever operates the server, so that they can act on them.</p>
