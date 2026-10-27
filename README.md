@@ -78,6 +78,31 @@ fills in as the conversation happens:
 - from three different people,
 - across two separate days.
 
+**And it is unlocked again by a ceiling.** Ramirez & Zhang (2007) found that
+partners who moved from online to face-to-face *early* had better relational
+outcomes, while those who left it late did **worse than partners who never met
+at all** — Walther's hyperpersonal model gives the mechanism, since text-only
+invites both sides to idealise and the meeting has to survive it. So the clock
+starts the moment a circle *could* have met. At a fortnight it is nudged; at a
+month the app says plainly that the circle is avoiding it, and refuses to post
+another icebreaker. A date in the diary stops the clock. Chat first, then meet
+soon — not chat indefinitely.
+
+**Hours, not messages.** Hall (2018) puts a casual friend at roughly 50 hours
+together, a friend at 90 and a close friend at 200+, and found that leisure
+hours count while hours spent working alongside someone do not. A circle with
+four hundred messages and no hours should be able to see that about itself, so
+the ledger counts only time people confirm they actually spent together — an
+RSVP banks nothing.
+
+**Repeating by default.** Adams's conditions for close friendship are
+proximity, *repeated* unplanned interaction, and somewhere safe enough to
+confide. One evening with five strangers fails the middle one, which is the
+real defect in dinner-with-strangers apps: you never see those people again, so
+no hours ever accumulate. A meetup can repeat weekly, fortnightly or every four
+weeks; when one passes it is filed in the ledger and the series rolls on to its
+next date with the RSVPs cleared. One-offs are offered last.
+
 **A meetup is a proposal until a quorum says yes.** Someone suggests a thing, a
 place and a time; it becomes real when `max(2, ceil(members / 3))` people say
 yes, and not before. It never happens because one person pushed. A proposal can
@@ -405,6 +430,12 @@ behavioural record completely.
 - A circle has to reach three people before it can plan anything, which means a
   brand-new city starts cold. That is the honest cost of refusing to seat
   strangers at a table on day one.
+- The drift thresholds (14 and 28 days) are a judgement call. Ramirez & Zhang
+  established the *direction* — late switches go worse — in a lab, not the
+  crossover point in weeks.
+- Hours are self-reported. Someone can claim a meetup they skipped, and the
+  only check is that two people have to confirm before it counts as the
+  circle's hours rather than one person's.
 - Vetting is the host's judgement plus two seconds. It is a real filter and not
   a background check, and nothing here verifies that anyone is who they say.
 - Circle messages are plain text in the database, readable by whoever runs the

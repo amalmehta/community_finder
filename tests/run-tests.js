@@ -563,6 +563,41 @@ group('circles: the chat-first wiring', function () {
   ok(css.indexOf('.msg.prompt') !== -1, 'prompts look different from chatter');
 });
 
+// The gate has a floor and a ceiling, and they come from opposite findings.
+// Keeping only the floor is the failure mode the ceiling exists to prevent,
+// so both halves are pinned here.
+group('circles: the ceiling, the hours and repeating', function () {
+  var fs = require('fs');
+  var server = fs.readFileSync(path.join(root, 'server/app.js'), 'utf8');
+  var circles = fs.readFileSync(path.join(root, 'src/circles.js'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+
+  // Ramirez & Zhang (2007): late online-to-offline switches end worse than
+  // never meeting at all.
+  ok(/nudgeDays:\s*14/.test(server), 'a circle is nudged after a fortnight ready and unmet');
+  ok(/driftDays:\s*28/.test(server), 'and named as drifting after a month');
+  ok(server.indexOf('Another question is not what it needs') !== -1,
+     'a drifting circle is refused another icebreaker');
+  ok(circles.indexOf('driftBlock') !== -1, 'the ceiling is shown, not just enforced');
+  ok(css.indexOf('.notice.drift') !== -1, 'and it looks different from an ordinary notice');
+
+  // Hall (2018): hours together, not messages, are what make a friend.
+  ok(/hours:\s*50, label: 'casual friends'/.test(server), 'fifty hours is a casual friend');
+  ok(/hours:\s*90, label: 'friends'/.test(server), 'ninety is a friend');
+  ok(/hours:\s*200, label: 'close friends'/.test(server), 'two hundred is a close friend');
+  ok(circles.indexOf('hoursBlock') !== -1, 'the ladder is drawn');
+  ok(circles.indexOf('confirmCard') !== -1, 'and hours are banked by confirming attendance');
+  ok(server.indexOf('attended = 1') !== -1 || server.indexOf('setAttendance') !== -1,
+     'an RSVP on its own banks nothing');
+
+  // Adams: repeated interaction, not a single evening.
+  ['weekly', 'fortnightly', 'monthly'].forEach(function (k) {
+    ok(server.indexOf(k + ': {') !== -1, 'meetups can repeat ' + k);
+  });
+  ok(circles.indexOf("var order = ['fortnightly', 'weekly', 'monthly', '']") !== -1,
+     'and repeating is the default, with the one-off last');
+});
+
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail) {
   failures.slice(0, 25).forEach(function (f) { console.log('   ✗ ' + f); });

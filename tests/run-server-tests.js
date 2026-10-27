@@ -486,6 +486,138 @@ async function verifyEmail(call, email) {
     eq(closed, undefined, 'a closed circle leaves discovery');
   });
 
+  await group('circles: the ceiling, the hours and repeating', async () => {
+    const BIO = 'Here for a handful of people I actually know rather than a long list of ones I have met once.';
+    const INT = [{ id: 'outdoors' }, { id: 'food' }, { id: 'music' }];
+    const crew = {};
+    for (const [short, username] of Object.entries({ kit: 'kitc', lou: 'louc', max: 'maxc' })) {
+      const c = client();
+      await c('POST', '/api/signup', {
+        username, password: 'hunter2hunter', display: short[0].toUpperCase() + short.slice(1),
+        city: 'Austin', bio: BIO, ageOk: true, interests: INT
+      });
+      await verifyEmail(c, username + '@example.com');
+      crew[short] = c;
+    }
+    const { kit, lou, max } = crew;
+
+    let r = await kit('POST', '/api/circles', {
+      name: 'Walks and a coffee', city: 'Austin', blurb: BIO,
+      question: 'What does a good Sunday morning look like for you?',
+      interests: ['outdoors', 'food'], cap: 6
+    });
+    const cid = r.data.circle.id;
+    eq(r.data.circle.readyAt, null, 'a new circle has no clock running yet');
+    eq(r.data.circle.drift.stage, 'none', 'and is not drifting, because it could not meet anyway');
+
+    for (const [who, answer] of [[lou, 'Long walks and then sitting down somewhere with a coffee for an hour. That is the whole ambition.'],
+                                 [max, 'I walk most weekends alone and would rather not. Also I know every coffee place in this city.']]) {
+      await who('POST', '/api/circles/' + cid + '/apply', { answer });
+      const app = (await kit('GET', '/api/circles/' + cid)).data.applications[0];
+      await kit('POST', `/api/circles/${cid}/applications/${app.id}/approve`);
+    }
+    for (let i = 0; i < 7; i++) {
+      await kit('POST', '/api/circles/' + cid + '/messages', { body: 'Kit ' + i });
+      await lou('POST', '/api/circles/' + cid + '/messages', { body: 'Lou ' + i });
+      await max('POST', '/api/circles/' + cid + '/messages', { body: 'Max ' + i });
+    }
+
+    // ---- the clock starts the moment the circle could have met ----
+    r = await kit('GET', '/api/circles/' + cid);
+    ok(r.data.circle.readyAt > 0, 'becoming ready stamps the clock');
+    eq(r.data.circle.drift.stage, 'ok', 'and a circle that just became ready is not drifting');
+    eq(r.data.circle.hours.mine.hours, 0, 'no hours yet — messages do not count as hours');
+    eq(r.data.circle.hours.mine.next.hours, 50, 'the next rung is Hall’s fifty hours');
+    eq(r.data.circle.hours.mine.next.label, 'casual friends', 'which is where casual friendship starts');
+
+    const back = (d) => store.db.prepare('UPDATE circles SET ready_at = ? WHERE id = ?')
+      .run(Date.now() - d * 86400000, cid);
+
+    // ---- the ceiling: Ramirez & Zhang, late switches go worse ----
+    back(15);
+    r = await kit('GET', '/api/circles/' + cid);
+    eq(r.data.circle.drift.stage, 'nudge', 'a fortnight ready and unmet is a nudge');
+    eq(r.data.circle.drift.days, 15, 'and it says how long it has been');
+    eq(r.data.circle.drift.metBefore, false, 'this circle has never met');
+
+    back(30);
+    r = await kit('GET', '/api/circles/' + cid);
+    eq(r.data.circle.drift.stage, 'drifting', 'a month ready and unmet is drifting');
+
+    // The one place the app refuses to help you keep talking.
+    r = await kit('POST', '/api/circles/' + cid + '/prompt');
+    eq(r.status, 409, 'a drifting circle cannot post another icebreaker');
+    ok(/propose something/.test(r.data.error), 'it says what to do instead');
+
+    // ---- a date in the diary stops the clock ----
+    eq((await kit('POST', '/api/circles/' + cid + '/meetups',
+      { title: 'Sunday walk', place: 'Barton Springs gate' })).status, 400,
+      'a plan without a time is refused');
+
+    r = await kit('POST', '/api/circles/' + cid + '/meetups', {
+      title: 'Sunday walk and a coffee', place: 'Barton Springs gate',
+      startsAt: Date.now() + 3 * 86400000, cadence: 'weekly', hours: 2
+    });
+    eq(r.status, 201, 'a dated proposal is accepted');
+    eq(r.data.cadence, 'weekly', 'and can repeat');
+    const mid = (await kit('GET', '/api/circles/' + cid)).data.meetups[0].id;
+    await lou('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes' });
+
+    r = await kit('GET', '/api/circles/' + cid);
+    eq(r.data.meetups[0].status, 'on', 'quorum confirms it');
+    eq(r.data.circle.drift.stage, 'planned', 'and the clock stops while something is in the diary');
+    eq((await lou('POST', '/api/circles/' + cid + '/prompt')).status, 201,
+       'with a plan booked, prompts are fine again');
+
+    // ---- a recurring meetup rolls itself forward ----
+    const was = store.meetupById(mid).starts_at;
+    store.db.prepare('UPDATE meetups SET starts_at = ? WHERE id = ?')
+      .run(Date.now() - 2 * 86400000, mid);
+    r = await kit('GET', '/api/circles/' + cid);
+    eq(r.data.occurrences.length, 1, 'once its time passes it is filed in the ledger');
+    eq(r.data.meetups.length, 1, 'and the series is still live');
+    ok(r.data.meetups[0].startsAt > Date.now(), 'rolled on to its next date');
+    eq(r.data.meetups[0].yes, 0, 'with the RSVPs cleared — you say yes to each one');
+    eq(r.data.circle.met, 1, 'the circle has met once');
+    ok(r.data.circle.drift.metBefore, 'which the clock now measures from');
+    ok(was > 0, 'the original date was real');
+
+    // ---- hours are banked by turning up, not by saying you would ----
+    eq(r.data.circle.hours.mine.hours, 0, 'an RSVP alone banks nothing');
+    eq(r.data.confirm.length, 1, 'everyone is asked whether they were actually there');
+    const occ = r.data.confirm[0].id;
+
+    eq((await client()('POST', '/api/occurrences/' + occ + '/attended', { attended: true })).status, 401,
+       'a stranger cannot log attendance');
+    r = await kit('POST', '/api/occurrences/' + occ + '/attended', { attended: true });
+    eq(r.status, 200, 'a member can say they were there');
+    eq(r.data.hours.hours, 2, 'which banks the hours');
+    eq(r.data.circleHours, 0, 'but one person turning up is not the circle meeting');
+
+    await lou('POST', '/api/occurrences/' + occ + '/attended', { attended: true });
+    await max('POST', '/api/occurrences/' + occ + '/attended', { attended: false });
+    r = await kit('GET', '/api/circles/' + cid);
+    eq(r.data.circle.hours.circle, 2, 'two people confirming makes it the circle’s hours');
+    eq(r.data.confirm.length, 0, 'and the question stops being asked');
+    eq(r.data.members.filter((m) => m.display === 'Max')[0].hours, 0,
+       'someone who missed it banks nothing');
+    eq(r.data.circle.hours.mine.next.hours, 50, 'two hours of fifty');
+
+    // ---- a one-off finishes rather than repeating ----
+    r = await lou('POST', '/api/circles/' + cid + '/meetups', {
+      title: 'One-off gallery thing', place: 'Blanton steps',
+      startsAt: Date.now() + 86400000, cadence: '', hours: 1
+    });
+    const oneOff = r.data.id;
+    await kit('POST', '/api/meetups/' + oneOff + '/rsvp', { answer: 'yes' });
+    store.db.prepare('UPDATE meetups SET starts_at = ? WHERE id = ?')
+      .run(Date.now() - 86400000, oneOff);
+    r = await kit('GET', '/api/circles/' + cid);
+    eq(store.meetupById(oneOff).status, 'done', 'a one-off is done once it has happened');
+    ok(!r.data.meetups.some((k) => k.id === oneOff), 'and drops out of the live list');
+    eq(r.data.occurrences.length, 2, 'while staying in the history');
+  });
+
   await group('production readiness', async () => {
     const r = await fetch(base + '/api/health');
     eq(r.status, 200, 'health check answers');

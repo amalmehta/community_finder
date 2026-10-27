@@ -813,3 +813,15 @@ main:focus { outline: none; }
 }
 
 .strip { margin-top: var(--s7); padding-top: var(--s2); border-top: 1px solid var(--line); }
+
+/* The ceiling on the chat phase, and the hours ledger under it. */
+.notice.drift { border-left-color: var(--accent); }
+.notice.drift .hint { margin: var(--s2) 0 0; color: var(--ink-soft); }
+.notice.drift.bad b { color: var(--accent-ink); }
+
+.hours { margin-top: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--line); }
+.hours .hint { margin: var(--s1) 0 0; color: var(--ink-faint); font-size: var(--t-small); }
+.hours .quorum { margin: var(--s2) 0 var(--s2); }
+
+.meetup.past { opacity: .72; }
+.meetup.past h4 { font-size: var(--t-body); font-weight: 600; }

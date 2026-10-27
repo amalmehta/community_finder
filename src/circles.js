@@ -72,6 +72,70 @@
     });
   }
 
+  function hoursText(n) {
+    var h = Math.round(n * 10) / 10;
+    return (h === Math.round(h) ? String(h) : h.toFixed(1)) + (h === 1 ? ' hour' : ' hours');
+  }
+
+  function days(n) { return n + (n === 1 ? ' day' : ' days'); }
+
+  /* The ceiling on the chat phase.
+   *
+   * Ramirez & Zhang (2007) found that partners who moved from online to
+   * face-to-face early did better, and that those who left it late did worse
+   * than partners who never met at all. A circle that has been able to meet
+   * for weeks and has not is not getting to know each other — it is avoiding,
+   * and this is the one place the app says so. */
+  function driftBlock(c) {
+    var d = c.drift;
+    if (!d || d.stage === 'none' || d.stage === 'ok') return null;
+
+    if (d.stage === 'planned') {
+      return el('div', { class: 'notice' }, [
+        el('b', { text: 'Something is in the diary. ' }),
+        whenText(d.next) + '.' + (d.metBefore ? '' : ' First time for this circle.')
+      ]);
+    }
+    var drifting = d.stage === 'drifting';
+    return el('div', { class: 'notice drift' + (drifting ? ' bad' : '') }, [
+      el('b', { text: drifting ? 'This circle is avoiding it. ' : 'Time to meet. ' }),
+      d.metBefore
+        ? 'It has been ' + days(d.days) + ' since you last did anything together.'
+        : 'You have been able to meet for ' + days(d.days) + ' and have not.',
+      el('p', { class: 'hint', text: drifting
+        ? 'Groups that talk online for a long time and then meet do worse than groups that meet early — and worse than groups that never meet at all. The conversation has done its job. Propose something small.'
+        : 'The research is unkind about long online-only runs: the longer the wait, the worse the first meeting tends to go. Something short and local is enough.' })
+    ]);
+  }
+
+  /* Hours, not messages.
+   *
+   * Hall (2018): about 50 hours together to a casual friend, 90 to a friend,
+   * 200+ to a close friend. Only time people confirm they actually spent
+   * together counts — a circle with four hundred messages and no hours should
+   * be able to see that about itself. */
+  function hoursBlock(c) {
+    var mine = c.hours.mine;
+    var next = mine.next;
+    var pct = next ? Math.min(100, Math.round(mine.hours / next.hours * 100)) : 100;
+    return el('div', { class: 'hours' }, [
+      el('div', { class: 'ready-head' }, [
+        el('b', { text: 'Hours together' }),
+        el('span', { class: 'badge', text: 'you: ' + hoursText(mine.hours) })
+      ]),
+      el('div', { class: 'quorum' }, [
+        el('div', { class: 'quorum-fill', style: 'width:' + pct + '%' })
+      ]),
+      el('p', { class: 'hint', text: next
+        ? hoursText(next.hours) + ' is roughly where people become ' + next.label + '.'
+          + (mine.reached ? ' You are past ' + mine.reached.label + '.' : '')
+        : 'Past 200 hours — close friends, by the numbers.' }),
+      el('p', { class: 'hint', text: c.met
+        ? 'The circle has ' + hoursText(c.hours.circle) + ' between it, across ' + c.met + (c.met === 1 ? ' meetup' : ' meetups') + '.'
+        : 'None yet. Messages do not count towards this, which is the point.' })
+    ]);
+  }
+
   function loading(text) {
     return el('div', { class: 'card loading' }, [
       el('span', { class: 'spinner', 'aria-hidden': 'true' }),
@@ -176,7 +240,9 @@
       el('p', { class: 'where', text: c.city + ' · ' + liveLine(c) + (c.myRole === 'host' ? ' · you host' : '') }),
       interestBadges(c.interests, c.overlapIds),
       readinessBlock(c.readiness, { quiet: true }),
-      c.stale ? el('p', { class: 'hint nudge', text: 'Nobody has said anything for a while. Open it and post a prompt.' }) : null
+      driftBlock(c),
+      c.stale && (!c.drift || c.drift.stage === 'none' || c.drift.stage === 'ok')
+        ? el('p', { class: 'hint nudge', text: 'Nobody has said anything for a while. Open it and post a prompt.' }) : null
     ]);
   }
 
@@ -428,7 +494,9 @@
     host.appendChild(el('article', { class: 'card' }, [
       el('p', { class: 'blurb', text: c.blurb }),
       interestBadges(c.interests, c.overlapIds),
-      readinessBlock(c.readiness, {})
+      c.myRole ? driftBlock(c) : null,
+      readinessBlock(c.readiness, {}),
+      c.myRole && c.readiness.ready ? hoursBlock(c) : null
     ]));
 
     if (!c.myRole) {
@@ -444,11 +512,35 @@
       return;
     }
 
+    if (d.confirm && d.confirm.length) confirmCard(host, c, d.confirm);
     chatCard(host, c);
-    meetupCard(host, c, d.meetups);
+    meetupCard(host, c, d.meetups, d.occurrences, d.cadences);
     if (d.applications && d.applications.length) applicationsCard(host, c, d.applications);
     membersCard(host, c, d.members);
     hostTools(host, c);
+  }
+
+  function confirmCard(host, c, list) {
+    var err = errLine();
+    host.appendChild(el('article', { class: 'card' }, [
+      el('h3', { text: list.length === 1 ? 'Were you there?' : 'Were you at these?' }),
+      el('p', { class: 'hint', text: 'An RSVP is an intention. This is the record, and it is the only thing that adds to your hours.' }),
+      err
+    ].concat(list.map(function (o) {
+      function mark(yes, text, ghost) {
+        return el('button', { class: 'btn sm' + (ghost ? ' ghost' : ''), type: 'button', onclick: async function (ev) {
+          err.hidden = true;
+          ev.currentTarget.disabled = true;
+          try { await api('POST', '/api/occurrences/' + o.id + '/attended', { attended: yes }); openCircle(c.id); }
+          catch (e) { showErr(err, e); ev.currentTarget.disabled = false; }
+        } }, [text]);
+      }
+      return el('div', { class: 'meetup' }, [
+        el('h4', { text: o.title }),
+        el('p', { class: 'where', text: whenText(o.startsAt) + ' · ' + hoursText(o.hours) }),
+        el('div', { class: 'actions' }, [mark(true, 'I was there'), mark(false, 'I missed it', true)])
+      ]);
+    }))));
   }
 
   // ---------- chat ----------
@@ -563,7 +655,7 @@
     ]);
   }
 
-  function meetupCard(host, c, meetups) {
+  function meetupCard(host, c, meetups, occurrences, cadences) {
     var body = [el('h3', { text: 'Doing something' })];
 
     if (!c.readiness.ready) {
@@ -590,7 +682,13 @@
           el('h4', { text: k.title }),
           el('span', { class: 'badge' + (k.status === 'on' ? ' hit' : ''), text: k.status === 'on' ? 'It is on' : k.yes + ' of ' + k.quorum })
         ]),
-        el('p', { class: 'where', text: k.place + ' · ' + whenText(k.startsAt) + ' · proposed by ' + k.proposer }),
+        el('p', { class: 'where', text: [
+          k.place,
+          (k.recurring ? 'next ' : '') + whenText(k.startsAt),
+          hoursText(k.hours),
+          k.recurring ? k.cadenceLabel.toLowerCase() : 'one-off',
+          'proposed by ' + k.proposer
+        ].join(' · ') }),
         k.details ? el('p', { class: 'blurb', text: k.details }) : null,
         k.org ? el('p', { class: 'hint' }, [
           'Anchored to ',
@@ -598,6 +696,9 @@
         ]) : null,
         bar,
         el('p', { class: 'hint', text: k.going.length ? 'Going: ' + k.going.join(', ') : 'Nobody has said yes yet.' }),
+        k.recurring
+          ? el('p', { class: 'hint', text: 'Repeats ' + k.cadenceLabel.toLowerCase() + '. You say yes or no to each one as it comes round.' })
+          : el('p', { class: 'hint', text: 'One-off. Seeing the same people again is what turns a nice evening into a friendship, so a repeating one is usually worth more.' }),
         err,
         el('div', { class: 'actions' }, [
           rsvpBtn('yes', 'Yes'), rsvpBtn('maybe', 'Maybe'), rsvpBtn('no', 'No'),
@@ -617,23 +718,41 @@
       body.push(el('div', { class: 'actions' }, [
         el('button', { class: 'btn sm', type: 'button', onclick: function (ev) {
           ev.currentTarget.hidden = true;
-          slot.appendChild(proposeForm(c));
+          slot.appendChild(proposeForm(c, cadences));
         } }, ['Propose something'])
       ]));
       body.push(slot);
     } else if (!meetups || !meetups.length) {
-      body.push(el('p', { class: 'hint', text: 'When the circle is ready, anyone here can propose a thing to do. It only happens once enough of you say yes — never because one person pushed.' }));
+      body.push(el('p', { class: 'hint', text: 'When the circle is ready, anyone here can propose a thing to do. It only happens once enough of you say yes — never because one person pushed. Repeating beats one-off: fifty-odd hours together is what a friendship costs.' }));
+    }
+
+    if (occurrences && occurrences.length) {
+      body.push(el('div', { class: 'results-head sub' }, [el('h2', { text: 'What you have done' })]));
+      occurrences.forEach(function (o) {
+        body.push(el('div', { class: 'meetup past' }, [
+          el('h4', { text: o.title }),
+          el('p', { class: 'where', text: [whenText(o.startsAt), hoursText(o.hours),
+            o.attended + (o.attended === 1 ? ' person' : ' people') + ' confirmed'].join(' · ') })
+        ]));
+      });
     }
 
     host.appendChild(el('article', { class: 'card' }, body));
   }
 
-  function proposeForm(c) {
+  function proposeForm(c, cadences) {
     var orgs = orgSuggestions(c);
     var title = el('input', { type: 'text', maxlength: '120', placeholder: 'e.g. Sunday morning walk, then coffee' });
     var place = el('input', { type: 'text', maxlength: '160', placeholder: 'A public place — café, park entrance, the venue' });
-    var when = el('input', { type: 'datetime-local' });
+    var when = el('input', { type: 'datetime-local', required: true });
     var details = el('textarea', { rows: '2', maxlength: '600', placeholder: 'Anything else worth knowing (optional)' });
+    var hours = el('input', { type: 'number', min: '0.5', max: '12', step: '0.5', value: '2' });
+    // Repeating is the default on purpose. One-offs are how you have a nice
+    // evening with people you never see again.
+    var order = ['fortnightly', 'weekly', 'monthly', ''];
+    var cadence = el('select', {}, order.map(function (k) {
+      return el('option', { value: k, text: (cadences && cadences[k] ? cadences[k].label : k) || 'Just the once' });
+    }));
     var pick = el('select', {}, [el('option', { value: '', text: 'Nothing in particular' })].concat(
       orgs.map(function (o) { return el('option', { value: o.id, text: o.name + ' — ' + (o.neighborhood || c.city) }); })
     ));
@@ -657,6 +776,16 @@
       el('label', { class: 'field' }, [el('span', { text: 'What you would do' }), title]),
       el('label', { class: 'field' }, [el('span', { text: 'Where' }), place]),
       el('label', { class: 'field' }, [el('span', { text: 'When' }), when]),
+      el('div', { class: 'row2' }, [
+        el('label', { class: 'field' }, [
+          el('span', { text: 'How often' }), cadence,
+          el('p', { class: 'hint', text: 'Seeing the same people repeatedly is what builds a friendship — roughly fifty hours of it. One evening builds nothing.' })
+        ]),
+        el('label', { class: 'field' }, [
+          el('span', { text: 'Roughly how long' }), hours,
+          el('p', { class: 'hint', text: 'Hours, and what counts towards the circle\u2019s total.' })
+        ])
+      ]),
       el('label', { class: 'field' }, [el('span', { text: 'Details' }), details]),
       err,
       el('div', { class: 'actions' }, [
@@ -668,6 +797,7 @@
           try {
             await api('POST', '/api/circles/' + c.id + '/meetups', {
               title: title.value, place: place.value, details: details.value,
+              cadence: cadence.value, hours: Number(hours.value),
               startsAt: when.value ? new Date(when.value).getTime() : null,
               orgId: o ? o.id : '', orgName: o ? o.name : '', orgUrl: o ? (o.firstStep && o.firstStep.url) || o.url : ''
             });
@@ -729,7 +859,8 @@
         ]),
         p.bio ? el('p', { class: 'blurb', text: p.bio }) : null,
         el('p', { class: 'where', text: [p.city, p.verified ? 'verified' : 'unverified',
-          p.vouches === 1 ? '1 vouch' : p.vouches + ' vouches', 'joined ' + ago(p.joinedAt)].join(' · ') }),
+          p.vouches === 1 ? '1 vouch' : p.vouches + ' vouches',
+          hoursText(p.hours) + ' together', 'joined ' + ago(p.joinedAt)].join(' · ') }),
         err,
         el('div', { class: 'actions' }, [
           p.iVouched ? el('span', { class: 'badge hit', text: 'You vouch for them' })

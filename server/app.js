@@ -105,6 +105,51 @@ function quorumFor(members) {
   return Math.min(members, Math.max(2, Math.ceil(members / 3)));
 }
 
+// The gate above is a floor. This is the ceiling, and it exists because of
+// Ramirez & Zhang (2007): partners who switched from online to face-to-face
+// *early* had better relational outcomes, while those who switched late had
+// worse outcomes than partners who never met at all. Walther's hyperpersonal
+// model gives the mechanism — text-only invites both sides to idealise, and a
+// meeting months later has to survive that idealisation.
+//
+// So a circle that has been able to meet for weeks and has not is avoiding,
+// and the honest thing is to say so rather than keep congratulating it on its
+// conversation. The clock runs from whichever is later: becoming ready, or
+// the last time the circle actually did something.
+const DRIFT_RULE = { nudgeDays: 14, driftDays: 28 };
+
+// Hall (2018): roughly 50 hours of time together to reach a casual friend, 90
+// to a friend, 200+ to a close friend — and leisure hours count while hours
+// spent working alongside someone do not. Messages are not hours. The ledger
+// counts only time people confirm they actually spent together.
+const HALL = [
+  { hours: 50, label: 'casual friends' },
+  { hours: 90, label: 'friends' },
+  { hours: 200, label: 'close friends' }
+];
+
+// Adams's conditions for close friendship are proximity, *repeated* unplanned
+// interaction, and somewhere safe enough to confide. A one-off meetup fails
+// the middle one, which is the real defect in dinner-with-strangers apps: you
+// never see those people again, so no hours ever accumulate.
+const CADENCES = {
+  '': { label: 'Just the once', days: 0 },
+  weekly: { label: 'Every week', days: 7 },
+  fortnightly: { label: 'Every two weeks', days: 14 },
+  monthly: { label: 'Every four weeks', days: 28 }
+};
+
+/** Where someone is on Hall's ladder, and what the next rung is. */
+function hallLadder(hours) {
+  const h = Math.round(hours * 10) / 10;
+  return {
+    hours: h,
+    rungs: HALL,
+    reached: HALL.filter((r) => h >= r.hours).slice(-1)[0] || null,
+    next: HALL.filter((r) => h < r.hours)[0] || null
+  };
+}
+
 // ---------------------------------------------------------------- helpers
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -233,11 +278,13 @@ const DEFAULT_LIMITS = {
 const VERSION = require('../package.json').version;
 
 function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure = false,
-                    limits = {}, mailer = null, baseUrl = null, log = null, ready = {} } = {}) {
+                    limits = {}, mailer = null, baseUrl = null, log = null, ready = {},
+                    drift = {} } = {}) {
   const L = Object.assign({}, DEFAULT_LIMITS, limits);
   // Tests run a circle's whole life in a few milliseconds, so the "separate
   // days" part of the gate has to be adjustable. Nothing else overrides it.
   const R = Object.assign({}, READY_RULE, ready);
+  const D = Object.assign({}, DRIFT_RULE, drift);
   SECURE_MODE = !!secure;
   const store = createStore(open(file));
   const mail = mailer || createMailer();
@@ -597,6 +644,34 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
   // ------------------------------------------------------------------ circles
   const norm = (x) => String(x || '').trim().toLowerCase();
 
+  /** Close the books on any confirmed meetup whose time has come and gone:
+   *  file it in the ledger, then either roll a recurring one on to its next
+   *  date or mark a one-off done. Lazy — it runs when a circle is looked at. */
+  function rollCircle(circleId) {
+    store.dueMeetups(circleId).forEach((m) => {
+      store.recordOccurrence(m);
+      const days = (CADENCES[m.cadence] || CADENCES['']).days;
+      if (!days) return store.rollMeetup(m.id, null);
+      let next = m.starts_at;
+      while (next <= Date.now()) next += days * DAY;
+      store.rollMeetup(m.id, next);
+    });
+  }
+
+  /** How long this circle has been able to meet without doing so. */
+  function driftOf(c, isReady) {
+    const lastMet = store.lastMetAt(c.id);
+    const next = store.nextPlanned(c.id);
+    const from = Math.max(c.ready_at || 0, lastMet || 0);
+    const base = { lastMet, next, metBefore: !!lastMet, nudgeDays: D.nudgeDays, driftDays: D.driftDays };
+
+    if (!isReady || !from) return Object.assign({ stage: 'none', days: 0 }, base);
+    if (next) return Object.assign({ stage: 'planned', days: 0 }, base);
+    const days = Math.floor((Date.now() - from) / DAY);
+    const stage = days >= D.driftDays ? 'drifting' : days >= D.nudgeDays ? 'nudge' : 'ok';
+    return Object.assign({ stage, days }, base);
+  }
+
   /** Everything the UI needs about one circle, from this person's angle. */
   function viewCircle(c, u, trust) {
     const stats = store.circleStats(c.id);
@@ -623,6 +698,14 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
       apply = { ok: true, waitlist: true, why: 'Full right now — you would join the waiting list.' };
     }
 
+    // The first time a circle could have met, note when that was: the drift
+    // clock runs from here.
+    const rd = readiness(stats, R);
+    if (rd.ready && !c.ready_at) {
+      store.markReady(c.id);
+      c.ready_at = Date.now();
+    }
+
     return {
       id: c.id, name: c.name, city: c.city, blurb: c.blurb, question: c.question,
       hostId: c.host_id, hostName: c.host_name || (store.userById(c.host_id) || {}).display || null,
@@ -635,7 +718,14 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
         speakers: stats.weekSpeakers, lastAt: stats.lastAt
       },
       stale: !!(mem && (!stats.lastAt || Date.now() - stats.lastAt > 6 * DAY)),
-      readiness: readiness(stats, R),
+      readiness: rd,
+      readyAt: c.ready_at || null,
+      drift: driftOf(c, rd.ready),
+      met: store.metCount(c.id),
+      hours: {
+        mine: hallLadder(store.hoursOf(u.id, c.id)),
+        circle: Math.round(store.circleHours(c.id) * 10) / 10
+      },
       myRole: mem ? mem.role : null,
       myApplication: app ? { id: app.id, status: app.status, at: app.created_at } : null,
       pending: c.pending === undefined ? undefined : c.pending,
@@ -674,7 +764,8 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     const override = String(url.searchParams.get('interests') || '').split(',').filter(Boolean);
 
     const rows = store.listCircles(u.id, {});
-    let views = rows.map((c) => viewCircle(c, u, trust));
+    rows.forEach((c) => { if (store.memberOf(c.id, u.id)) rollCircle(c.id); });
+    let views = store.listCircles(u.id, {}).map((c) => viewCircle(c, u, trust));
     const city = url.searchParams.get('city');
     if (city) views = views.filter((v) => norm(v.city) === norm(city) || v.myRole);
 
@@ -683,7 +774,7 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
 
     send(res, 200, {
       mine, circles: open, trust, rule: R, capRange: CAP_RANGE,
-      trustLabels: TRUST_LABELS, prompts: PROMPTS.length,
+      trustLabels: TRUST_LABELS, prompts: PROMPTS.length, hall: HALL, cadences: CADENCES,
       me: { id: u.id, city: u.city, display: u.display }
     });
   });
@@ -723,20 +814,29 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
   route('GET', /^\/api\/circles\/(\d+)$/, async (req, res, m) => {
     const u = currentUser(req);
     if (!u) return fail(res, 401, 'Sign in first.');
-    const c = store.circleById(Number(m[1]));
+    let c = store.circleById(Number(m[1]));
     if (!c) return fail(res, 404, 'No such circle.');
+    if (store.memberOf(c.id, u.id)) {
+      rollCircle(c.id);
+      c = store.circleById(c.id);
+    }
     const trust = trustOf(u, store);
     const v = viewCircle(c, u, trust);
     const mem = !!v.myRole;
 
     // A non-member sees the shopfront: what it is, how busy, what it will ask
     // them. Never the conversation, and never who is in it.
-    if (!mem) return send(res, 200, { circle: v, trust, rule: R, members: null, meetups: [], safety: globalThis.FYC.MEETUP_SAFETY });
+    if (!mem) {
+      return send(res, 200, {
+        circle: v, trust, rule: R, members: null, meetups: [], occurrences: [], confirm: [],
+        cadences: CADENCES, hall: HALL, safety: globalThis.FYC.MEETUP_SAFETY
+      });
+    }
 
     const members = store.circleMembers(c.id).map((p) => ({
       id: p.id, display: p.display, city: p.city, bio: p.bio,
       role: p.role, joinedAt: p.joined_at, said: p.said, vouches: p.vouches,
-      verified: !!p.email_verified,
+      verified: !!p.email_verified, hours: Math.round(store.hoursOf(p.id, c.id) * 10) / 10,
       iVouched: store.hasVouched(c.id, u.id, p.id),
       canVouch: p.id !== u.id && p.said > 0 && !store.hasVouched(c.id, u.id, p.id)
     }));
@@ -747,6 +847,8 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
         id: k.id, title: k.title, place: k.place, startsAt: k.starts_at, details: k.details,
         org: k.org_name ? { id: k.org_id, name: k.org_name, url: k.org_url } : null,
         quorum: k.quorum, yes: k.yes, maybe: k.maybe, status: k.status,
+        cadence: k.cadence || '', cadenceLabel: (CADENCES[k.cadence] || CADENCES['']).label,
+        hours: k.hours, recurring: !!k.cadence,
         proposer: k.proposer_name, proposerId: k.proposer_id,
         myRsvp: mineR ? mineR.answer : null,
         going: rsvps.filter((r) => r.answer === 'yes').map((r) => r.display)
@@ -755,6 +857,15 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
 
     send(res, 200, {
       circle: v, trust, rule: R, members, meetups,
+      cadences: CADENCES, hall: HALL,
+      // What has already happened, and anything this person has not yet said
+      // whether they turned up to. Hours are only banked on a yes here.
+      occurrences: store.occurrencesFor(c.id, 10).map((o) => ({
+        id: o.id, title: o.title, startsAt: o.starts_at, hours: o.hours, attended: o.attended
+      })),
+      confirm: store.unconfirmedFor(c.id, u.id).map((o) => ({
+        id: o.id, title: o.title, startsAt: o.starts_at, hours: o.hours
+      })),
       safety: globalThis.FYC.MEETUP_SAFETY,
       applications: v.myRole === 'host' || members.length > 2 ? store.applicationsFor(c.id).map((a) => ({
         id: a.id, display: a.display, city: a.city, bio: a.bio, answer: a.answer,
@@ -921,6 +1032,14 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
   route('POST', /^\/api\/circles\/(\d+)\/prompt$/, async (req, res, m) => {
     const got = requireMember(req, res, Number(m[1]));
     if (!got) return;
+    // Posting another question to a circle that has been able to meet for a
+    // month is the avoidance, not the cure. This is the one place the app
+    // refuses to help you keep talking — and it is checked before the rate
+    // limit, because "wait twelve hours" is the wrong thing to be told here.
+    const dr = driftOf(got.c, readiness(store.circleStats(got.c.id), R).ready);
+    if (dr.stage === 'drifting') {
+      return fail(res, 409, `This circle has been ready to meet for ${dr.days} days. Another question is not what it needs — propose something.`);
+    }
     if (Date.now() - store.lastPromptAt(got.c.id) < 12 * HOUR) {
       return fail(res, 429, 'One prompt every twelve hours. Let the last one breathe.');
     }
@@ -962,20 +1081,24 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     const title = String(body.title || '').trim();
     const place = String(body.place || '').trim();
     const startsAt = Number(body.startsAt) || null;
+    const cadence = Object.prototype.hasOwnProperty.call(CADENCES, body.cadence || '') ? (body.cadence || '') : '';
+    const hours = Math.min(12, Math.max(0.5, Number(body.hours) || 2));
     if (title.length < 4) return fail(res, 400, 'Say what you would do.');
     if (place.length < 3) return fail(res, 400, 'Name a public place to meet.');
-    if (startsAt && startsAt < Date.now() - HOUR) return fail(res, 400, 'Pick a time that has not happened yet.');
+    if (!startsAt) return fail(res, 400, 'Pick a date and time — a plan without one is a wish.');
+    if (startsAt < Date.now() - HOUR) return fail(res, 400, 'Pick a time that has not happened yet.');
 
     const id = store.createMeetup({
       circleId: got.c.id, proposerId: got.u.id, title, place, startsAt,
       details: String(body.details || ''),
       orgId: body.orgId, orgName: body.orgName, orgUrl: body.orgUrl,
-      quorum: quorumFor(stats.members)
+      quorum: quorumFor(stats.members), cadence, hours
     });
     store.note('u:' + got.u.id, 'meetup');
+    const repeats = cadence ? ` ${CADENCES[cadence].label.toLowerCase()}` : '';
     store.addCircleMessage(got.c.id, null,
-      `${got.u.display} proposed: ${title} — ${place}. It is on once ${quorumFor(stats.members)} of you say yes.`, 'system');
-    send(res, 201, { id, quorum: quorumFor(stats.members) });
+      `${got.u.display} proposed: ${title} — ${place}${repeats}. It is on once ${quorumFor(stats.members)} of you say yes.`, 'system');
+    send(res, 201, { id, quorum: quorumFor(stats.members), cadence, hours });
   });
 
   route('POST', /^\/api\/meetups\/(\d+)\/rsvp$/, async (req, res, m) => {
@@ -1010,6 +1133,23 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     store.cancelMeetup(k.id);
     store.addCircleMessage(k.circle_id, null, `${k.title} is off.`, 'system');
     send(res, 200, { ok: true });
+  });
+
+  /** Hours only count when someone says they were actually there. An RSVP is
+   *  an intention; this is the record. */
+  route('POST', /^\/api\/occurrences\/(\d+)\/attended$/, async (req, res, m) => {
+    const u = currentUser(req);
+    if (!u) return fail(res, 401, 'Sign in first.');
+    const o = store.occurrenceById(Number(m[1]));
+    if (!o) return fail(res, 404, 'No such meetup.');
+    if (!store.memberOf(o.circle_id, u.id)) return fail(res, 403, 'Members only.');
+    if (Date.now() - o.starts_at > 30 * DAY) return fail(res, 409, 'Too long ago to log.');
+    const body = await readJson(req);
+    store.setAttendance(o.id, u.id, body.attended !== false);
+    send(res, 200, {
+      hours: hallLadder(store.hoursOf(u.id, o.circle_id)),
+      circleHours: Math.round(store.circleHours(o.circle_id) * 10) / 10
+    });
   });
 
   // One call for every badge in the header.

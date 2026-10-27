@@ -97,6 +97,36 @@ meetup until the circle has had a real conversation:
 all four are met. The front end draws the same four as a checklist, so the gate
 is visible rather than a disabled button.
 
+**The ceiling** (`DRIFT_RULE`). The floor above stops cold meetings; this stops
+the opposite failure. Ramirez & Zhang (2007) found that late online-to-offline
+switches produce worse outcomes than never meeting at all. `circles.ready_at`
+is stamped the first time a circle passes the gate, and the clock runs from
+whichever is later, that or the last occurrence:
+
+| Days ready and unmet | `drift.stage` | What happens |
+|---|---|---|
+| a confirmed meetup is in the future | `planned` | clock stopped |
+| 0–13 | `ok` | nothing |
+| 14–27 | `nudge` | the circle is told it is time |
+| 28+ | `drifting` | named as avoidance, **and `POST /prompt` returns 409** |
+
+Refusing the icebreaker is deliberate: posting another question to a circle
+that has been able to meet for a month is the avoidance, not the cure. It is
+checked before the twelve-hour prompt limit, so the person gets the useful
+refusal rather than "wait twelve hours".
+
+**Hours, not messages** (`HALL`). Hall (2018): ~50 hours together to a casual
+friend, 90 to a friend, 200+ to a close friend. `meetup_occurrences` is the
+ledger and `attendance` is the record; hours are banked only when someone says
+they were there (`POST /api/occurrences/:id/attended`). An occurrence counts
+towards the *circle's* hours only once two people have confirmed, so one person
+claiming a meetup nobody attended does nothing.
+
+**Repeating** (`CADENCES`: weekly, fortnightly, monthly). A recurring meetup row
+is always the *next* occurrence. When its end time passes, `rollCircle` files an
+occurrence, clears the RSVPs and advances the date; a one-off becomes `done`
+instead. Rolling is lazy — it happens when a member looks at the circle.
+
 **A meetup is a proposal until a quorum says yes.** Quorum is
 `max(2, ceil(members / 3))`. Enough yes RSVPs flips it to `on` automatically; it
 never happens because one person pushed. A proposal can be anchored to a
@@ -132,6 +162,7 @@ POST   /api/circles/:id/vouch
 POST   /api/circles/:id/meetups          409 until the circle is ready
 POST   /api/meetups/:id/rsvp             yes | maybe | no; quorum confirms it
 POST   /api/meetups/:id/cancel           proposer or host
+POST   /api/occurrences/:id/attended     were you there? the only thing that banks hours
 GET    /api/unread                       every badge in the header, in one call
 ```
 
@@ -158,12 +189,14 @@ auth decision in the main README.
 node tests/run-server-tests.js
 ```
 
-179 assertions covering signup and sign-in, session isolation, interest
+218 assertions covering signup and sign-in, session isolation, interest
 visibility, the request/accept/message flow, outsiders being kept out of other
 people's threads, blocking, reporting, rate limits, the full circle lifecycle
 (trust tiers, written applications, member seconding, the readiness gate,
-quorum, vouching, caps and waitlists, host tools), and that the server will not
-serve its own source or escape the project directory.
+quorum, vouching, caps and waitlists, host tools), the drift clock and its
+refusal of icebreakers, the hours ledger, recurring meetups rolling forward,
+and that the server will not serve its own source or escape the project
+directory.
 
 The "two separate days" rung of the readiness gate is the one thing the tests
 relax, via `createApp({ ready: { minDays: 1 } })` — a circle's whole life

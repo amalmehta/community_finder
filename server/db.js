@@ -112,7 +112,11 @@ CREATE TABLE IF NOT EXISTS circles (
   cap         INTEGER NOT NULL DEFAULT 8, -- small by design; see CAP_RANGE
   min_trust   INTEGER NOT NULL DEFAULT 1, -- the trust tier needed to apply
   status      TEXT NOT NULL DEFAULT 'open',   -- open | closed
-  created_at  INTEGER NOT NULL
+  created_at  INTEGER NOT NULL,
+  -- Stamped the first time the circle passes the readiness gate. The drift
+  -- clock runs from here: a circle that has been able to meet for weeks and
+  -- has not is avoiding, not getting to know each other.
+  ready_at    INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS circle_interests (
@@ -177,9 +181,13 @@ CREATE TABLE IF NOT EXISTS meetups (
   org_name     TEXT NOT NULL DEFAULT '',
   org_url      TEXT NOT NULL DEFAULT '',
   quorum       INTEGER NOT NULL DEFAULT 3,
-  status       TEXT NOT NULL DEFAULT 'proposed',  -- proposed | on | cancelled
+  status       TEXT NOT NULL DEFAULT 'proposed',  -- proposed | on | done | cancelled
   created_at   INTEGER NOT NULL,
-  confirmed_at INTEGER
+  confirmed_at INTEGER,
+  -- A recurring row is the *next* occurrence: once one passes, it rolls
+  -- forward and the RSVPs reset. One-offs become 'done' instead.
+  cadence      TEXT NOT NULL DEFAULT '',   -- '' | weekly | fortnightly | monthly
+  hours        REAL NOT NULL DEFAULT 2
 );
 
 CREATE TABLE IF NOT EXISTS meetup_rsvps (
@@ -199,6 +207,31 @@ CREATE TABLE IF NOT EXISTS application_votes (
   PRIMARY KEY (app_id, user_id)
 );
 
+-- One row per occurrence that has actually come and gone. This is the ledger
+-- the hours are counted from: messages are not hours, and only hours predict
+-- friendship (Hall 2018).
+CREATE TABLE IF NOT EXISTS meetup_occurrences (
+  id         INTEGER PRIMARY KEY,
+  meetup_id  INTEGER NOT NULL REFERENCES meetups(id) ON DELETE CASCADE,
+  circle_id  INTEGER NOT NULL REFERENCES circles(id) ON DELETE CASCADE,
+  title      TEXT NOT NULL DEFAULT '',
+  starts_at  INTEGER NOT NULL,
+  hours      REAL NOT NULL DEFAULT 2,
+  created_at INTEGER NOT NULL
+);
+
+-- attended is NULL until the person says. Nobody is counted as present on the
+-- strength of an RSVP alone.
+CREATE TABLE IF NOT EXISTS attendance (
+  occurrence_id INTEGER NOT NULL REFERENCES meetup_occurrences(id) ON DELETE CASCADE,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  attended      INTEGER,
+  at            INTEGER NOT NULL,
+  PRIMARY KEY (occurrence_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_occ ON meetup_occurrences(circle_id, starts_at);
+CREATE INDEX IF NOT EXISTS idx_att ON attendance(user_id, attended);
 CREATE INDEX IF NOT EXISTS idx_cmsg ON circle_messages(circle_id, id);
 CREATE INDEX IF NOT EXISTS idx_cmem ON circle_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_cint ON circle_interests(interest);
@@ -212,7 +245,10 @@ const ADDED_COLUMNS = [
   ['users', 'open_to_direct', 'INTEGER NOT NULL DEFAULT 1'],
   ['users', 'suspended', 'INTEGER NOT NULL DEFAULT 0'],
   ['reports', 'resolved_at', 'INTEGER'],
-  ['reports', 'note', "TEXT NOT NULL DEFAULT ''"]
+  ['reports', 'note', "TEXT NOT NULL DEFAULT ''"],
+  ['circles', 'ready_at', 'INTEGER'],
+  ['meetups', 'cadence', "TEXT NOT NULL DEFAULT ''"],
+  ['meetups', 'hours', 'REAL NOT NULL DEFAULT 2']
 ];
 
 function migrate(db) {
@@ -662,13 +698,14 @@ function createStore(db) {
     createMeetup(m) {
       const info = q(`INSERT INTO meetups
           (circle_id, proposer_id, title, place, starts_at, details, org_id, org_name, org_url,
-           quorum, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+           quorum, created_at, cadence, hours)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(m.circleId, m.proposerId, String(m.title).slice(0, 120),
              String(m.place || '').slice(0, 160), m.startsAt || null,
              String(m.details || '').slice(0, 600),
              String(m.orgId || '').slice(0, 60), String(m.orgName || '').slice(0, 120),
-             String(m.orgUrl || '').slice(0, 300), m.quorum, now());
+             String(m.orgUrl || '').slice(0, 300), m.quorum, now(),
+             String(m.cadence || ''), Number(m.hours) || 2);
       const id = Number(info.lastInsertRowid);
       S.rsvp(id, m.proposerId, 'yes');
       return id;
@@ -681,7 +718,7 @@ function createStore(db) {
                        (SELECT COUNT(*) FROM meetup_rsvps r WHERE r.meetup_id = m.id AND r.answer = 'yes') AS yes,
                        (SELECT COUNT(*) FROM meetup_rsvps r WHERE r.meetup_id = m.id AND r.answer = 'maybe') AS maybe
                 FROM meetups m JOIN users u ON u.id = m.proposer_id
-                WHERE m.circle_id = ? AND m.status != 'cancelled'
+                WHERE m.circle_id = ? AND m.status IN ('proposed', 'on')
                 ORDER BY COALESCE(m.starts_at, m.created_at) ASC`).all(circleId);
     },
     rsvp(meetupId, userId, answer) {
@@ -705,13 +742,112 @@ function createStore(db) {
       q(`UPDATE meetups SET status = 'cancelled' WHERE id = ?`).run(id);
     },
 
+    // ---- the drift clock ----
+    /** Stamped once, the first time the circle could have met. */
+    markReady(circleId) {
+      q('UPDATE circles SET ready_at = ? WHERE id = ? AND ready_at IS NULL').run(now(), circleId);
+    },
+    /** When this circle last actually did something, planned or not. */
+    lastMetAt(circleId) {
+      const r = q('SELECT MAX(starts_at) AS at FROM meetup_occurrences WHERE circle_id = ?')
+        .get(circleId);
+      return r.at || null;
+    },
+    /** A confirmed thing still in the future. Having one means not drifting. */
+    nextPlanned(circleId) {
+      const r = q(`SELECT MIN(starts_at) AS at FROM meetups
+                   WHERE circle_id = ? AND status = 'on' AND starts_at > ?`)
+        .get(circleId, now());
+      return r.at || null;
+    },
+
+    // ---- occurrences ----
+    /** Confirmed meetups whose end time has passed and that need rolling. */
+    dueMeetups(circleId) {
+      return q(`SELECT * FROM meetups
+                WHERE circle_id = ? AND status = 'on' AND starts_at IS NOT NULL
+                  AND starts_at + (hours * 3600000) < ?`).all(circleId, now());
+    },
+    /** File an occurrence, and pencil in everyone who had said yes. */
+    recordOccurrence(m) {
+      const t = now();
+      const info = q(`INSERT INTO meetup_occurrences
+                        (meetup_id, circle_id, title, starts_at, hours, created_at)
+                      VALUES (?, ?, ?, ?, ?, ?)`)
+        .run(m.id, m.circle_id, m.title, m.starts_at, m.hours, t);
+      const id = Number(info.lastInsertRowid);
+      const ins = q('INSERT OR IGNORE INTO attendance (occurrence_id, user_id, attended, at) VALUES (?, ?, NULL, ?)');
+      q(`SELECT user_id FROM meetup_rsvps WHERE meetup_id = ? AND answer = 'yes'`)
+        .all(m.id).forEach((r) => ins.run(id, r.user_id, t));
+      return id;
+    },
+    /** Move a recurring meetup on to its next date; RSVPs start again. */
+    rollMeetup(id, nextStartsAt) {
+      if (nextStartsAt) {
+        q('UPDATE meetups SET starts_at = ? WHERE id = ?').run(nextStartsAt, id);
+        q('DELETE FROM meetup_rsvps WHERE meetup_id = ?').run(id);
+      } else {
+        q(`UPDATE meetups SET status = 'done' WHERE id = ?`).run(id);
+      }
+    },
+    occurrenceById(id) {
+      return q('SELECT * FROM meetup_occurrences WHERE id = ?').get(Number(id));
+    },
+    occurrencesFor(circleId, limit = 20) {
+      return q(`SELECT o.*,
+                       (SELECT COUNT(*) FROM attendance a
+                         WHERE a.occurrence_id = o.id AND a.attended = 1) AS attended
+                FROM meetup_occurrences o WHERE o.circle_id = ?
+                ORDER BY o.starts_at DESC LIMIT ?`).all(circleId, limit);
+    },
+    /** Occurrences this person has not said yes or no to yet. */
+    unconfirmedFor(circleId, userId, windowMs = 14 * 86400000) {
+      return q(`SELECT o.* FROM meetup_occurrences o
+                LEFT JOIN attendance a ON a.occurrence_id = o.id AND a.user_id = ?
+                WHERE o.circle_id = ? AND o.starts_at > ?
+                  AND (a.attended IS NULL)
+                ORDER BY o.starts_at DESC`)
+        .all(userId, circleId, now() - windowMs);
+    },
+    setAttendance(occurrenceId, userId, attended) {
+      q(`INSERT INTO attendance (occurrence_id, user_id, attended, at) VALUES (?, ?, ?, ?)
+         ON CONFLICT (occurrence_id, user_id)
+         DO UPDATE SET attended = excluded.attended, at = excluded.at`)
+        .run(occurrenceId, userId, attended ? 1 : 0, now());
+    },
+
+    // ---- hours (Hall 2018: hours together, not messages, make a friend) ----
+    /** Hours this person has banked in this circle, confirmed by them. */
+    hoursOf(userId, circleId) {
+      const r = q(`SELECT COALESCE(SUM(o.hours), 0) AS h
+                   FROM attendance a JOIN meetup_occurrences o ON o.id = a.occurrence_id
+                   WHERE a.user_id = ? AND a.attended = 1 AND o.circle_id = ?`)
+        .get(userId, circleId);
+      return r.h || 0;
+    },
+    /** Hours the circle has spent together: occurrences two or more turned up to. */
+    circleHours(circleId) {
+      const r = q(`SELECT COALESCE(SUM(o.hours), 0) AS h FROM meetup_occurrences o
+                   WHERE o.circle_id = ?
+                     AND (SELECT COUNT(*) FROM attendance a
+                           WHERE a.occurrence_id = o.id AND a.attended = 1) >= 2`)
+        .get(circleId);
+      return r.h || 0;
+    },
+    metCount(circleId) {
+      return q('SELECT COUNT(*) AS n FROM meetup_occurrences WHERE circle_id = ?').get(circleId).n;
+    },
+
     // ---- moderation over circles ----
     circleOverview() {
       return q(`SELECT c.id, c.name, c.city, c.status, u.username AS host,
                        (SELECT COUNT(*) FROM circle_members cm WHERE cm.circle_id = c.id) AS members,
                        (SELECT COUNT(*) FROM circle_messages m WHERE m.circle_id = c.id AND m.kind = 'chat') AS messages,
                        (SELECT MAX(created_at) FROM circle_messages m WHERE m.circle_id = c.id) AS last_at,
-                       (SELECT COUNT(*) FROM circle_applications a WHERE a.circle_id = c.id AND a.status = 'pending') AS pending
+                       (SELECT COUNT(*) FROM circle_applications a WHERE a.circle_id = c.id AND a.status = 'pending') AS pending,
+                       c.ready_at,
+                       (SELECT MAX(starts_at) FROM meetup_occurrences o WHERE o.circle_id = c.id) AS met_at,
+                       (SELECT COUNT(*) FROM meetup_occurrences o WHERE o.circle_id = c.id) AS met_count
                 FROM circles c JOIN users u ON u.id = c.host_id
                 ORDER BY c.created_at ASC`).all();
     },
