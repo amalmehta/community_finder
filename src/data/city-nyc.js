@@ -231,11 +231,11 @@
         neighborhood: 'Chelsea',
         blurb: 'Improv school and theater with a famously warm beginner level-one class, plus cheap shows most nights. Level one is 100% people who have never done it.',
         interests: ['theater', 'social'],
-        url: 'https://www.magnettheater.com/',
+        url: 'https://magnettheater.com/',
         firstStep: {
           kind: 'register',
           label: 'Sign up for a level-one class (or just see a cheap show first)',
-          url: 'https://www.magnettheater.com/classes/',
+          url: 'https://magnettheater.com/class/',
           when: 'Terms start regularly; shows most nights'
         },
         expect: [

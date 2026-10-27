@@ -84,7 +84,7 @@
         firstStep: {
           kind: 'visit',
           label: 'Come to a public open house or tour',
-          url: 'https://pumpingstationone.org/events/',
+          url: 'https://wiki.pumpingstationone.org/wiki/Events',
           when: 'Regular open nights — check the calendar'
         },
         expect: [
