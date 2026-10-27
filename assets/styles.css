@@ -844,3 +844,25 @@ main:focus { outline: none; }
 .hint.plan { color: var(--ink-soft); font-style: italic; }
 
 .member .badges { margin-top: var(--s1); }
+
+/* What a circle says it is: the lines its members wrote, and the history
+   behind them. And a question handed to the people who have gone quiet. */
+.card.story .where { margin-bottom: var(--s2); }
+.card.story .hint { color: var(--ink-faint); font-size: var(--t-small); }
+.card.story .field { margin-top: var(--s3); }
+.wants { list-style: none; margin: var(--s2) 0; padding: 0; }
+.wants li {
+  padding: var(--s2) 0 var(--s2) var(--s3); margin: 0;
+  border-left: 3px solid var(--moss-soft); font-family: var(--serif);
+  font-size: var(--t-lead); line-height: 1.5;
+}
+.wants li + li { margin-top: var(--s1); }
+.wants li b { font-family: var(--font); font-size: var(--t-small); color: var(--moss); }
+
+.prompt-to {
+  display: block; margin-top: var(--s2); font-size: var(--t-small);
+  color: var(--ink-soft); font-style: italic;
+}
+.msg.prompt.for-me { border-left-color: var(--accent); background: var(--accent-soft); }
+.msg.prompt.for-me .prompt-tag { color: var(--accent-ink); }
+.msg.prompt.for-me .prompt-to { color: var(--accent-ink); font-style: normal; font-weight: 600; }

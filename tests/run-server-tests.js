@@ -817,6 +817,204 @@ async function verifyEmail(call, email) {
     eq(r.data.meetups[0].yes, 0, 'so the next date is planned for on its own terms');
   });
 
+  await group('circles: turn-taking, the quiet, and what a circle is for', async () => {
+    const BIO = 'Moved here for a job and stayed for the hills. Good at starting things, historically bad at keeping them going.';
+    const INT = [{ id: 'outdoors' }, { id: 'food' }, { id: 'games' }];
+    const crew = {};
+    for (const [short, username] of Object.entries({
+      ada: 'adad', ben: 'bend', cal: 'cald', dee: 'deed', eve: 'eved', fay: 'fayd'
+    })) {
+      const c = client();
+      await c('POST', '/api/signup', {
+        username, password: 'hunter2hunter', display: short[0].toUpperCase() + short.slice(1),
+        city: 'Portland', bio: BIO, ageOk: true, interests: INT
+      });
+      await verifyEmail(c, username + '@example.com');
+      crew[short] = c;
+    }
+    const { ada, ben, cal, dee, eve, fay } = crew;
+
+    // ---- the cap came down ----
+    // Fay, Garrod & Carletta (2000): a discussion in a group of five stays a
+    // dialogue; the same discussion in a group of ten becomes serial
+    // monologue. Eight is the ceiling now, and asking for twelve gets eight.
+    let r = await ada('POST', '/api/circles', {
+      name: 'Hills and dinner, Southeast', city: 'Portland', blurb: BIO,
+      question: 'What is the last walk you did that you would do again?',
+      interests: ['outdoors', 'food'], cap: 12
+    });
+    const cid = r.data.circle.id;
+    eq(r.data.circle.cap, 8, 'a circle cannot be built for twelve people any more');
+    eq((await ada('GET', '/api/circles')).data.capRange.max, 8, 'and the ceiling is published');
+    eq((await ada('GET', '/api/circles')).data.capRange.default, 6, 'with six the default');
+
+    for (const who of [ben, cal, dee, eve, fay]) {
+      await who('POST', '/api/circles/' + cid + '/apply', {
+        answer: 'The Wildwood from the zoo end, in the rain, which is the only way I have ever done it. Would like company next time.'
+      });
+      const app = (await ada('GET', '/api/circles/' + cid)).data.applications[0];
+      await ada('POST', `/api/circles/${cid}/applications/${app.id}/approve`);
+    }
+    eq((await ada('GET', '/api/circles/' + cid)).data.circle.members, 6, 'six people in it');
+
+    // ---- turn-taking equality ----
+    // Woolley et al. (2010): collective intelligence tracked the equality of
+    // conversational turn-taking, not the brilliance of the members. One
+    // person writing the whole thing is a broadcast, and the old gate let it
+    // through.
+    const gate = async (who) => (await who('GET', '/api/circles/' + cid)).data.circle.readiness;
+    const check = (rd, id) => rd.checks.filter((c) => c.id === id)[0];
+
+    for (let i = 0; i < 22; i++) {
+      await ada('POST', '/api/circles/' + cid + '/messages', { body: 'Ada again, message ' + i });
+    }
+    let rd = await gate(ada);
+    eq(rd.of, 5, 'the gate has five parts now');
+    eq(check(rd, 'messages').have >= 20, true, 'twenty messages are there');
+    eq(check(rd, 'speakers').need, 4, 'and four of six people have to be talking');
+    eq(check(rd, 'balance').have, 100, 'one voice is all of it');
+    eq(check(rd, 'balance').max, 50, 'where half is the most anyone may be');
+    eq(rd.ready, false, 'so twenty-two messages from one person is not a conversation');
+
+    // Three people talking is still not four of six.
+    for (const who of [ben, cal]) {
+      await who('POST', '/api/circles/' + cid + '/messages', { body: 'Agreed, broadly.' });
+    }
+    rd = await gate(ada);
+    eq(check(rd, 'speakers').have, 3, 'three of them have spoken');
+    eq(rd.ready, false, 'which in a circle of six is still an audience');
+
+    await dee('POST', '/api/circles/' + cid + '/messages', { body: 'Me too, for what it is worth.' });
+    rd = await gate(ada);
+    ok(check(rd, 'speakers').have >= check(rd, 'speakers').need, 'four of six are talking');
+    eq(rd.ready, false, 'and it is the share, on its own, still holding the gate shut');
+    eq(rd.done, 4, 'four of the five parts met');
+    eq(check(rd, 'balance').have > 50, true, 'because one person is still most of it');
+
+    // Now everyone else talks enough that nobody is more than half.
+    for (let i = 0; i < 6; i++) {
+      for (const who of [ben, cal, dee, eve]) {
+        await who('POST', '/api/circles/' + cid + '/messages', { body: 'Something of my own to add, number ' + i });
+      }
+    }
+    rd = await gate(ada);
+    ok(check(rd, 'balance').have <= 50, 'nobody is more than half the conversation');
+    eq(rd.ready, true, 'and now the circle can plan something');
+
+    // ---- the question gets handed to whoever has gone quiet ----
+    // Preece, Nonnecke & Andrews (2004): people who read without posting
+    // mostly have not been asked anything. Fay is in this circle and has
+    // never said a word, which is exactly the case.
+    const backdate = (hours) => {
+      store.db.prepare('UPDATE circle_members SET joined_at = joined_at - ? WHERE circle_id = ?')
+        .run(hours * 3600000, cid);
+      store.db.prepare(`UPDATE circle_messages SET created_at = created_at - ? WHERE circle_id = ?`)
+        .run(hours * 3600000, cid);
+    };
+    const agePrompts = () => store.db.prepare(
+      `UPDATE circle_messages SET created_at = created_at - ? WHERE circle_id = ? AND kind = 'prompt'`
+    ).run(13 * 3600000, cid);
+
+    backdate(72);
+    // Eve speaks now, so she is not quiet; Fay has still never spoken.
+    await eve('POST', '/api/circles/' + cid + '/messages', { body: 'Still here, still reading.' });
+
+    let p = await ada('POST', '/api/circles/' + cid + '/prompt');
+    eq(p.status, 201, 'a question goes up');
+    ok(p.data.invited.indexOf('Fay') !== -1, 'and it is handed to the person who has never spoken');
+    eq(p.data.invited.indexOf('Eve'), -1, 'not to someone who spoke a minute ago');
+    eq(p.data.invited.indexOf('Ada'), -1, 'and never to whoever pressed the button');
+    ok(p.data.invited.length <= 2, 'two at the most: a spotlight on everyone is a roll call');
+    const firstInvited = p.data.invited.slice();
+
+    r = await fay('GET', '/api/circles/' + cid + '/messages');
+    const asked = r.data.messages.filter((m) => m.kind === 'prompt').slice(-1)[0];
+    ok(Array.isArray(asked.invited), 'the question carries who it was for');
+    ok(asked.invited.some((x) => x.display === 'Fay'), 'by name, so the UI never has to guess');
+    ok(asked.invites === undefined, 'and the raw id list does not leave the server');
+
+    agePrompts();
+    p = await ada('POST', '/api/circles/' + cid + '/prompt');
+    firstInvited.forEach((name) => {
+      eq(p.data.invited.indexOf(name), -1, name + ' is not asked twice running');
+    });
+
+    // ---- what the circle says it is ----
+    // Lickel et al. (2000): shared goals are part of what makes a set of
+    // people read as a group. Postmes et al. (2005): the members have to have
+    // written it themselves.
+    const LINE = 'Somebody to walk with on a Sunday who does not mind the rain.';
+    eq((await ada('POST', '/api/circles/' + cid + '/wants', { wants: 'eh' })).status, 400,
+       'a line has to be a line');
+    eq((await ada('POST', '/api/circles/' + cid + '/wants', { wants: LINE })).status, 200,
+       'and then it is yours');
+    r = await ben('GET', '/api/circles/' + cid);
+    eq(r.data.members.filter((m) => m.display === 'Ada')[0].wants, LINE,
+       'the rest of the circle can read it');
+    eq(r.data.wants.maxChars, 140, 'one line, and the limit says so');
+
+    await ben('POST', '/api/circles/' + cid + '/wants', { wants: 'x'.repeat(300) });
+    eq((await ben('GET', '/api/circles/' + cid)).data.members
+      .filter((m) => m.display === 'Ben')[0].wants.length, 140, 'anything longer is cut to length');
+    await ben('POST', '/api/circles/' + cid + '/wants', { wants: '' });
+    eq((await ben('GET', '/api/circles/' + cid)).data.members
+      .filter((m) => m.display === 'Ben')[0].wants, '', 'and taking it down needs no explanation');
+
+    const outsider = client();
+    await outsider('POST', '/api/signup', {
+      username: 'nonmembr', password: 'hunter2hunter', display: 'Nonmembr',
+      city: 'Portland', bio: BIO, ageOk: true, interests: INT
+    });
+    await verifyEmail(outsider, 'nonmembr@example.com');
+    eq((await outsider('POST', '/api/circles/' + cid + '/wants', { wants: LINE })).status, 403,
+       'somebody outside the circle cannot write what it is for');
+    eq((await outsider('GET', '/api/circles/' + cid)).data.circle.story, null,
+       'and cannot read it either');
+
+    r = await ada('GET', '/api/circles/' + cid);
+    ok(r.data.circle.story.since > 0, 'the circle knows how long it has been going');
+    ok(r.data.circle.story.days >= 1, 'and across how many days it has talked');
+    eq(r.data.circle.story.occurrences, 0, 'nothing has happened in person yet');
+    eq(r.data.circle.story.regulars.length, 0, 'so nobody is a regular');
+    const listed = await ada('GET', '/api/circles');
+    eq(listed.data.mine.concat(listed.data.circles).filter((x) => x.id === cid)[0].story, null,
+       'and a list of sixty circles does not pay for any of it');
+
+    // Who has been at every single one, which is the half of a shared history
+    // that cannot be faced out of.
+    const ids = {};
+    r.data.members.forEach((m) => { ids[m.display] = m.id; });
+    const prop = await ada('POST', '/api/circles/' + cid + '/meetups', {
+      title: 'Wildwood from the zoo end', place: 'Washington Park, by the station',
+      startsAt: Date.now() + 5 * 86400000, details: 'Three hours, out and back, rain regardless.',
+      hours: 3, plan: 'Taking the MAX to Washington Park for half nine'
+    });
+    eq(prop.status, 201, 'a ready circle can propose something');
+    const occ = store.db.prepare(`INSERT INTO meetup_occurrences
+      (meetup_id, circle_id, title, starts_at, hours, created_at) VALUES (?, ?, ?, ?, 2, ?)`);
+    const bind = (title, at) => occ.run(prop.data.id, cid, title, at, Date.now());
+    const o1 = Number(bind('A walk', Date.now() - 86400000).lastInsertRowid);
+    eq(store.regulars(cid).names.length, 0, 'one occasion is not a habit');
+    const o2 = Number(bind('Another walk', Date.now() - 3600000).lastInsertRowid);
+    [o1, o2].forEach((o) => {
+      store.setAttendance(o, ids.Ada, true);
+      store.setAttendance(o, ids.Ben, true);
+    });
+    store.setAttendance(o2, ids.Cal, true);
+    const reg = store.regulars(cid);
+    eq(reg.total, 2, 'two occasions on the record');
+    eq(reg.names.join(','), 'Ada,Ben', 'and the two who were at both of them');
+    ok(reg.names.indexOf('Cal') === -1, 'turning up once is not turning up every time');
+
+    // ---- the old ceiling comes down without throwing anyone out ----
+    store.db.prepare('UPDATE circles SET cap = 12 WHERE id = ?').run(cid);
+    store.lowerCaps(8);
+    eq(store.circleById(cid).cap, 8, 'a circle built for twelve comes down to eight');
+    store.lowerCaps(4);
+    eq(store.circleById(cid).cap, 6, 'but never below the people already in it');
+    store.db.prepare('UPDATE circles SET cap = 8 WHERE id = ?').run(cid);
+  });
+
   await group('production readiness', async () => {
     const r = await fetch(base + '/api/health');
     eq(r.status, 200, 'health check answers');

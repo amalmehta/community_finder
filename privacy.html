@@ -28,7 +28,7 @@
     <li>Your display name, city, short bio, and which interests you chose — each flagged visible or hidden</li>
     <li>Your email address, only if you add one, and whether it is verified</li>
     <li>Connection requests and the messages in your conversations</li>
-    <li>Circles you host or belong to, what you wrote when applying to one, everything said in a circle&rsquo;s group chat, who you have vouched for, meetup proposals and your yes/maybe/no on each, the plan you write for getting to a meetup, and whether you confirmed you were at one</li>
+    <li>Circles you host or belong to, what you wrote when applying to one, everything said in a circle&rsquo;s group chat, who you have vouched for, meetup proposals and your yes/maybe/no on each, the plan you write for getting to a meetup, whether you confirmed you were at one, your one line on what you want out of a circle, and which questions the app handed to you</li>
     <li>Blocks and reports you make</li>
     <li>A log line per request: method, path, status and duration. No query strings, no bodies, no cookies</li>
   </ul>
@@ -43,6 +43,8 @@
   <p>Two things inside a circle are narrower than the group chat. The plan you write when you say yes to a meetup &mdash; where you are setting off from, when, and how &mdash; is shown back only to you; no other member, the host included, ever sees it, which is why it is safe to put a route in it. And a one-to-one thread you start with someone from a circle is an ordinary conversation between the two of you: nobody else in the circle can see it, and blocking, reporting and the daily limits work there exactly as they do anywhere else.</p>
   <p>The circle shows every member what any two of you both picked, built only from interests you both marked visible. A hidden interest stays hidden from the people in your circles too.</p>
   <p>When someone answers a question and nobody replies for four hours, the other members are told so that one of them does. The person who answered is never shown that notice.</p>
+  <p>Your line on what you want out of a circle is written for the other members of that circle and shown to them with your name on it. It is per circle, not part of your profile, and never appears outside the circle you wrote it in. Taking it down removes it, and needs no explanation.</p>
+  <p>When the app posts a question it sometimes addresses it to up to two members who have not said anything for a couple of days &mdash; never the person who asked for the question, and never the same people as the previous one. That is visible to the whole circle, by name, because a question handed over privately is not an invitation anybody can take up. Nothing about how much or how little you have said is shown beyond the message count that has always been on your card in the member list, and there is currently no way to opt out of being asked.</p>
 
   <h2>Messages</h2>
   <p>Messages, in a conversation or a circle, are stored in plain text in the database so they can be shown to everyone who should see them. They are not end-to-end encrypted. Anyone with access to the server can read them, which in a self-hosted deployment means whoever runs it. Do not use this for anything you would not want an administrator to see.</p>

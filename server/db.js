@@ -254,7 +254,14 @@ const ADDED_COLUMNS = [
   ['meetups', 'cadence', "TEXT NOT NULL DEFAULT ''"],
   ['meetups', 'hours', 'REAL NOT NULL DEFAULT 2'],
   // The if-then plan attached to a yes. Private to the person who wrote it.
-  ['meetup_rsvps', 'plan', "TEXT NOT NULL DEFAULT ''"]
+  ['meetup_rsvps', 'plan', "TEXT NOT NULL DEFAULT ''"],
+  // Who a question was addressed to, as a comma-separated list of user ids.
+  // The question itself still comes from the fixed list; this is only who it
+  // was handed to.
+  ['circle_messages', 'invites', "TEXT NOT NULL DEFAULT ''"],
+  // One line from each member on what they want out of the circle. Together
+  // they are what the circle says it is for, written by the people in it.
+  ['circle_members', 'wants', "TEXT NOT NULL DEFAULT ''"]
 ];
 
 function migrate(db) {
@@ -535,6 +542,13 @@ function createStore(db) {
       q('UPDATE circles SET blurb = ?, question = ?, cap = ?, min_trust = ? WHERE id = ?')
         .run(String(blurb || '').slice(0, 400), String(question || '').slice(0, 200), cap, minTrust, id);
     },
+    /** Bring every circle under a new ceiling, without throwing anyone out:
+     *  a circle that already has ten people keeps room for ten. */
+    lowerCaps(max) {
+      q(`UPDATE circles SET cap = MAX(?, (SELECT COUNT(*) FROM circle_members cm
+                                          WHERE cm.circle_id = circles.id))
+         WHERE cap > ?`).run(max, max);
+    },
     closeCircle(id) {
       q(`UPDATE circles SET status = 'closed' WHERE id = ?`).run(id);
     },
@@ -547,7 +561,7 @@ function createStore(db) {
       return q('SELECT COUNT(*) AS n FROM circle_members WHERE circle_id = ?').get(circleId).n;
     },
     circleMembers(circleId) {
-      return q(`SELECT cm.role, cm.joined_at, u.id, u.display, u.username, u.city, u.bio,
+      return q(`SELECT cm.role, cm.joined_at, cm.wants, u.id, u.display, u.username, u.city, u.bio,
                        u.email_verified, u.suspended, u.open_to_direct,
                        (SELECT COUNT(*) FROM circle_messages m
                          WHERE m.circle_id = cm.circle_id AND m.sender_id = u.id AND m.kind = 'chat') AS said,
@@ -555,6 +569,15 @@ function createStore(db) {
                 FROM circle_members cm JOIN users u ON u.id = cm.user_id
                 WHERE cm.circle_id = ?
                 ORDER BY cm.role = 'host' DESC, cm.joined_at ASC`).all(circleId);
+    },
+    /** One member's line on what they want out of this circle. Lickel et al.
+     *  (2000) found shared goals to be one of the features that make a
+     *  collection of people read as a real group; Postmes et al. (2005) found
+     *  an identity built out of what members themselves say binds harder than
+     *  one handed down. So this is written by them, not by the host. */
+    setWants(circleId, userId, wants) {
+      q('UPDATE circle_members SET wants = ? WHERE circle_id = ? AND user_id = ?')
+        .run(String(wants || '').slice(0, 140), circleId, userId);
     },
     addMember(circleId, userId, role = 'member') {
       q(`INSERT OR IGNORE INTO circle_members (circle_id, user_id, role, joined_at)
@@ -577,12 +600,20 @@ function createStore(db) {
                           COUNT(DISTINCT CAST(created_at / 86400000 AS INTEGER)) AS days,
                           MAX(created_at) AS last_at
                    FROM circle_messages WHERE circle_id = ? AND kind = 'chat'`).get(circleId);
+      // The biggest single share of the talking. Woolley et al.: groups where
+      // the turns are spread do better than groups with one dominant voice,
+      // so the gate needs to know whether this is a conversation or a
+      // broadcast with an audience.
+      const loud = q(`SELECT COUNT(*) AS n FROM circle_messages
+                      WHERE circle_id = ? AND kind = 'chat' AND sender_id IS NOT NULL
+                      GROUP BY sender_id ORDER BY n DESC LIMIT 1`).get(circleId);
       const wk = q(`SELECT COUNT(*) AS messages, COUNT(DISTINCT sender_id) AS speakers
                     FROM circle_messages
                     WHERE circle_id = ? AND kind = 'chat' AND created_at > ?`)
         .get(circleId, now() - 7 * 86400000);
       return {
         messages: r.messages || 0, speakers: r.speakers || 0, days: r.days || 0,
+        loudest: loud ? loud.n : 0,
         lastAt: r.last_at || null,
         weekMessages: wk.messages || 0, weekSpeakers: wk.speakers || 0,
         members: S.memberCount(circleId)
@@ -651,14 +682,16 @@ function createStore(db) {
     },
 
     // ---- circle chat ----
-    addCircleMessage(circleId, senderId, body, kind = 'chat') {
-      const info = q(`INSERT INTO circle_messages (circle_id, sender_id, body, kind, created_at)
-                      VALUES (?, ?, ?, ?, ?)`)
-        .run(circleId, senderId, String(body).slice(0, 2000), kind, now());
+    addCircleMessage(circleId, senderId, body, kind = 'chat', invites = []) {
+      const info = q(`INSERT INTO circle_messages
+                        (circle_id, sender_id, body, kind, created_at, invites)
+                      VALUES (?, ?, ?, ?, ?, ?)`)
+        .run(circleId, senderId, String(body).slice(0, 2000), kind, now(),
+             (invites || []).map(Number).join(','));
       return Number(info.lastInsertRowid);
     },
     circleMessages(circleId, sinceId = 0) {
-      return q(`SELECT m.id, m.sender_id, m.body, m.kind, m.created_at,
+      return q(`SELECT m.id, m.sender_id, m.body, m.kind, m.created_at, m.invites,
                        COALESCE(u.display, 'someone who left') AS sender_name
                 FROM circle_messages m LEFT JOIN users u ON u.id = m.sender_id
                 WHERE m.circle_id = ? AND m.id > ?
@@ -700,6 +733,36 @@ function createStore(db) {
                        LIMIT 1`).get(circleId, first.id, first.sender_id);
       if (reply) return null;
       return { userId: first.sender_id, display: first.display, at: first.created_at };
+    },
+    /** Who the next question should be handed to: members who have not said
+     *  anything lately, quietest first. `graceMs` keeps somebody who joined
+     *  this morning out of it, and the ids from the last question are left out
+     *  so the same person is never asked twice running. */
+    quietMembers(circleId, { quietMs, graceMs, skip = [], limit = 2 } = {}) {
+      const cut = now() - quietMs;
+      return q(`SELECT u.id, u.display,
+                       (SELECT COUNT(*) FROM circle_messages m
+                         WHERE m.circle_id = cm.circle_id AND m.sender_id = u.id
+                           AND m.kind = 'chat') AS said,
+                       (SELECT MAX(m.created_at) FROM circle_messages m
+                         WHERE m.circle_id = cm.circle_id AND m.sender_id = u.id
+                           AND m.kind = 'chat') AS last_at
+                FROM circle_members cm JOIN users u ON u.id = cm.user_id
+                WHERE cm.circle_id = ? AND cm.joined_at <= ?
+                  AND COALESCE((SELECT MAX(m.created_at) FROM circle_messages m
+                                WHERE m.circle_id = cm.circle_id AND m.sender_id = u.id
+                                  AND m.kind = 'chat'), 0) < ?
+                ORDER BY said ASC, cm.joined_at ASC`)
+        .all(circleId, now() - graceMs, cut)
+        .filter((r) => skip.indexOf(r.id) === -1)
+        .slice(0, limit);
+    },
+    /** Who the last question was handed to. */
+    lastInvites(circleId) {
+      const r = q(`SELECT invites FROM circle_messages
+                   WHERE circle_id = ? AND kind = 'prompt'
+                   ORDER BY id DESC LIMIT 1`).get(circleId);
+      return r && r.invites ? r.invites.split(',').map(Number).filter(Boolean) : [];
     },
     /** Has this person actually said anything here? The side-thread gate. */
     saidIn(circleId, userId) {
@@ -898,6 +961,22 @@ function createStore(db) {
     },
 
     // ---- moderation over circles ----
+    /** Who has been at every single one. A shared history with names in it is
+     *  one of the things that makes a group feel like a group rather than a
+     *  list of people — and unlike a message count, it cannot be faked. */
+    regulars(circleId) {
+      const total = q('SELECT COUNT(*) AS n FROM meetup_occurrences WHERE circle_id = ?')
+        .get(circleId).n;
+      if (total < 2) return { total, names: [] };
+      const names = q(`SELECT u.display, COUNT(*) AS n
+                       FROM attendance a
+                       JOIN meetup_occurrences o ON o.id = a.occurrence_id
+                       JOIN users u ON u.id = a.user_id
+                       WHERE o.circle_id = ? AND a.attended = 1
+                       GROUP BY a.user_id HAVING n = ?
+                       ORDER BY u.display ASC`).all(circleId, total).map((r) => r.display);
+      return { total, names };
+    },
     circleOverview() {
       return q(`SELECT c.id, c.name, c.city, c.status, u.username AS host,
                        (SELECT COUNT(*) FROM circle_members cm WHERE cm.circle_id = c.id) AS members,

@@ -17,7 +17,8 @@
     openId: null,
     trust: null,
     rule: null,
-    capRange: { min: 4, max: 12, default: 8 },
+    capRange: { min: 4, max: 8, default: 6 },
+    wantsRule: { maxChars: 140, minChars: 8 },
     safety: [],
     planAsk: 'Say how you will get there: where you are setting off from, when, and how.'
   };
@@ -79,6 +80,18 @@
   }
 
   function days(n) { return n + (n === 1 ? ' day' : ' days'); }
+
+  function dateText(ms) {
+    if (!ms) return 'a while back';
+    return new Date(ms).toLocaleDateString(undefined,
+      { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+
+  function names(list) {
+    if (!list.length) return '';
+    if (list.length === 1) return list[0];
+    return list.slice(0, -1).join(', ') + ' and ' + list[list.length - 1];
+  }
 
   /* The ceiling on the chat phase.
    *
@@ -183,6 +196,80 @@
     ]);
   }
 
+  /* Entitativity: whether a set of people reads as a unit or as an aggregate.
+   *
+   * Campbell (1958) named the thing; Lickel, Hamilton et al. (2000) worked out
+   * what drives the perception — interaction, shared goals, duration, and how
+   * much the group matters to its members. Postmes et al. (2005) add that an
+   * identity built out of what the members themselves say is held harder than
+   * one deduced from a label handed to them. A circle had interaction and
+   * duration and nowhere to show either, and the only person who had ever
+   * said what it was for was the host. */
+  function storyCard(host, c, members) {
+    var st = c.story;
+    if (!st) return;
+    var all = members || [];
+    var said = all.filter(function (p) { return p.wants; });
+    var me = all.filter(function (p) { return p.id === (S.user && S.user.id); })[0];
+    var err = errLine();
+
+    var line = ['Talking since ' + dateText(st.since)];
+    if (st.days) line.push(days(st.days) + ' of it');
+    if (c.met) line.push(c.met === 1 ? 'one time together' : c.met + ' times together');
+    if (c.hours.circle) line.push(hoursText(c.hours.circle) + ' between you');
+
+    var want = el('textarea', { rows: '2', maxlength: String(st.maxChars),
+      placeholder: 'One line — what you want out of this circle' });
+    want.value = me ? me.wants : '';
+
+    async function save(text, btn) {
+      err.hidden = true;
+      if (btn) btn.disabled = true;
+      try {
+        await api('POST', '/api/circles/' + c.id + '/wants', { wants: text });
+        openCircle(c.id);
+      } catch (e) { showErr(err, e); if (btn) btn.disabled = false; }
+    }
+
+    host.appendChild(el('article', { class: 'card story' }, [
+      el('h3', { text: 'What this circle is' }),
+      el('p', { class: 'where', text: line.join(' · ') }),
+      st.regulars.length
+        ? el('p', { class: 'hint', text: names(st.regulars)
+            + (st.regulars.length === 1 ? ' has' : ' have') + ' been at '
+            + (st.occurrences === 2 ? 'both of them.' : 'all ' + st.occurrences + ' of them.') })
+        : null,
+      said.length
+        ? el('ul', { class: 'wants' }, said.map(function (p) {
+            return el('li', {}, [
+              el('b', { text: p.display + ' — ' }),
+              el('span', { text: p.wants })
+            ]);
+          }))
+        : null,
+      el('p', { class: 'hint', text: said.length
+        ? said.length + ' of the ' + all.length + ' of you have said what you came for. '
+          + 'A set of people starts to feel like a group when it has shared goals and a '
+          + 'history behind it, and the first of those is not something an app can write for you.'
+        : 'Nobody has said what they came for yet. The host wrote what the circle is — '
+          + 'this is the part the rest of you write, a line each.' }),
+      err,
+      el('label', { class: 'field' }, [
+        el('span', { text: me && me.wants ? 'Your line' : 'Add yours' }), want
+      ]),
+      el('div', { class: 'actions' }, [
+        el('button', { class: 'btn sm', type: 'button', onclick: function (ev) {
+          save(want.value, ev.currentTarget);
+        } }, [me && me.wants ? 'Save' : 'Add it']),
+        me && me.wants
+          ? el('button', { class: 'btn ghost sm', type: 'button', onclick: function (ev) {
+              save('', ev.currentTarget);
+            } }, ['Take mine down'])
+          : null
+      ])
+    ]));
+  }
+
   function loading(text) {
     return el('div', { class: 'card loading' }, [
       el('span', { class: 'spinner', 'aria-hidden': 'true' }),
@@ -242,15 +329,21 @@
         el('span', { class: 'badge', text: r.done + ' of ' + r.of })
       ]),
       o.quiet ? null : el('ul', { class: 'ready-list' }, r.checks.map(function (c) {
-        var done = c.have >= c.need;
+        // Four of them are floors. The last one is a ceiling, and it is the
+        // only part of the gate a circle can fail by talking more.
+        var ceiling = c.max !== undefined;
+        var unit = c.unit || '';
+        var done = ceiling ? c.have <= c.max : c.have >= c.need;
         return el('li', { class: done ? 'done' : '' }, [
           el('span', { class: 'tick', 'aria-hidden': 'true', text: done ? '✓' : '·' }),
-          el('span', { text: Math.min(c.have, c.need) + ' of ' + c.need + ' ' + c.label })
+          el('span', { text: ceiling
+            ? c.have + unit + ' ' + c.label + ' — ' + c.max + unit + ' or less'
+            : Math.min(c.have, c.need) + ' of ' + c.need + ' ' + c.label })
         ]);
       })),
       o.quiet ? null : el('p', { class: 'hint', text: r.ready
         ? 'Anyone here can propose something now. It happens once enough of you say yes.'
-        : 'Nobody can propose a meetup until all four are met. That is on purpose: you get to know people here first.' })
+        : 'Nobody can propose a meetup until all five are met. The last one is why: groups where the turns are shared out think better together than groups with one dominant voice, so twenty messages mostly from one person is not a conversation yet.' })
     ]);
   }
 
@@ -530,6 +623,7 @@
     host.innerHTML = '';
     S.safety = d.safety || [];
     if (d.planAsk) S.planAsk = d.planAsk;
+    if (d.wants) S.wantsRule = d.wants;
     var c = d.circle;
 
     host.appendChild(el('div', { class: 'actions' }, [
@@ -564,6 +658,7 @@
     }
 
     if (d.confirm && d.confirm.length) confirmCard(host, c, d.confirm);
+    storyCard(host, c, d.members);
     chatCard(host, c);
     meetupCard(host, c, d.meetups, d.occurrences, d.cadences);
     if (d.applications && d.applications.length) applicationsCard(host, c, d.applications);
@@ -626,11 +721,24 @@
             // The set it came from, so the escalation is visible rather than
             // something the app does quietly behind the conversation.
             var set = FYC.PROMPT_SETS[FYC.promptDepth(m.body) - 1];
-            list.appendChild(el('div', { class: 'msg prompt' }, [
+            // Who it was handed to. Preece et al. (2004): people who read a
+            // group for weeks without posting mostly have not been asked
+            // anything. Being asked by name is the cheapest fix there is, and
+            // the wording has to stay an invitation rather than a summons.
+            var to = (m.invited || []);
+            var forMe = to.some(function (p) { return p.id === (S.user && S.user.id); });
+            var others = to.filter(function (p) { return !(S.user && p.id === S.user.id); })
+              .map(function (p) { return p.display; });
+            list.appendChild(el('div', { class: 'msg prompt' + (forMe ? ' for-me' : '') }, [
               el('span', { class: 'prompt-tag', text: set
                 ? 'Question for the circle · ' + set.label.toLowerCase()
                 : 'Question for the circle' }),
-              el('p', { text: m.body })
+              el('p', { text: m.body }),
+              to.length ? el('span', { class: 'prompt-to', text: forMe
+                ? (others.length
+                    ? 'For you and ' + names(others) + ', if you feel like it.'
+                    : 'For you, if you feel like it. No obligation at all.')
+                : names(others) + ', this one is yours if you want it.' }) : null
             ]));
           } else {
             var mine = m.sender_id === (S.user && S.user.id);

@@ -44,7 +44,7 @@ five people you have never spoken to. The dinner is the product. Whether you
 actually have anything to say to each other is left to chance and to you, on
 the night, in person, with no way out before dessert.
 
-A **circle** inverts that. It is four to twelve people in one city who share
+A **circle** inverts that. It is four to eight people in one city who share
 interests and one group chat. You talk. Only when the circle has genuinely been
 a conversation does the app let anyone propose doing something — and then only
 if enough people say yes.
@@ -70,13 +70,23 @@ other person has actually said something. That is what keeps it from being a
 follow button. Starting a circle needs tier 2.
 
 **The meetup button is locked until the circle has talked.** Not a nudge, not a
-suggestion — the server returns 409. Four conditions, shown as a checklist that
+suggestion — the server returns 409. Five conditions, shown as a checklist that
 fills in as the conversation happens:
 
 - three people in the circle,
 - twenty messages,
-- from three different people,
-- across two separate days.
+- from three different people, and at least 60% of the circle once it is bigger
+  than five,
+- across two separate days,
+- with nobody accounting for more than half of it.
+
+The last two of those come from Woolley, Chabris, Pentland, Hashmi & Malone
+(2010), who found a group's collective intelligence predicted by the *equality*
+of conversational turn-taking rather than by the ability of its members: groups
+with one dominant voice did worse. The first three conditions could not tell a
+conversation from a broadcast — twenty messages from three of eight people
+passed, and so did twenty messages where one person wrote seventeen. It is the
+one part of the gate a circle can fail by talking more.
 
 **And it is unlocked again by a ceiling.** Ramirez & Zhang (2007) found that
 partners who moved from online to face-to-face *early* had better relational
@@ -147,6 +157,41 @@ bare intention, and the quorum means other people are relying on it, so a yes
 asks how you will get there: where you are setting off from, when, and how. Only
 you ever see it, it is shown back to you on the card as the reminder, and when a
 repeating meetup rolls on it goes with the RSVP — each date needs its own plan.
+
+**And the question is handed to whoever has gone quiet.** Preece, Nonnecke &
+Andrews (2004) asked people in online communities why they read for months
+without ever posting. The answers were not indifference: they had nothing to add
+yet, they did not want to intrude, and nobody had ever asked them anything. So a
+question the app posts is addressed by name to up to two members who have not
+said anything in two days — never to whoever pressed the button, never to the
+same person twice running, and never to somebody who joined that morning. The
+wording is an invitation and stays one: *"For you, if you feel like it. No
+obligation at all."* It is also the thing that gets a circle past the
+turn-taking half of the gate, which is not an accident.
+
+**A circle can say what it is for, in its members' own words.** Campbell (1958)
+called it entitativity — how strongly a set of people reads as a real unit
+rather than a collection of individuals — and Lickel, Hamilton et al. (2000)
+worked out which features drive that perception: interaction, shared goals,
+duration, and how much the group matters to the people in it. Postmes, Spears,
+Lee & Novak (2005) add that an identity *induced* from what members themselves
+contribute is held more strongly than one deduced from a label handed to them.
+A circle already had interaction and duration and nowhere to show either, and
+the only person who had ever said what it was for was the host. So each member
+writes one line — "somebody to walk with on a Sunday who does not mind the
+rain" — and the lines together are what the circle is, next to how long it has
+been going, how many separate days it has talked, how many times it has met, and
+who has been at every single one. Taking your line down needs no explanation.
+
+**Small enough to be a dialogue.** Fay, Garrod & Carletta (2000) recorded the
+same discussion task in groups of five and groups of ten: the fives held a
+dialogue, where what one person said was picked up and built on, while the tens
+collapsed into serial monologue addressed to the room. Dunbar, Duncan & Nettle
+(1995) found conversations in the wild fragmenting past about four people. So a
+circle holds eight at most and six by default, down from twelve. Circles built
+under the old ceiling come down to the new one without anyone being removed: a
+circle that already has ten people keeps room for ten and loses only the empty
+seats.
 
 **Dead group chats are the default**, so the circle can post a question from the
 set it has earned — one per twelve hours — and a circle nobody has spoken in for
@@ -290,14 +335,15 @@ npm test        # both suites
 node tests/run-tests.js
 ```
 
-7900+ assertions covering data integrity (every listing has a valid first step,
+7950+ assertions covering data integrity (every listing has a valid first step,
 a real URL, interests that exist in the taxonomy, ratings in range), city lookup
 and aliasing, the universal fallback engine, matcher behaviour (a nervous person
 gets gentle options first, budget is respected, the comfort dial actually
 re-ranks, no duplicate results), that `index.html` loads every file it needs,
 and that every number the circles argument rests on is still the number the
-research says — the four rungs of the gate, 14 and 28 days, 50/90/200 hours,
-three escalating question sets, two answers to climb one. Change one of those
+research says — the five rungs of the gate, 50% for one voice, 14 and 28 days,
+50/90/200 hours, three escalating question sets, two answers to climb one, eight
+people at most. Change one of those
 and this suite fails, which is the point of pinning them.
 
 ```bash
@@ -322,14 +368,17 @@ each week. You can also run it on demand from the Actions tab.
 node tests/run-server-tests.js
 ```
 
-263 assertions against a real HTTP server on a throwaway database: signup and
+311 assertions against a real HTTP server on a throwaway database: signup and
 sign-in, session isolation, that a hidden interest cannot be used to find you,
 the request/accept/message flow, outsiders being locked out of other people's
 threads, blocking, reporting, rate limits, the whole life of a circle — vetting,
 the gate, the drift clock, the hours ledger, meetups rolling forward, the
 question sets refusing to escalate on an unanswered question, one-to-one threads
 being closed to anyone who has not spoken, if-then plans being required on a yes
-and shown to nobody else — and that the server serves only the front end, not
+and shown to nobody else, the gate staying shut on a circle where one person
+wrote most of it, a question being handed to the member who has never spoken and
+not to the one who asked for it, and what a circle says it is for staying inside
+it — and that the server serves only the front end, not
 its own source, the database, or anything reachable by path traversal.
 
 **Moving around it:** every question has **Back**, which replays your earlier
@@ -491,6 +540,24 @@ behavioural record completely.
   into friendships, and they are also how a group quietly becomes two people
   and some bystanders. The gate (both of you having spoken in the circle) is
   about safety, not about that.
+- The turn-taking check counts messages, which is not what Woolley et al.
+  measured. They recorded speaking turns in a room and had coders rate social
+  sensitivity; a message count cannot see that two of the four "voices" are
+  saying "agreed" and nothing else. It is a floor against the obvious failure,
+  not a measure of a balanced conversation.
+- A circle can also fail that check honestly. A host who answers everything
+  because they are the only one with the answers is counted the same as one who
+  will not stop talking, and the only remedy the app offers either of them is to
+  post a question and wait.
+- Naming the quiet people is a judgement call about tone, and it can land badly.
+  Somebody who reads a circle happily and never posts is now addressed by name
+  in front of everyone, and "no obligation" is a sentence rather than a
+  guarantee. Two at a time, never twice running, and no way to opt out of it
+  yet — that last part is the gap.
+- What a circle says it is for is a free-text line per member with nothing
+  checking that the lines have anything to do with each other. Lickel's shared
+  goals are *actually* shared; eight people writing eight different things is
+  what this would show, honestly, and it would still read as a group.
 - Vetting is the host's judgement plus two seconds. It is a real filter and not
   a background check, and nothing here verifies that anyone is who they say.
 - Circle messages are plain text in the database, readable by whoever runs the

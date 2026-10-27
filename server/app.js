@@ -50,26 +50,47 @@ function directAllowed(from, to, shared) {
 
 const PROMPTS = globalThis.FYC.PROMPTS;
 
-// Small by design. Past a dozen people a group chat stops being a conversation
-// and starts being a feed, which is the thing we are trying not to build.
-const CAP_RANGE = { min: 4, max: 12, default: 8 };
+// Small by design, and smaller than it was. Fay, Garrod & Carletta (2000)
+// recorded the same discussion task in groups of five and groups of ten: the
+// fives held a dialogue, where what one person said was picked up and built
+// on, while the tens collapsed into serial monologue addressed to the room.
+// Dunbar, Duncan & Nettle (1995) found conversations in the wild fragmenting
+// once more than about four people were in them. Eight is the ceiling and six
+// the default, because the thing we are trying not to build is a feed.
+const CAP_RANGE = { min: 4, max: 8, default: 6 };
 
+// Woolley, Chabris, Pentland, Hashmi & Malone (2010) found a group's
+// collective intelligence predicted by two things more than by the ability of
+// its members: the social sensitivity of the people in it, and the *equality*
+// of conversational turn-taking. Groups with one dominant voice did worse.
+// Neither of the first two gates could tell a conversation from a broadcast —
+// twenty messages from three of eight people passed, and so did twenty
+// messages where one person wrote seventeen. These two can.
 const READY_RULE = {
   minMembers: 3,     // three is the smallest number that is not a pair
   minMessages: 20,   // enough that it is a thread, not an exchange of hellos
   minSpeakers: 3,    // not two people talking while the rest watch
-  minDays: 2         // across more than one sitting
+  minDays: 2,        // across more than one sitting
+  minVoices: 60,     // and at least this percent of the circle, once it is big
+  maxShare: 50       // nobody is more than half of it
 };
 
-/** Why a circle can or cannot plan something yet, in the words the UI shows. */
+/** Why a circle can or cannot plan something yet, in the words the UI shows.
+ *  Most checks are floors; `max` marks the one that is a ceiling. */
 function readiness(stats, rule) {
+  const voices = Math.max(rule.minSpeakers,
+    Math.ceil(stats.members * rule.minVoices / 100));
+  const share = stats.messages
+    ? Math.round((stats.loudest || 0) * 100 / stats.messages) : 0;
   const checks = [
     { id: 'members', label: 'people in the circle', have: stats.members, need: rule.minMembers },
     { id: 'messages', label: 'messages between you', have: stats.messages, need: rule.minMessages },
-    { id: 'speakers', label: 'different people talking', have: stats.speakers, need: rule.minSpeakers },
-    { id: 'days', label: 'separate days of conversation', have: stats.days, need: rule.minDays }
+    { id: 'speakers', label: 'different people talking', have: stats.speakers, need: voices },
+    { id: 'days', label: 'separate days of conversation', have: stats.days, need: rule.minDays },
+    { id: 'balance', label: 'of it from any one person', have: share, max: rule.maxShare, unit: '%' }
   ];
-  const done = checks.filter((c) => c.have >= c.need).length;
+  const met = (c) => (c.max === undefined ? c.have >= c.need : c.have <= c.max);
+  const done = checks.filter(met).length;
   return { ready: done === checks.length, checks, done, of: checks.length };
 }
 
@@ -170,6 +191,31 @@ const DISCLOSURE = {
 const INTENTION = { minChars: 12 };
 const PLAN_ASK = 'Say how you will get there: where you are setting off from, when, and how. ' +
   'That sentence is most of the difference between meaning to go and going.';
+
+// Preece, Nonnecke & Andrews (2004) asked people in online communities why
+// they read without ever posting. The reasons were not indifference: they had
+// nothing to add yet, they did not want to intrude, and nobody had ever asked
+// them anything. That is the gap between a circle of eight and a conversation
+// between three, and it is also the gap the turn-taking gate above now
+// refuses to let a circle meet across. So when the app posts a question it
+// hands it to the people who have not spoken lately — by name, with no
+// obligation, and never to the same person twice running.
+const QUIET = {
+  quietHours: 48,    // not a word in this long, and the question is yours
+  graceHours: 24,    // somebody who joined this morning is not quiet, just new
+  invite: 2          // two at most: a spotlight on everyone is a roll call
+};
+
+// Campbell (1958) called it entitativity — the degree to which a collection
+// of people is perceived as a real unit rather than an aggregate. Lickel,
+// Hamilton et al. (2000) sorted out which features drive that perception:
+// interaction, shared goals, duration, and importance to the members.
+// Postmes, Spears, Lee & Novak (2005) add that an identity induced from what
+// members themselves contribute is held more strongly than one deduced from a
+// label handed to them. A circle already has interaction and duration; what
+// it has no way to say is what it is *for*, in the members' own words. So:
+// one line each, and the lines together are the answer.
+const WANTS = { maxChars: 140, minChars: 8 };
 
 /** How deep this circle has earned the right to ask, and what is left. */
 function disclosureOf(runs, rule) {
@@ -329,15 +375,20 @@ const VERSION = require('../package.json').version;
 
 function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure = false,
                     limits = {}, mailer = null, baseUrl = null, log = null, ready = {},
-                    drift = {}, disclosure = {} } = {}) {
+                    drift = {}, disclosure = {}, quiet = {} } = {}) {
   const L = Object.assign({}, DEFAULT_LIMITS, limits);
   // Tests run a circle's whole life in a few milliseconds, so the "separate
   // days" part of the gate has to be adjustable. Nothing else overrides it.
   const R = Object.assign({}, READY_RULE, ready);
   const D = Object.assign({}, DRIFT_RULE, drift);
   const DI = Object.assign({}, DISCLOSURE, disclosure);
+  const Q = Object.assign({}, QUIET, quiet);
   SECURE_MODE = !!secure;
   const store = createStore(open(file));
+  // Circles made under the old twelve-person ceiling come down to the new
+  // one. Nobody is removed: a circle that already has ten people keeps room
+  // for ten, and only loses the empty seats above it.
+  store.lowerCaps(CAP_RANGE.max);
   const mail = mailer || createMailer();
   setInterval(() => store.prune(), HOUR).unref?.();
 
@@ -797,6 +848,19 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
       }
     }
 
+    // What the circle *is*, as against what it is doing this week: how long
+     // it has been going, how much of it there has been, and who has turned up
+     // to all of it. Entitativity, in Campbell's word — and it is the one
+     // thing a group thread cannot show you about itself.
+    const story = mem && deep ? (() => {
+      const reg = store.regulars(c.id);
+      return {
+        since: c.created_at, days: stats.days,
+        occurrences: reg.total, regulars: reg.names,
+        maxChars: WANTS.maxChars, minChars: WANTS.minChars
+      };
+    })() : null;
+
     return {
       id: c.id, name: c.name, city: c.city, blurb: c.blurb, question: c.question,
       hostId: c.host_id, hostName: c.host_name || (store.userById(c.host_id) || {}).display || null,
@@ -819,6 +883,7 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
       },
       disclosure: disc,
       respond,
+      story,
       myRole: mem ? mem.role : null,
       myApplication: app ? { id: app.id, status: app.status, at: app.created_at } : null,
       pending: c.pending === undefined ? undefined : c.pending,
@@ -936,7 +1001,9 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
       canVouch: p.id !== u.id && p.said > 0 && !store.hasVouched(c.id, u.id, p.id),
       // What the two of you have in common, which the group thread never
       // says out loud. Visible interests only, on both sides.
-      shared: p.id === u.id ? [] : store.sharedInterests(u.id, p.id)
+      shared: p.id === u.id ? [] : store.sharedInterests(u.id, p.id),
+      // What they said they came for, in their own words.
+      wants: p.wants || ''
     }, sideThread(c.id, u, p)));
     const meetups = store.meetupsFor(c.id).map((k) => {
       const rsvps = store.rsvpsFor(k.id);
@@ -958,6 +1025,7 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     send(res, 200, {
       circle: v, trust, rule: R, members, meetups,
       cadences: CADENCES, hall: HALL, promptSets: PROMPT_SETS, planAsk: PLAN_ASK,
+      wants: WANTS,
       // What has already happened, and anything this person has not yet said
       // whether they turned up to. Hours are only banked on a yes here.
       occurrences: store.occurrencesFor(c.id, 10).map((o) => ({
@@ -1101,7 +1169,19 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     if (!got) return;
     const url = new URL(req.url, 'http://x');
     const since = Number(url.searchParams.get('since') || 0);
-    send(res, 200, { messages: store.circleMessages(got.c.id, since) });
+    const rows = store.circleMessages(got.c.id, since);
+    // A question handed to particular people travels with their names, so the
+    // conversation never has to guess who it was for.
+    const names = {};
+    if (rows.some((r) => r.invites)) {
+      store.circleMembers(got.c.id).forEach((p) => { names[p.id] = p.display; });
+    }
+    send(res, 200, { messages: rows.map((r) => {
+      const ids = String(r.invites || '').split(',').map(Number).filter(Boolean);
+      delete r.invites;
+      r.invited = ids.map((i) => ({ id: i, display: names[i] || 'someone who left' }));
+      return r;
+    }) });
   });
 
   route('POST', /^\/api\/circles\/(\d+)\/messages$/, async (req, res, m) => {
@@ -1155,8 +1235,41 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     const next = unused(PROMPT_SETS[disc.depth - 1].prompts)[0]
       || unused(PROMPTS)[0]
       || PROMPTS[used.length % PROMPTS.length];
-    const id = store.addCircleMessage(got.c.id, null, next, 'prompt');
-    send(res, 201, { id, body: next, disclosure: disc });
+    // And it is handed to whoever has not spoken lately. Preece et al.: the
+    // usual reason somebody reads a group for weeks without posting is not
+    // indifference, it is that nobody ever asked them anything. Never the
+    // person who pressed the button, and never the same people as last time.
+    const invited = store.quietMembers(got.c.id, {
+      quietMs: Q.quietHours * HOUR,
+      graceMs: Q.graceHours * HOUR,
+      skip: store.lastInvites(got.c.id).concat([got.u.id]),
+      limit: Q.invite
+    });
+    const id = store.addCircleMessage(got.c.id, null, next, 'prompt', invited.map((p) => p.id));
+    send(res, 201, {
+      id, body: next, disclosure: disc, invited: invited.map((p) => p.display)
+    });
+  });
+
+  /** Your one line on what you want out of this circle.
+   *
+   *  Lickel et al. (2000): shared goals are among the features that make a
+   *  set of people read as a group rather than an aggregate. Postmes et al.
+   *  (2005): an identity induced from what the members themselves say is held
+   *  harder than one deduced from a label handed down. The host already wrote
+   *  what the circle is; this is what the people in it came for, and it is
+   *  theirs. An empty string clears it, because changing your mind in public
+   *  should not need an apology. */
+  route('POST', /^\/api\/circles\/(\d+)\/wants$/, async (req, res, m) => {
+    const got = requireMember(req, res, Number(m[1]));
+    if (!got) return;
+    const body = await readJson(req);
+    const text = String(body.wants || '').trim().slice(0, WANTS.maxChars);
+    if (text && text.length < WANTS.minChars) {
+      return fail(res, 400, `A few more words than that — ${WANTS.minChars} characters or more.`);
+    }
+    store.setWants(got.c.id, got.u.id, text);
+    send(res, 200, { wants: text });
   });
 
   /** A thread with one person from the circle.

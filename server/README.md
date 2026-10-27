@@ -90,12 +90,25 @@ meetup until the circle has had a real conversation:
 
 - three people in it,
 - twenty messages,
-- from three different people,
-- across two separate days.
+- from at least three different people, and from `minVoices` (60%) of the circle
+  once 60% of it is more than three,
+- across two separate days,
+- with no single person accounting for more than `maxShare` (50%) of the
+  messages.
 
 `POST /api/circles/:id/meetups` returns 409 with exactly what is missing until
-all four are met. The front end draws the same four as a checklist, so the gate
+all five are met. The front end draws the same five as a checklist, so the gate
 is visible rather than a disabled button.
+
+The last two are from Woolley, Chabris, Pentland, Hashmi & Malone (2010), who
+found a group's collective intelligence predicted by the equality of
+conversational turn-taking rather than by the ability of its members. The first
+three checks could not tell a conversation from a broadcast: twenty messages
+from three of eight people passed, and so did twenty messages where one person
+wrote seventeen. `circleStats` returns `loudest` (the largest per-sender count)
+and `readiness` turns it into a percentage. It is the only check expressed as a
+ceiling: checks carry either `need` (a floor) or `max`, and the only part of the
+gate a circle can fail by talking more.
 
 **The ceiling** (`DRIFT_RULE`). The floor above stops cold meetings; this stops
 the opposite failure. Ramirez & Zhang (2007) found that late online-to-offline
@@ -164,6 +177,32 @@ than if they had said nothing. After `respondAfterHours` (4) it appears on the
 circle as `respond` — for everyone **except** the person it happened to. Telling
 them nobody replied would be the one genuinely cruel thing the app could do.
 
+**The question is handed to whoever has gone quiet** (`QUIET`, `quietMembers`).
+Preece, Nonnecke & Andrews (2004) asked people in online communities why they
+read without posting: not indifference, but having nothing to add yet, not
+wanting to intrude, and never having been asked anything. So
+`POST /api/circles/:id/prompt` picks up to `invite` (2) members who have said
+nothing for `quietHours` (48) and joined more than `graceHours` (24) ago,
+quietest first, and stores their ids on the message's `invites` column. Excluded:
+whoever pressed the button, and anyone named on the previous question
+(`lastInvites`) — nobody is spotlit twice running. `GET /messages` resolves the
+ids to names as `invited` and the raw column never leaves the server. The
+question itself still comes from the fixed list; this only records who it was
+handed to. It is also what gets a circle past the turn-taking half of the gate.
+
+**What the circle says it is** (`WANTS`, `story`). Campbell (1958) called it
+entitativity; Lickel, Hamilton et al. (2000) identified the features behind the
+perception — interaction, shared goals, duration, importance to the members —
+and Postmes, Spears, Lee & Novak (2005) found an identity induced from members'
+own contributions held more strongly than one deduced from a label handed down.
+`POST /api/circles/:id/wants` stores one line per membership (8–140 characters,
+empty clears it), returned to other members as `wants`. The circle view's
+`story` carries `since`, `days`, `occurrences` and `regulars` — who has
+attended every single occurrence, from `regulars` in `db.js`, which needs at
+least two before anyone counts as one. `story` is computed only for members and
+only when `viewCircle` is called with `deep`, so a list of sixty circles does
+not pay for it.
+
 **Bonds, not just a shared subject** (`BOND`, `sideThread`). Ren, Kraut &
 Kiesler (2007) separate identity-based attachment (to the group and its
 subject) from bond-based attachment (to the particular people in it). One group
@@ -176,8 +215,15 @@ there, which is what stops it being a cold DM — and the thread is an ordinary
 accepted connection, so it lands in Messages under the same blocking, reporting
 and daily caps as everything else. `openToDirect` is still respected.
 
-Circles are capped at 4–12 people (`CAP_RANGE`); past the cap an application is
-waitlisted rather than refused. A non-member sees a circle's name, city,
+Circles are capped at 4–8 people, 6 by default (`CAP_RANGE`); past the cap an
+application is waitlisted rather than refused. The ceiling was 12 and came down
+on the strength of Fay, Garrod & Carletta (2000) — the same discussion task held
+a dialogue in groups of five and collapsed into serial monologue in groups of
+ten — and Dunbar, Duncan & Nettle (1995), who found conversations fragmenting
+past about four people. `createApp` calls `store.lowerCaps(CAP_RANGE.max)` once
+at startup, which brings existing circles under the new ceiling without removing
+anyone: a circle with ten members keeps `cap` 10 and loses only its empty
+seats. A non-member sees a circle's name, city,
 description, joining question, size and liveliness — never the conversation,
 never the member list, and not how deep its questions have got. Questions come
 from `FYC.PROMPT_SETS` in `src/data/core.js`, shared with the front end so
@@ -197,11 +243,12 @@ DELETE /api/circles/:id/apply            withdraw
 POST   /api/circles/:id/applications/:a/(approve|decline|second)
 POST   /api/circles/:id/leave
 DELETE /api/circles/:id/members/:uid     host removes someone
-GET    /api/circles/:id/messages?since=  members only
+GET    /api/circles/:id/messages?since=  members only; prompts carry `invited`
 POST   /api/circles/:id/messages
 POST   /api/circles/:id/read             move the unread marker
 POST   /api/circles/:id/prompt           the next question, from the set you have earned
 POST   /api/circles/:id/threads          one-to-one, if you have both spoken here
+POST   /api/circles/:id/wants            your line on what you came for; '' clears it
 POST   /api/circles/:id/vouch
 POST   /api/circles/:id/meetups          409 until the circle is ready; needs a plan
 POST   /api/meetups/:id/rsvp             yes | maybe | no; a yes needs a plan
@@ -233,7 +280,7 @@ auth decision in the main README.
 node tests/run-server-tests.js
 ```
 
-263 assertions covering signup and sign-in, session isolation, interest
+311 assertions covering signup and sign-in, session isolation, interest
 visibility, the request/accept/message flow, outsiders being kept out of other
 people's threads, blocking, reporting, rate limits, the full circle lifecycle
 (trust tiers, written applications, member seconding, the readiness gate,
@@ -242,13 +289,19 @@ refusal of icebreakers, the hours ledger, recurring meetups rolling forward,
 the escalating question sets refusing to advance on an unanswered question, the
 responsiveness nudge staying hidden from the person it is about, the one-to-one
 thread gate in both directions, if-then plans being required on a yes and
-visible to nobody else, and that the server will not serve its own source or
-escape the project directory.
+visible to nobody else, the turn-taking check holding the gate shut on a circle
+where one person wrote most of it, a question being handed by name to the member
+who has never spoken (and never to whoever asked for it, or the same person
+twice running), what a circle says it is for staying inside it, the ceiling
+coming down to eight without removing anyone, and that the server will not serve
+its own source or escape the project directory.
 
 Two things are relaxed, both because a circle's whole life happens in
 milliseconds there: the "two separate days" rung of the readiness gate, via
 `createApp({ ready: { minDays: 1 } })`, and the four-hour grace period before
 anyone is told nobody replied, via `disclosure: { respondAfterHours: 0 }`. The
-other three rungs, and everything else, are tested at their real values — the
-twelve-hour gap between questions included, which the tests work around by
-winding the message clock back rather than switching the rule off.
+other four rungs, and everything else, are tested at their real values. The
+twelve-hour gap between questions, the 48-hour quiet window and the 24-hour
+grace period for a new member are all real, and the tests work around them by
+winding the message clock and the join dates back rather than switching the
+rules off.

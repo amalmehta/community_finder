@@ -656,6 +656,66 @@ group('circles: bonds, escalating questions and if-then plans', function () {
   ok(css.indexOf('.planbox') !== -1, 'and it has somewhere to go');
 });
 
+group('circles: turn-taking, the quiet, and what a circle is for', function () {
+  var fs = require('fs');
+  var server = fs.readFileSync(path.join(root, 'server/app.js'), 'utf8');
+  var db = fs.readFileSync(path.join(root, 'server/db.js'), 'utf8');
+  var circles = fs.readFileSync(path.join(root, 'src/circles.js'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+
+  // Woolley et al. (2010): collective intelligence tracked the equality of
+  // conversational turn-taking. The gate had no way to tell a conversation
+  // from one person with an audience; now it has two.
+  ok(/minVoices:\s*60/.test(server), 'most of the circle has to be talking, not three of them');
+  ok(/maxShare:\s*50/.test(server), 'and nobody may be more than half of it');
+  ok(server.indexOf("id: 'balance'") !== -1, 'the share is a part of the gate, not a hint');
+  ok(server.indexOf('max: rule.maxShare') !== -1, 'carried as a ceiling rather than a floor');
+  ok(server.indexOf('c.max === undefined ? c.have >= c.need : c.have <= c.max') !== -1,
+     'so the server scores a ceiling the right way round');
+  ok(db.indexOf('GROUP BY sender_id ORDER BY n DESC LIMIT 1') !== -1,
+     'the loudest single voice is measured');
+  ok(circles.indexOf('c.max !== undefined') !== -1, 'and the front end draws the ceiling too');
+  ok(circles.indexOf('all five are met') !== -1, 'the gate says there are five of them');
+  ok(circles.indexOf('one dominant voice') !== -1, 'and says why the fifth one is there');
+
+  // Preece, Nonnecke & Andrews (2004): the usual reason somebody never posts
+  // is that nobody asked them anything. The fix is an invitation, which has
+  // to stay an invitation.
+  ok(/quietHours:\s*48/.test(server), 'a question goes to whoever has not spoken in two days');
+  ok(/graceHours:\s*24/.test(server), 'but not to somebody who joined this morning');
+  ok(/invite:\s*2/.test(server), 'two people at most, so it is never a roll call');
+  ok(server.indexOf('store.lastInvites(got.c.id).concat([got.u.id])') !== -1,
+     'never the same person twice running, and never whoever asked');
+  ok(db.indexOf('quietMembers') !== -1, 'the store knows who has gone quiet');
+  ok(db.indexOf('lastInvites') !== -1, 'and who the last question went to');
+  ok(circles.indexOf('No obligation at all.') !== -1, 'being asked carries no obligation');
+  ok(circles.indexOf('this one is yours if you want it') !== -1,
+     'and everyone else can see it was handed over');
+  ok(css.indexOf('.msg.prompt.for-me') !== -1, 'a question for you looks different');
+  ok(css.indexOf('.prompt-to') !== -1, 'and says who it was for');
+
+  // Campbell (1958) / Lickel et al. (2000) / Postmes et al. (2005): shared
+  // goals and a history are what make a set of people read as a group, and an
+  // identity the members wrote binds harder than one handed down.
+  ok(/maxChars:\s*140/.test(server), 'one line each on what you came for');
+  ok(/minChars:\s*8/.test(server), 'and it has to be a line');
+  ok(server.indexOf('/wants$/') !== -1, 'with somewhere to put it');
+  ok(db.indexOf('setWants') !== -1, 'stored against the membership, not the person');
+  ok(db.indexOf('regulars') !== -1, 'and who has been at every single one');
+  ok(server.indexOf('story') !== -1, 'the circle can say what it is');
+  ok(server.indexOf('mem && deep') !== -1, 'to its members, and only on its own page');
+  ok(circles.indexOf('storyCard') !== -1, 'it is drawn');
+  ok(circles.indexOf('Take mine down') !== -1, 'and changing your mind needs no apology');
+  ok(css.indexOf('.wants li') !== -1, 'the lines have a shape of their own');
+
+  // Fay, Garrod & Carletta (2000): five holds a dialogue, ten does not.
+  ok(/max:\s*8,\s*default:\s*6/.test(server), 'eight people at most, six by default');
+  ok(/max:\s*8,\s*default:\s*6/.test(circles), 'and the front end agrees before it asks');
+  ok(server.indexOf('store.lowerCaps(CAP_RANGE.max)') !== -1, 'old circles come down to it');
+  ok(db.indexOf('WHERE cap > ?') !== -1, 'without throwing anyone out');
+  ok(server.indexOf('serial monologue') !== -1, 'and the reason is in the code');
+});
+
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail) {
   failures.slice(0, 25).forEach(function (f) { console.log('   ✗ ' + f); });
