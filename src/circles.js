@@ -18,7 +18,8 @@
     trust: null,
     rule: null,
     capRange: { min: 4, max: 12, default: 8 },
-    safety: []
+    safety: [],
+    planAsk: 'Say how you will get there: where you are setting off from, when, and how.'
   };
 
   // ---------- helpers (deliberately a local copy; see social.js) ----------
@@ -136,6 +137,52 @@
     ]);
   }
 
+  /* Questions that get harder as the circle earns them.
+   *
+   * Aron et al. (1997) walked strangers up three sets of escalating questions
+   * and got more closeness in forty-five minutes than small talk ever
+   * produces; the escalation is the mechanism. Reis & Shaver add the
+   * condition — disclosure only builds closeness if someone responds to it —
+   * so a set opens only once the one below it has actually been answered, by
+   * more than one person. A circle cannot skip to the deep end by waiting. */
+  function disclosureBlock(c, sets) {
+    var d = c.disclosure;
+    if (!d) return null;
+    var list = sets && sets.length ? sets : FYC.PROMPT_SETS;
+    return el('div', { class: 'ladder-box' }, [
+      el('div', { class: 'ready-head' }, [
+        el('b', { text: 'How deep the questions go' }),
+        el('span', { class: 'badge', text: d.label.toLowerCase() + ' · ' + d.depth + ' of ' + d.of })
+      ]),
+      el('ol', { class: 'ladder' }, list.map(function (s) {
+        return el('li', { class: s.depth < d.depth ? 'done' : s.depth === d.depth ? 'now' : '' }, [
+          el('b', { text: s.label }),
+          el('span', { text: ' — ' + s.note })
+        ]);
+      })),
+      el('p', { class: 'hint', text: d.needed
+        ? d.answered + ' of ' + d.needed + ' questions at this level answered by '
+          + d.answeredBy + ' or more of you. That is what opens the next one — a '
+          + 'question nobody replies to does not count, because being answered is the whole point of asking.'
+        : 'Every set is open. There is nothing left for the app to hold back.' })
+    ]);
+  }
+
+  /* Somebody answered and nobody said anything back.
+   *
+   * This is the failure mode Reis & Shaver's model predicts: the disclosure
+   * happened, the response did not, and the person who went first is worse off
+   * than if they had said nothing. Never shown to the person it happened to. */
+  function respondBlock(c) {
+    var r = c.respond;
+    if (!r) return null;
+    return el('div', { class: 'notice drift' }, [
+      el('b', { text: r.display + ' answered and nobody replied. ' }),
+      'That was ' + ago(r.at) + '.',
+      el('p', { class: 'hint', text: 'Answering a question is the easy half. Disclosure only brings people closer when somebody responds to it, so this one is on the rest of you.' })
+    ]);
+  }
+
   function loading(text) {
     return el('div', { class: 'card loading' }, [
       el('span', { class: 'spinner', 'aria-hidden': 'true' }),
@@ -240,6 +287,7 @@
       el('p', { class: 'where', text: c.city + ' · ' + liveLine(c) + (c.myRole === 'host' ? ' · you host' : '') }),
       interestBadges(c.interests, c.overlapIds),
       readinessBlock(c.readiness, { quiet: true }),
+      respondBlock(c),
       driftBlock(c),
       c.stale && (!c.drift || c.drift.stage === 'none' || c.drift.stage === 'ok')
         ? el('p', { class: 'hint nudge', text: 'Nobody has said anything for a while. Open it and post a prompt.' }) : null
@@ -481,6 +529,7 @@
     }
     host.innerHTML = '';
     S.safety = d.safety || [];
+    if (d.planAsk) S.planAsk = d.planAsk;
     var c = d.circle;
 
     host.appendChild(el('div', { class: 'actions' }, [
@@ -494,8 +543,10 @@
     host.appendChild(el('article', { class: 'card' }, [
       el('p', { class: 'blurb', text: c.blurb }),
       interestBadges(c.interests, c.overlapIds),
+      c.myRole ? respondBlock(c) : null,
       c.myRole ? driftBlock(c) : null,
       readinessBlock(c.readiness, {}),
+      c.myRole ? disclosureBlock(c, d.promptSets) : null,
       c.myRole && c.readiness.ready ? hoursBlock(c) : null
     ]));
 
@@ -572,8 +623,13 @@
           if (m.kind === 'system') {
             list.appendChild(el('div', { class: 'msg system' }, [el('p', { text: m.body })]));
           } else if (m.kind === 'prompt') {
+            // The set it came from, so the escalation is visible rather than
+            // something the app does quietly behind the conversation.
+            var set = FYC.PROMPT_SETS[FYC.promptDepth(m.body) - 1];
             list.appendChild(el('div', { class: 'msg prompt' }, [
-              el('span', { class: 'prompt-tag', text: 'Question for the circle' }),
+              el('span', { class: 'prompt-tag', text: set
+                ? 'Question for the circle · ' + set.label.toLowerCase()
+                : 'Question for the circle' }),
               el('p', { text: m.body })
             ]));
           } else {
@@ -626,8 +682,11 @@
           try { await api('POST', '/api/circles/' + c.id + '/prompt'); await pull(); }
           catch (e) { showErr(err, e); }
           btn.disabled = false;
-        } }, ['Post a question for everyone'])
+        } }, [c.disclosure && c.disclosure.depth > 1
+          ? 'Post a ' + c.disclosure.label.toLowerCase() + ' question'
+          : 'Post a question for everyone'])
       ]),
+      c.disclosure ? el('p', { class: 'hint', text: 'The questions get more personal as the circle answers them. You are on "' + c.disclosure.label + '".' }) : null,
       readyBox
     ]));
 
@@ -667,13 +726,52 @@
       var bar = el('div', { class: 'quorum' }, [
         el('div', { class: 'quorum-fill', style: 'width:' + Math.min(100, Math.round(k.yes / k.quorum * 100)) + '%' })
       ]);
+      var planSlot = el('div');
+
+      async function answer(ans, plan) {
+        err.hidden = true;
+        try {
+          await api('POST', '/api/meetups/' + k.id + '/rsvp', { answer: ans, plan: plan || '' });
+          openCircle(c.id);
+        } catch (e) { showErr(err, e); }
+      }
+
+      /* A yes asks one more question: how you will actually get there.
+       *
+       * Gollwitzer & Sheeran (2006) meta-analysed 94 studies of if-then plans
+       * — naming when, where and how you will act moves people from intending
+       * to doing, with a medium-to-large effect. A yes here is exactly a bare
+       * intention, and the quorum means other people are counting on it. */
+      function planForm() {
+        var field = el('input', {
+          type: 'text', maxlength: '200', value: k.myPlan || '',
+          placeholder: 'e.g. leaving work at 6:15, the 14 bus, there by 6:40'
+        });
+        var box = el('div', { class: 'planbox' }, [
+          el('p', { class: 'hint', text: S.planAsk }),
+          el('label', { class: 'field' }, [el('span', { text: 'How you will get there' }), field]),
+          el('p', { class: 'hint', text: 'Only you ever see this. It is here because writing it down is what makes people turn up.' }),
+          el('div', { class: 'actions' }, [
+            el('button', { class: 'btn sm', type: 'button', onclick: function () {
+              answer('yes', field.value);
+            } }, [k.myRsvp === 'yes' ? 'Save the plan' : 'Yes, and that is my plan'])
+          ])
+        ]);
+        field.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); answer('yes', field.value); }
+        });
+        return box;
+      }
+
       function rsvpBtn(ans, text) {
         return el('button', {
           class: 'btn sm' + (k.myRsvp === ans ? '' : ' ghost'), type: 'button',
-          onclick: async function () {
-            err.hidden = true;
-            try { await api('POST', '/api/meetups/' + k.id + '/rsvp', { answer: ans }); openCircle(c.id); }
-            catch (e) { showErr(err, e); }
+          onclick: function (ev) {
+            if (ans !== 'yes') return answer(ans);
+            // Yes is the only answer that costs a sentence.
+            planSlot.innerHTML = '';
+            planSlot.appendChild(planForm());
+            ev.currentTarget.blur();
           }
         }, [text]);
       }
@@ -699,9 +797,12 @@
         k.recurring
           ? el('p', { class: 'hint', text: 'Repeats ' + k.cadenceLabel.toLowerCase() + '. You say yes or no to each one as it comes round.' })
           : el('p', { class: 'hint', text: 'One-off. Seeing the same people again is what turns a nice evening into a friendship, so a repeating one is usually worth more.' }),
+        k.myRsvp === 'yes' && k.myPlan
+          ? el('p', { class: 'hint plan', text: 'Your plan: ' + k.myPlan + ' — only you see this.' }) : null,
         err,
         el('div', { class: 'actions' }, [
-          rsvpBtn('yes', 'Yes'), rsvpBtn('maybe', 'Maybe'), rsvpBtn('no', 'No'),
+          rsvpBtn('yes', k.myRsvp === 'yes' ? 'Yes · change the plan' : 'Yes'),
+          rsvpBtn('maybe', 'Maybe'), rsvpBtn('no', 'No'),
           (k.proposerId === (S.user && S.user.id) || c.myRole === 'host')
             ? el('button', { class: 'btn ghost sm', type: 'button', onclick: async function () {
                 if (!confirm('Call off "' + k.title + '"?')) return;
@@ -709,6 +810,7 @@
                 openCircle(c.id);
               } }, ['Call it off']) : null
         ]),
+        planSlot,
         safetyList()
       ]));
     });
@@ -747,6 +849,7 @@
     var when = el('input', { type: 'datetime-local', required: true });
     var details = el('textarea', { rows: '2', maxlength: '600', placeholder: 'Anything else worth knowing (optional)' });
     var hours = el('input', { type: 'number', min: '0.5', max: '12', step: '0.5', value: '2' });
+    var plan = el('input', { type: 'text', maxlength: '200', placeholder: 'e.g. walking from home at 9:30, there by 10' });
     // Repeating is the default on purpose. One-offs are how you have a nice
     // evening with people you never see again.
     var order = ['fortnightly', 'weekly', 'monthly', ''];
@@ -787,6 +890,10 @@
         ])
       ]),
       el('label', { class: 'field' }, [el('span', { text: 'Details' }), details]),
+      el('label', { class: 'field' }, [
+        el('span', { text: 'How you will get there' }), plan,
+        el('p', { class: 'hint', text: 'Proposing it is your yes, so it carries a plan like anyone else’s. ' + S.planAsk + ' Only you see it.' })
+      ]),
       err,
       el('div', { class: 'actions' }, [
         el('button', { class: 'btn sm', type: 'button', onclick: async function (ev) {
@@ -797,7 +904,7 @@
           try {
             await api('POST', '/api/circles/' + c.id + '/meetups', {
               title: title.value, place: place.value, details: details.value,
-              cadence: cadence.value, hours: Number(hours.value),
+              cadence: cadence.value, hours: Number(hours.value), plan: plan.value,
               startsAt: when.value ? new Date(when.value).getTime() : null,
               orgId: o ? o.id : '', orgName: o ? o.name : '', orgUrl: o ? (o.firstStep && o.firstStep.url) || o.url : ''
             });
@@ -846,12 +953,47 @@
     }))));
   }
 
+  /* A thread with one person, not the whole room.
+   *
+   * Ren, Kraut & Kiesler (2007): you can be attached to a group because of
+   * what it is about, or because of the people in it. A single group thread
+   * only ever builds the first kind, and the second is the kind that survives
+   * the group going quiet. So there is a door to one person — and it is a
+   * narrow one, because you have both already spoken here. */
+  function sideThreadBox(c, p, err) {
+    var text = el('textarea', { rows: '2', maxlength: '2000',
+      placeholder: 'Something only worth saying to ' + p.display + '…' });
+    var done = el('p', { class: 'hint', hidden: true });
+    var box = el('div', { class: 'applybox' }, [
+      el('p', { class: 'hint', text: 'This starts an ordinary conversation in Messages — the two of you, nobody else in the circle. Blocking and reporting work there exactly as they do everywhere else.' }),
+      text, done,
+      el('div', { class: 'actions' }, [
+        el('button', { class: 'btn sm', type: 'button', onclick: async function (ev) {
+          err.hidden = true;
+          var btn = ev.currentTarget;
+          btn.disabled = true;
+          try {
+            await api('POST', '/api/circles/' + c.id + '/threads', { userId: p.id, body: text.value });
+            text.hidden = true;
+            btn.hidden = true;
+            done.textContent = 'Sent. It is in Messages now.';
+            done.hidden = false;
+          } catch (e) { showErr(err, e); btn.disabled = false; }
+        } }, ['Send it']),
+        el('button', { class: 'btn ghost sm', type: 'button', onclick: function () { show('messages'); } }, ['Open Messages'])
+      ])
+    ]);
+    return box;
+  }
+
   function membersCard(host, c, members) {
     host.appendChild(el('article', { class: 'card' }, [
       el('h3', { text: 'Who is here' }),
-      el('p', { class: 'hint', text: 'Vouch for someone once you have actually talked. Two vouches move them up a trust tier, which is what gets them into other circles.' })
+      el('p', { class: 'hint', text: 'Vouch for someone once you have actually talked. Two vouches move them up a trust tier, which is what gets them into other circles.' }),
+      el('p', { class: 'hint', text: 'A group thread builds attachment to the group. Attachment to the people in it needs knowing something about them one at a time — which is what the shared interests and the one-to-one threads are for.' })
     ].concat(members.map(function (p) {
       var err = errLine();
+      var slot = el('div');
       return el('div', { class: 'member' }, [
         el('div', { class: 'person-top' }, [
           el('h4', { text: p.display + (p.role === 'host' ? ' · host' : '') }),
@@ -861,8 +1003,20 @@
         el('p', { class: 'where', text: [p.city, p.verified ? 'verified' : 'unverified',
           p.vouches === 1 ? '1 vouch' : p.vouches + ' vouches',
           hoursText(p.hours) + ' together', 'joined ' + ago(p.joinedAt)].join(' · ') }),
+        p.shared && p.shared.length ? el('p', { class: 'hint', text: p.shared.length === 1
+          ? 'You both picked:' : 'The ' + p.shared.length + ' things you both picked:' }) : null,
+        p.shared && p.shared.length ? interestBadges(p.shared, p.shared) : null,
         err,
+        p.whyNot && !p.canMessage ? el('p', { class: 'hint locked', text: p.whyNot }) : null,
         el('div', { class: 'actions' }, [
+          p.threadId ? el('button', { class: 'btn ghost sm', type: 'button', onclick: function () {
+            show('messages');
+          } }, ['You two are already talking'])
+            : p.canMessage ? el('button', { class: 'btn ghost sm', type: 'button', onclick: function (ev) {
+                ev.currentTarget.hidden = true;
+                slot.appendChild(sideThreadBox(c, p, err));
+              } }, ['Message ' + p.display])
+            : null,
           p.iVouched ? el('span', { class: 'badge hit', text: 'You vouch for them' })
             : p.canVouch ? el('button', { class: 'btn ghost sm', type: 'button', onclick: async function (ev) {
                 err.hidden = true;
@@ -876,7 +1030,8 @@
             await api('DELETE', '/api/circles/' + c.id + '/members/' + p.id);
             openCircle(c.id);
           } }, ['Remove']) : null
-        ])
+        ]),
+        slot
       ]);
     }))));
   }
@@ -947,8 +1102,8 @@
     host.appendChild(box);
   }
 
-  function show() {
-    if (window.FYC_SHOW) window.FYC_SHOW('circles');
+  function show(which) {
+    if (window.FYC_SHOW) window.FYC_SHOW(which || 'circles');
   }
 
   // ---------- wiring ----------

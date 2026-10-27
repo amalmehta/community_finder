@@ -190,11 +190,15 @@ CREATE TABLE IF NOT EXISTS meetups (
   hours        REAL NOT NULL DEFAULT 2
 );
 
+-- plan is the if-then plan behind a yes: where you are setting off from, when,
+-- and how. Gollwitzer & Sheeran (2006) is the reason it is asked for at all,
+-- and it is shown back only to the person who wrote it.
 CREATE TABLE IF NOT EXISTS meetup_rsvps (
   meetup_id INTEGER NOT NULL REFERENCES meetups(id) ON DELETE CASCADE,
   user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   answer    TEXT NOT NULL,            -- yes | maybe | no
   at        INTEGER NOT NULL,
+  plan      TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (meetup_id, user_id)
 );
 
@@ -248,7 +252,9 @@ const ADDED_COLUMNS = [
   ['reports', 'note', "TEXT NOT NULL DEFAULT ''"],
   ['circles', 'ready_at', 'INTEGER'],
   ['meetups', 'cadence', "TEXT NOT NULL DEFAULT ''"],
-  ['meetups', 'hours', 'REAL NOT NULL DEFAULT 2']
+  ['meetups', 'hours', 'REAL NOT NULL DEFAULT 2'],
+  // The if-then plan attached to a yes. Private to the person who wrote it.
+  ['meetup_rsvps', 'plan', "TEXT NOT NULL DEFAULT ''"]
 ];
 
 function migrate(db) {
@@ -542,7 +548,7 @@ function createStore(db) {
     },
     circleMembers(circleId) {
       return q(`SELECT cm.role, cm.joined_at, u.id, u.display, u.username, u.city, u.bio,
-                       u.email_verified, u.suspended,
+                       u.email_verified, u.suspended, u.open_to_direct,
                        (SELECT COUNT(*) FROM circle_messages m
                          WHERE m.circle_id = cm.circle_id AND m.sender_id = u.id AND m.kind = 'chat') AS said,
                        (SELECT COUNT(*) FROM vouches v WHERE v.to_id = u.id) AS vouches
@@ -662,6 +668,52 @@ function createStore(db) {
       return q(`SELECT body FROM circle_messages WHERE circle_id = ? AND kind = 'prompt'`)
         .all(circleId).map((r) => r.body);
     },
+    /** Every prompt this circle has had, and how many different people replied
+     *  to it before the next one went up. An unanswered question is what the
+     *  escalating sets refuse to climb past. */
+    promptRuns(circleId) {
+      const ps = q(`SELECT id, body FROM circle_messages
+                    WHERE circle_id = ? AND kind = 'prompt' ORDER BY id ASC`).all(circleId);
+      const count = q(`SELECT COUNT(DISTINCT sender_id) AS n FROM circle_messages
+                       WHERE circle_id = ? AND kind = 'chat' AND id > ? AND id < ?`);
+      return ps.map((p, i) => ({
+        id: p.id,
+        body: p.body,
+        answeredBy: count.get(circleId, p.id, ps[i + 1] ? ps[i + 1].id : Number.MAX_SAFE_INTEGER).n
+      }));
+    },
+    /** Someone answered the last question and nobody has said anything since.
+     *  Reis & Shaver: disclosure without a response does not build closeness,
+     *  it just leaves someone hanging. */
+    lastUnanswered(circleId) {
+      const p = q(`SELECT id FROM circle_messages WHERE circle_id = ? AND kind = 'prompt'
+                   ORDER BY id DESC LIMIT 1`).get(circleId);
+      if (!p) return null;
+      const first = q(`SELECT m.id, m.sender_id, m.created_at,
+                              COALESCE(u.display, 'someone who left') AS display
+                       FROM circle_messages m LEFT JOIN users u ON u.id = m.sender_id
+                       WHERE m.circle_id = ? AND m.kind = 'chat' AND m.id > ?
+                       ORDER BY m.id ASC LIMIT 1`).get(circleId, p.id);
+      if (!first) return null;
+      const reply = q(`SELECT 1 FROM circle_messages
+                       WHERE circle_id = ? AND kind = 'chat' AND id > ? AND sender_id IS NOT ?
+                       LIMIT 1`).get(circleId, first.id, first.sender_id);
+      if (reply) return null;
+      return { userId: first.sender_id, display: first.display, at: first.created_at };
+    },
+    /** Has this person actually said anything here? The side-thread gate. */
+    saidIn(circleId, userId) {
+      return q(`SELECT COUNT(*) AS n FROM circle_messages
+                WHERE circle_id = ? AND sender_id = ? AND kind = 'chat'`).get(circleId, userId).n;
+    },
+    /** What two people both picked, and both show. Individuating information
+     *  that a single group thread never surfaces on its own. */
+    sharedInterests(a, b) {
+      return q(`SELECT x.interest FROM user_interests x
+                JOIN user_interests y ON y.interest = x.interest AND y.user_id = ?
+                WHERE x.user_id = ? AND x.visible = 1 AND y.visible = 1`)
+        .all(b, a).map((r) => r.interest);
+    },
     lastPromptAt(circleId) {
       const r = q(`SELECT MAX(created_at) AS at FROM circle_messages
                    WHERE circle_id = ? AND kind = 'prompt'`).get(circleId);
@@ -707,7 +759,8 @@ function createStore(db) {
              String(m.orgUrl || '').slice(0, 300), m.quorum, now(),
              String(m.cadence || ''), Number(m.hours) || 2);
       const id = Number(info.lastInsertRowid);
-      S.rsvp(id, m.proposerId, 'yes');
+      // Proposing is a yes, and a yes carries its plan like any other.
+      S.rsvp(id, m.proposerId, 'yes', m.plan);
       return id;
     },
     meetupById(id) {
@@ -721,14 +774,20 @@ function createStore(db) {
                 WHERE m.circle_id = ? AND m.status IN ('proposed', 'on')
                 ORDER BY COALESCE(m.starts_at, m.created_at) ASC`).all(circleId);
     },
-    rsvp(meetupId, userId, answer) {
-      q(`INSERT INTO meetup_rsvps (meetup_id, user_id, answer, at) VALUES (?, ?, ?, ?)
-         ON CONFLICT (meetup_id, user_id) DO UPDATE SET answer = excluded.answer, at = excluded.at`)
-        .run(meetupId, userId, answer, now());
+    rsvp(meetupId, userId, answer, plan) {
+      q(`INSERT INTO meetup_rsvps (meetup_id, user_id, answer, at, plan) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (meetup_id, user_id)
+         DO UPDATE SET answer = excluded.answer, at = excluded.at, plan = excluded.plan`)
+        .run(meetupId, userId, answer, now(), String(plan || '').slice(0, 200));
     },
     rsvpsFor(meetupId) {
       return q(`SELECT r.answer, r.user_id, u.display FROM meetup_rsvps r
                 JOIN users u ON u.id = r.user_id WHERE r.meetup_id = ?`).all(meetupId);
+    },
+    /** Your own row, which is the only place your plan is ever read from. */
+    myRsvp(meetupId, userId) {
+      return q('SELECT * FROM meetup_rsvps WHERE meetup_id = ? AND user_id = ?')
+        .get(meetupId, userId);
     },
     yesCount(meetupId) {
       return q(`SELECT COUNT(*) AS n FROM meetup_rsvps WHERE meetup_id = ? AND answer = 'yes'`)

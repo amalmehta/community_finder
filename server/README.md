@@ -134,12 +134,55 @@ hand-checked listing from the finder's own city data, so "do something" names a
 real place. Every meetup card carries the first-meetup checklist from
 `FYC.MEETUP_SAFETY`.
 
+**A yes carries a plan** (`INTENTION`, `PLAN_ASK`). Gollwitzer & Sheeran (2006),
+meta-analysing 94 studies, found that naming when, where and how you will act
+moves people from intending to doing with a medium-to-large effect. A yes is
+exactly a bare intention, and the quorum means others are relying on it, so
+`POST /api/meetups/:id/rsvp` requires `plan` of 12 characters or more when
+`answer` is `yes` — and nothing at all for `maybe` or `no`. Proposing counts as
+your yes, so `POST /api/circles/:id/meetups` requires one too. The plan lives on
+the RSVP row, is returned only to its author as `myPlan`, and is deleted with
+the RSVP when a recurring meetup rolls on: each date needs its own cue.
+
+**Questions that escalate as the circle earns them** (`PROMPT_SETS`,
+`DISCLOSURE`). Aron et al. (1997) produced more closeness between strangers in
+45 minutes than small talk ever does, by walking them up three sets of
+increasingly personal questions — the escalation is the mechanism. Reis &
+Shaver's intimacy model supplies the condition: disclosure only builds closeness
+when somebody responds to it. So `FYC.PROMPT_SETS` has three sets (Easy,
+Personal, Real) and a circle opens the next one by answering two questions at
+its current level, where "answered" means two or more different people replied
+before the next question went up (`promptRuns` in `db.js`). A question nobody
+answers buys nothing, and a circle cannot reach the deep end by waiting.
+`POST /api/circles/:id/prompt` draws from the earned set and reports
+`disclosure` back.
+
+**And when nobody replies, the rest of the circle hears about it.**
+`lastUnanswered` finds the case the model warns about: someone answered the
+question, nobody said anything back, and the person who went first is worse off
+than if they had said nothing. After `respondAfterHours` (4) it appears on the
+circle as `respond` — for everyone **except** the person it happened to. Telling
+them nobody replied would be the one genuinely cruel thing the app could do.
+
+**Bonds, not just a shared subject** (`BOND`, `sideThread`). Ren, Kraut &
+Kiesler (2007) separate identity-based attachment (to the group and its
+subject) from bond-based attachment (to the particular people in it). One group
+thread can only build the first, and the second is what survives the group
+going quiet. Two things make the second possible: the member list shows what any
+two people both picked (`sharedInterests`, visible interests on both sides
+only), and `POST /api/circles/:id/threads` opens a one-to-one conversation with
+someone from the circle. The door is narrow — you have both already spoken
+there, which is what stops it being a cold DM — and the thread is an ordinary
+accepted connection, so it lands in Messages under the same blocking, reporting
+and daily caps as everything else. `openToDirect` is still respected.
+
 Circles are capped at 4–12 people (`CAP_RANGE`); past the cap an application is
 waitlisted rather than refused. A non-member sees a circle's name, city,
-description, joining question, size and liveliness — never the conversation and
-never the member list. Icebreakers come from `FYC.PROMPTS` in
-`src/data/core.js`, shared with the front end so nobody can post an invented
-one, rate-limited to one per circle per twelve hours.
+description, joining question, size and liveliness — never the conversation,
+never the member list, and not how deep its questions have got. Questions come
+from `FYC.PROMPT_SETS` in `src/data/core.js`, shared with the front end so
+nobody can post an invented one, rate-limited to one per circle per twelve
+hours.
 
 ### Endpoints
 
@@ -157,10 +200,11 @@ DELETE /api/circles/:id/members/:uid     host removes someone
 GET    /api/circles/:id/messages?since=  members only
 POST   /api/circles/:id/messages
 POST   /api/circles/:id/read             move the unread marker
-POST   /api/circles/:id/prompt           post the next icebreaker
+POST   /api/circles/:id/prompt           the next question, from the set you have earned
+POST   /api/circles/:id/threads          one-to-one, if you have both spoken here
 POST   /api/circles/:id/vouch
-POST   /api/circles/:id/meetups          409 until the circle is ready
-POST   /api/meetups/:id/rsvp             yes | maybe | no; quorum confirms it
+POST   /api/circles/:id/meetups          409 until the circle is ready; needs a plan
+POST   /api/meetups/:id/rsvp             yes | maybe | no; a yes needs a plan
 POST   /api/meetups/:id/cancel           proposer or host
 POST   /api/occurrences/:id/attended     were you there? the only thing that banks hours
 GET    /api/unread                       every badge in the header, in one call
@@ -189,15 +233,22 @@ auth decision in the main README.
 node tests/run-server-tests.js
 ```
 
-218 assertions covering signup and sign-in, session isolation, interest
+263 assertions covering signup and sign-in, session isolation, interest
 visibility, the request/accept/message flow, outsiders being kept out of other
 people's threads, blocking, reporting, rate limits, the full circle lifecycle
 (trust tiers, written applications, member seconding, the readiness gate,
 quorum, vouching, caps and waitlists, host tools), the drift clock and its
 refusal of icebreakers, the hours ledger, recurring meetups rolling forward,
-and that the server will not serve its own source or escape the project
-directory.
+the escalating question sets refusing to advance on an unanswered question, the
+responsiveness nudge staying hidden from the person it is about, the one-to-one
+thread gate in both directions, if-then plans being required on a yes and
+visible to nobody else, and that the server will not serve its own source or
+escape the project directory.
 
-The "two separate days" rung of the readiness gate is the one thing the tests
-relax, via `createApp({ ready: { minDays: 1 } })` — a circle's whole life
-happens in milliseconds there. The other three rungs are tested for real.
+Two things are relaxed, both because a circle's whole life happens in
+milliseconds there: the "two separate days" rung of the readiness gate, via
+`createApp({ ready: { minDays: 1 } })`, and the four-hour grace period before
+anyone is told nobody replied, via `disclosure: { respondAfterHours: 0 }`. The
+other three rungs, and everything else, are tested at their real values — the
+twelve-hour gap between questions included, which the tests work around by
+winding the message clock back rather than switching the rule off.

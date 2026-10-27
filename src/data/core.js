@@ -96,20 +96,67 @@
   // --- Circles: what a chat-first group needs before it meets ---------------
   // Shared with the server so the prompt a circle sees and the prompt the
   // server stores are the same list, and nobody can post an invented one.
-  var PROMPTS = [
-    'What made you look for a group like this one?',
-    'What is something you have done near here lately that you would recommend?',
-    'What does a good weekend look like for you?',
-    'What are you slightly bad at but enjoy anyway?',
-    'What is the last thing you got properly absorbed in?',
-    'Where do you go when you want to be around people without talking to them?',
-    'What would you like to be doing more of six months from now?',
-    'What is a small thing in this city that you think is underrated?',
-    'What time of day are you actually any good?',
-    'What puts you off a group? Useful to know before we plan anything.',
-    'What is something you have changed your mind about recently?',
-    'If we did one thing together this month, what would you want it to be?'
+  //
+  // Three sets, deliberately escalating. Aron et al. (1997) got strangers to
+  // report more closeness in forty-five minutes than small-talk controls by
+  // walking them up a ladder of increasingly personal questions — the
+  // escalation is the mechanism, not the questions. A circle climbs it by
+  // answering: a set opens up once the one below it has actually been
+  // answered, by more than one person. Reis & Shaver's intimacy model is why
+  // that condition is there — disclosure only builds closeness when somebody
+  // responds to it, so an unanswered question earns nothing.
+  var PROMPT_SETS = [
+    {
+      depth: 1,
+      label: 'Easy',
+      note: 'Facts, places, recommendations. Nobody has to give anything away.',
+      prompts: [
+        'What made you look for a group like this one?',
+        'What is something you have done near here lately that you would recommend?',
+        'What does a good weekend look like for you?',
+        'What time of day are you actually any good?',
+        'What is a small thing in this city that you think is underrated?'
+      ]
+    },
+    {
+      depth: 2,
+      label: 'Personal',
+      note: 'What you like, what you avoid, what you are actually like.',
+      prompts: [
+        'What are you slightly bad at but enjoy anyway?',
+        'What is the last thing you got properly absorbed in?',
+        'Where do you go when you want to be around people without talking to them?',
+        'What puts you off a group? Useful to know before we plan anything.',
+        'What is something you have changed your mind about recently?'
+      ]
+    },
+    {
+      depth: 3,
+      label: 'Real',
+      note: 'The things people only say once they trust the room. This is where a group chat becomes a group.',
+      prompts: [
+        'What is something you are quietly proud of that never comes up in conversation?',
+        'When did you last feel properly part of something, and what was it?',
+        'What is the hardest part of making friends somewhere new, for you?',
+        'What would you like to be doing more of six months from now?',
+        'If we did one thing together this month, what would you want it to be?'
+      ]
+    }
   ];
+
+  // The flat list, in ladder order: PROMPTS[0] is still the easiest opener,
+  // which is what a new circle and the default joining question both use.
+  var PROMPTS = PROMPT_SETS.reduce(function (acc, s) { return acc.concat(s.prompts); }, []);
+
+  /** Which set a prompt came from, found by its text so nothing has to be
+   *  stored alongside the message. 0 if it is not one of ours. */
+  function promptDepth(body) {
+    var found = 0;
+    PROMPT_SETS.forEach(function (s) {
+      if (s.prompts.indexOf(String(body)) !== -1) found = s.depth;
+    });
+    return found;
+  }
 
   // Shown on every meetup card. Not legal cover — it is the advice you would
   // give a friend, in the place they would read it.
@@ -123,6 +170,8 @@
 
   var FYC = g.FYC || {};
   FYC.PROMPTS = PROMPTS;
+  FYC.PROMPT_SETS = PROMPT_SETS;
+  FYC.promptDepth = promptDepth;
   FYC.MEETUP_SAFETY = MEETUP_SAFETY;
   FYC.GROUPS = GROUPS;
   FYC.INTERESTS = INTERESTS;

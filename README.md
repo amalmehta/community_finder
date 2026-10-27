@@ -111,9 +111,46 @@ do something" names a real place with a real first step. Every meetup card
 carries the same five-line first-meetup checklist: public place, tell someone,
 your own way home, leaving early is fine, report anyone who pushes past a no.
 
-**Dead group chats are the default**, so the circle can post an icebreaker from
-a shared list — one per twelve hours — and a circle nobody has spoken in for six
-days says so on its card.
+**The questions get harder as the circle earns them.** Aron et al. (1997) got
+strangers to report more closeness after forty-five minutes than small talk ever
+produces, by walking them up three sets of increasingly personal questions — the
+escalation is the mechanism, not the questions. So the shared list comes in
+three sets: *Easy* (facts and recommendations), *Personal* (what you like, avoid
+and are actually like) and *Real* (the things people only say once they trust the
+room). A circle opens the next set by answering the one it is on — two
+questions, each answered by two or more people. Reis & Shaver's intimacy model
+is why that condition exists: disclosure only brings people closer when somebody
+responds to it, so a question nobody answers buys nothing and no circle can
+reach the deep end by waiting.
+
+**And if somebody answers and nobody replies, the rest of the circle hears
+about it.** That is the exact failure the same model predicts: the disclosure
+happened, the response did not, and the person who went first is worse off than
+if they had said nothing. Everyone sees that notice except the one person it is
+about — being told nobody replied to you is the one genuinely unkind thing this
+app could do.
+
+**A group chat builds attachment to the group. Friendships need the people.**
+Ren, Kraut & Kiesler (2007) separate attachment to a group and its subject from
+attachment to its particular members, and a single group thread can only build
+the first — while the second is the kind that survives the group going quiet. Two
+things make it possible: the member list says what any two of you actually both
+picked, and you can open a one-to-one thread with someone in your circle. That
+door is narrow on purpose — you have both already spoken there, so it is never a
+cold DM — and the conversation lands in Messages under the same blocking,
+reporting and daily caps as every other one.
+
+**Saying yes costs a sentence.** Gollwitzer & Sheeran (2006), across 94 studies,
+found that naming when, where and how you will act is most of the difference
+between intending to do something and doing it. A yes to a meetup is exactly a
+bare intention, and the quorum means other people are relying on it, so a yes
+asks how you will get there: where you are setting off from, when, and how. Only
+you ever see it, it is shown back to you on the card as the reminder, and when a
+repeating meetup rolls on it goes with the RSVP — each date needs its own plan.
+
+**Dead group chats are the default**, so the circle can post a question from the
+set it has earned — one per twelve hours — and a circle nobody has spoken in for
+six days says so on its card.
 
 ---
 
@@ -253,11 +290,15 @@ npm test        # both suites
 node tests/run-tests.js
 ```
 
-1670+ assertions covering data integrity (every listing has a valid first step,
+7900+ assertions covering data integrity (every listing has a valid first step,
 a real URL, interests that exist in the taxonomy, ratings in range), city lookup
 and aliasing, the universal fallback engine, matcher behaviour (a nervous person
 gets gentle options first, budget is respected, the comfort dial actually
-re-ranks, no duplicate results), and that `index.html` loads every file it needs.
+re-ranks, no duplicate results), that `index.html` loads every file it needs,
+and that every number the circles argument rests on is still the number the
+research says — the four rungs of the gate, 14 and 28 days, 50/90/200 hours,
+three escalating question sets, two answers to climb one. Change one of those
+and this suite fails, which is the point of pinning them.
 
 ```bash
 node tools/check-links.js
@@ -281,12 +322,15 @@ each week. You can also run it on demand from the Actions tab.
 node tests/run-server-tests.js
 ```
 
-65 assertions against a real HTTP server on a throwaway database: signup and
+263 assertions against a real HTTP server on a throwaway database: signup and
 sign-in, session isolation, that a hidden interest cannot be used to find you,
 the request/accept/message flow, outsiders being locked out of other people's
-threads, blocking, reporting, rate limits, and that the server serves only the
-front end — not its own source, the database, or anything reachable by path
-traversal.
+threads, blocking, reporting, rate limits, the whole life of a circle — vetting,
+the gate, the drift clock, the hours ledger, meetups rolling forward, the
+question sets refusing to escalate on an unanswered question, one-to-one threads
+being closed to anyone who has not spoken, if-then plans being required on a yes
+and shown to nobody else — and that the server serves only the front end, not
+its own source, the database, or anything reachable by path traversal.
 
 **Moving around it:** every question has **Back**, which replays your earlier
 answers from scratch rather than keeping undo state — the engine is pure, so the
@@ -436,6 +480,17 @@ behavioural record completely.
 - Hours are self-reported. Someone can claim a meetup they skipped, and the
   only check is that two people have to confirm before it counts as the
   circle's hours rather than one person's.
+- "Two people replied" is a crude stand-in for "the room responded". Reis and
+  Shaver's point is about perceived understanding, which no amount of counting
+  messages can detect; a circle could answer two questions dismissively and
+  still climb a rung.
+- The if-then plan is not checked against anything. Nobody verifies that the
+  bus exists or that you got on it — the research is about writing the plan,
+  and that is all this does.
+- One-to-one threads cut both ways. They are the mechanism that turns a group
+  into friendships, and they are also how a group quietly becomes two people
+  and some bystanders. The gate (both of you having spoken in the circle) is
+  about safety, not about that.
 - Vetting is the host's judgement plus two seconds. It is a real filter and not
   a background check, and nothing here verifies that anyone is who they say.
 - Circle messages are plain text in the database, readable by whoever runs the

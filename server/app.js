@@ -139,6 +139,56 @@ const CADENCES = {
   monthly: { label: 'Every four weeks', days: 28 }
 };
 
+// Ren, Kraut & Kiesler (2007) separate two reasons people stay with a group:
+// identity-based attachment, to the group and its subject, and bond-based
+// attachment, to the particular people in it. One group thread can only build
+// the first — bonds need to know about individuals, and somewhere to talk to
+// one of them. These are the two cheapest ways to make that possible without
+// turning a circle into a dating app: show what any two people actually have
+// in common, and open a one-to-one thread between people who have both
+// already spoken in the circle.
+const BOND = { bothSpoken: true };
+
+// Aron et al. (1997): strangers taken up a ladder of escalating questions
+// reported more closeness after forty-five minutes than small-talk controls,
+// and the escalation is the mechanism rather than the questions. Reis &
+// Shaver's intimacy model supplies the condition — disclosure only builds
+// closeness when someone responds to it — so a circle earns the next set by
+// answering the one it is on, and an unanswered question earns nothing.
+const PROMPT_SETS = globalThis.FYC.PROMPT_SETS;
+const DISCLOSURE = {
+  answersToAdvance: 2,    // answered questions needed to open the next set
+  answeredBy: 2,          // different people replying is what "answered" means
+  respondAfterHours: 4    // how long someone hangs before anyone is nudged
+};
+
+// Gollwitzer & Sheeran (2006), meta-analysing 94 studies: forming an if-then
+// plan that names when, where and how you will act has a medium-to-large
+// effect on whether you do it — far more than intending to. A yes to a meetup
+// is a goal intention, and the quorum means other people are relying on it,
+// so saying yes costs one sentence about how you will actually get there.
+const INTENTION = { minChars: 12 };
+const PLAN_ASK = 'Say how you will get there: where you are setting off from, when, and how. ' +
+  'That sentence is most of the difference between meaning to go and going.';
+
+/** How deep this circle has earned the right to ask, and what is left. */
+function disclosureOf(runs, rule) {
+  const answered = PROMPT_SETS.map(() => 0);
+  runs.forEach((r) => {
+    const d = globalThis.FYC.promptDepth(r.body);
+    if (d && r.answeredBy >= rule.answeredBy) answered[d - 1]++;
+  });
+  let depth = 1;
+  while (depth < PROMPT_SETS.length && answered[depth - 1] >= rule.answersToAdvance) depth++;
+  const set = PROMPT_SETS[depth - 1];
+  return {
+    depth, of: PROMPT_SETS.length, label: set.label, note: set.note,
+    answered: answered[depth - 1],
+    needed: depth < PROMPT_SETS.length ? rule.answersToAdvance : 0,
+    answeredBy: rule.answeredBy
+  };
+}
+
 /** Where someone is on Hall's ladder, and what the next rung is. */
 function hallLadder(hours) {
   const h = Math.round(hours * 10) / 10;
@@ -279,12 +329,13 @@ const VERSION = require('../package.json').version;
 
 function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure = false,
                     limits = {}, mailer = null, baseUrl = null, log = null, ready = {},
-                    drift = {} } = {}) {
+                    drift = {}, disclosure = {} } = {}) {
   const L = Object.assign({}, DEFAULT_LIMITS, limits);
   // Tests run a circle's whole life in a few milliseconds, so the "separate
   // days" part of the gate has to be adjustable. Nothing else overrides it.
   const R = Object.assign({}, READY_RULE, ready);
   const D = Object.assign({}, DRIFT_RULE, drift);
+  const DI = Object.assign({}, DISCLOSURE, disclosure);
   SECURE_MODE = !!secure;
   const store = createStore(open(file));
   const mail = mailer || createMailer();
@@ -672,8 +723,33 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     return Object.assign({ stage, days }, base);
   }
 
-  /** Everything the UI needs about one circle, from this person's angle. */
-  function viewCircle(c, u, trust) {
+  /** Whether this person can open a one-to-one thread with that one, and if
+   *  not, the reason in the words the UI shows. Narrow on purpose: nobody
+   *  gets a private message from someone who has not spoken in the circle,
+   *  in either direction, so it can never be a cold approach. */
+  function sideThread(circleId, me, them) {
+    const no = (why) => ({ canMessage: false, whyNot: why, threadId: null });
+    if (them.id === me.id) return no(null);
+    if (store.isBlocked(me.id, them.id)) return no(null);
+    const conn = store.connectionBetween(me.id, them.id);
+    if (conn && conn.status === 'accepted') {
+      return { canMessage: true, whyNot: null, threadId: conn.id };
+    }
+    if (conn && conn.status === 'pending') {
+      return no('There is already an introduction waiting with them.');
+    }
+    if (!them.open_to_direct) return no(them.display + ' only takes introductions.');
+    if (BOND.bothSpoken && !store.saidIn(circleId, me.id)) {
+      return no('Say something to the circle first.');
+    }
+    if (BOND.bothSpoken && !them.said) return no('Once they have said something here.');
+    return { canMessage: true, whyNot: null, threadId: null };
+  }
+
+  /** Everything the UI needs about one circle, from this person's angle.
+   *  `deep` adds what only the circle's own page shows, and costs a query per
+   *  question the circle has asked — so the list of sixty does without it. */
+  function viewCircle(c, u, trust, deep) {
     const stats = store.circleStats(c.id);
     const interests = c.interests !== undefined && c.interests !== null
       ? String(c.interests).split(',').filter(Boolean)
@@ -706,6 +782,21 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
       c.ready_at = Date.now();
     }
 
+    // How deep the questions have earned the right to go, and whether anyone
+    // is currently hanging. Members only: neither is any of a stranger's
+    // business. The nudge is cheap enough to carry on a card in the list; the
+    // ladder is not, and only the circle's own page draws it.
+    const disc = mem && deep ? disclosureOf(store.promptRuns(c.id), DI) : null;
+    let respond = null;
+    if (mem) {
+      const un = store.lastUnanswered(c.id);
+      // Never shown to the person who is waiting. "Nobody replied to you" is
+      // not something to tell the one it happened to.
+      if (un && un.userId !== u.id && Date.now() - un.at >= DI.respondAfterHours * HOUR) {
+        respond = { display: un.display, at: un.at, hours: DI.respondAfterHours };
+      }
+    }
+
     return {
       id: c.id, name: c.name, city: c.city, blurb: c.blurb, question: c.question,
       hostId: c.host_id, hostName: c.host_name || (store.userById(c.host_id) || {}).display || null,
@@ -726,6 +817,8 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
         mine: hallLadder(store.hoursOf(u.id, c.id)),
         circle: Math.round(store.circleHours(c.id) * 10) / 10
       },
+      disclosure: disc,
+      respond,
       myRole: mem ? mem.role : null,
       myApplication: app ? { id: app.id, status: app.status, at: app.created_at } : null,
       pending: c.pending === undefined ? undefined : c.pending,
@@ -774,7 +867,8 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
 
     send(res, 200, {
       mine, circles: open, trust, rule: R, capRange: CAP_RANGE,
-      trustLabels: TRUST_LABELS, prompts: PROMPTS.length, hall: HALL, cadences: CADENCES,
+      trustLabels: TRUST_LABELS, prompts: PROMPTS.length, promptSets: PROMPT_SETS,
+      hall: HALL, cadences: CADENCES, planAsk: PLAN_ASK,
       me: { id: u.id, city: u.city, display: u.display }
     });
   });
@@ -821,7 +915,7 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
       c = store.circleById(c.id);
     }
     const trust = trustOf(u, store);
-    const v = viewCircle(c, u, trust);
+    const v = viewCircle(c, u, trust, true);
     const mem = !!v.myRole;
 
     // A non-member sees the shopfront: what it is, how busy, what it will ask
@@ -829,20 +923,24 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     if (!mem) {
       return send(res, 200, {
         circle: v, trust, rule: R, members: null, meetups: [], occurrences: [], confirm: [],
-        cadences: CADENCES, hall: HALL, safety: globalThis.FYC.MEETUP_SAFETY
+        cadences: CADENCES, hall: HALL, promptSets: PROMPT_SETS, planAsk: PLAN_ASK,
+        safety: globalThis.FYC.MEETUP_SAFETY
       });
     }
 
-    const members = store.circleMembers(c.id).map((p) => ({
+    const members = store.circleMembers(c.id).map((p) => Object.assign({
       id: p.id, display: p.display, city: p.city, bio: p.bio,
       role: p.role, joinedAt: p.joined_at, said: p.said, vouches: p.vouches,
       verified: !!p.email_verified, hours: Math.round(store.hoursOf(p.id, c.id) * 10) / 10,
       iVouched: store.hasVouched(c.id, u.id, p.id),
-      canVouch: p.id !== u.id && p.said > 0 && !store.hasVouched(c.id, u.id, p.id)
-    }));
+      canVouch: p.id !== u.id && p.said > 0 && !store.hasVouched(c.id, u.id, p.id),
+      // What the two of you have in common, which the group thread never
+      // says out loud. Visible interests only, on both sides.
+      shared: p.id === u.id ? [] : store.sharedInterests(u.id, p.id)
+    }, sideThread(c.id, u, p)));
     const meetups = store.meetupsFor(c.id).map((k) => {
       const rsvps = store.rsvpsFor(k.id);
-      const mineR = rsvps.filter((r) => r.user_id === u.id)[0];
+      const mineR = store.myRsvp(k.id, u.id);
       return {
         id: k.id, title: k.title, place: k.place, startsAt: k.starts_at, details: k.details,
         org: k.org_name ? { id: k.org_id, name: k.org_name, url: k.org_url } : null,
@@ -851,13 +949,15 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
         hours: k.hours, recurring: !!k.cadence,
         proposer: k.proposer_name, proposerId: k.proposer_id,
         myRsvp: mineR ? mineR.answer : null,
+        // Your own if-then plan, returned to nobody but you.
+        myPlan: mineR ? mineR.plan || '' : '',
         going: rsvps.filter((r) => r.answer === 'yes').map((r) => r.display)
       };
     });
 
     send(res, 200, {
       circle: v, trust, rule: R, members, meetups,
-      cadences: CADENCES, hall: HALL,
+      cadences: CADENCES, hall: HALL, promptSets: PROMPT_SETS, planAsk: PLAN_ASK,
       // What has already happened, and anything this person has not yet said
       // whether they turned up to. Hours are only banked on a yes here.
       occurrences: store.occurrencesFor(c.id, 10).map((o) => ({
@@ -1027,8 +1127,11 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     send(res, 200, { ok: true });
   });
 
-  /** Post the next unused icebreaker. A dead group chat is the default state
-   *  of every group chat; this is the cheapest thing that fixes it. */
+  /** Post the next unused question. A dead group chat is the default state of
+   *  every group chat; this is the cheapest thing that fixes it. The question
+   *  comes from whichever set the circle has earned: three sets, each more
+   *  personal than the last, and a set opens only once the one below it has
+   *  been answered by more than one person. */
   route('POST', /^\/api\/circles\/(\d+)\/prompt$/, async (req, res, m) => {
     const got = requireMember(req, res, Number(m[1]));
     if (!got) return;
@@ -1043,10 +1146,50 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     if (Date.now() - store.lastPromptAt(got.c.id) < 12 * HOUR) {
       return fail(res, 429, 'One prompt every twelve hours. Let the last one breathe.');
     }
+    const disc = disclosureOf(store.promptRuns(got.c.id), DI);
     const used = store.promptsUsed(got.c.id);
-    const next = PROMPTS.filter((t) => used.indexOf(t) === -1)[0] || PROMPTS[used.length % PROMPTS.length];
+    const unused = (list) => list.filter((t) => used.indexOf(t) === -1);
+    // The earned set first; if it is used up, anything still unasked rather
+    // than nothing — a circle that has worked through fifteen questions does
+    // not need to be told to wait.
+    const next = unused(PROMPT_SETS[disc.depth - 1].prompts)[0]
+      || unused(PROMPTS)[0]
+      || PROMPTS[used.length % PROMPTS.length];
     const id = store.addCircleMessage(got.c.id, null, next, 'prompt');
-    send(res, 201, { id, body: next });
+    send(res, 201, { id, body: next, disclosure: disc });
+  });
+
+  /** A thread with one person from the circle.
+   *
+   *  Ren, Kraut & Kiesler (2007): attachment to a group is either to the group
+   *  and its subject, or to the particular people in it. A single group thread
+   *  can only ever build the first kind, and the second is what survives the
+   *  group going quiet. So: a door to one person — but a narrow one. You have
+   *  both already spoken here, which is what stops it being a cold DM, and the
+   *  thread lands in Messages like any other conversation, under the same
+   *  blocking, reporting and rate limits. */
+  route('POST', /^\/api\/circles\/(\d+)\/threads$/, async (req, res, m) => {
+    const got = requireMember(req, res, Number(m[1]));
+    if (!got) return;
+    const body = await readJson(req);
+    const them = store.circleMembers(got.c.id).filter((p) => p.id === Number(body.userId))[0];
+    if (!them) return fail(res, 404, 'They are not in this circle.');
+
+    const gate = sideThread(got.c.id, got.u, them);
+    if (!gate.canMessage) return fail(res, 403, gate.whyNot || 'You cannot message this person.');
+    if (store.countSince('u:' + got.u.id, 'request', DAY) >= L.requestsPerDay) {
+      return fail(res, 429, `That is ${L.requestsPerDay} new conversations today.`);
+    }
+    const text = String(body.body || '').trim();
+    if (text.length < 10) return fail(res, 400, 'Write at least a sentence.');
+
+    let threadId = gate.threadId;
+    if (!threadId) {
+      threadId = store.createAccepted(got.u.id, them.id);
+      store.note('u:' + got.u.id, 'request');
+    }
+    store.addMessage(threadId, got.u.id, text);
+    send(res, 201, { threadId });
   });
 
   route('POST', /^\/api\/circles\/(\d+)\/vouch$/, async (req, res, m) => {
@@ -1083,16 +1226,19 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     const startsAt = Number(body.startsAt) || null;
     const cadence = Object.prototype.hasOwnProperty.call(CADENCES, body.cadence || '') ? (body.cadence || '') : '';
     const hours = Math.min(12, Math.max(0.5, Number(body.hours) || 2));
+    const plan = String(body.plan || '').trim();
     if (title.length < 4) return fail(res, 400, 'Say what you would do.');
     if (place.length < 3) return fail(res, 400, 'Name a public place to meet.');
     if (!startsAt) return fail(res, 400, 'Pick a date and time — a plan without one is a wish.');
     if (startsAt < Date.now() - HOUR) return fail(res, 400, 'Pick a time that has not happened yet.');
+    // Proposing something counts as your yes, so it carries a plan like one.
+    if (plan.length < INTENTION.minChars) return fail(res, 400, PLAN_ASK);
 
     const id = store.createMeetup({
       circleId: got.c.id, proposerId: got.u.id, title, place, startsAt,
       details: String(body.details || ''),
       orgId: body.orgId, orgName: body.orgName, orgUrl: body.orgUrl,
-      quorum: quorumFor(stats.members), cadence, hours
+      quorum: quorumFor(stats.members), cadence, hours, plan
     });
     store.note('u:' + got.u.id, 'meetup');
     const repeats = cadence ? ` ${CADENCES[cadence].label.toLowerCase()}` : '';
@@ -1111,7 +1257,12 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     const body = await readJson(req);
     const answer = ['yes', 'maybe', 'no'].indexOf(body.answer) === -1 ? null : body.answer;
     if (!answer) return fail(res, 400, 'Answer yes, maybe or no.');
-    store.rsvp(k.id, u.id, answer);
+    // Only a yes needs a plan: a maybe promises nothing and a no costs nobody
+    // anything. A yes counts towards the quorum other people are relying on,
+    // which is exactly the intention an if-then plan is for.
+    const plan = String(body.plan || '').trim();
+    if (answer === 'yes' && plan.length < INTENTION.minChars) return fail(res, 400, PLAN_ASK);
+    store.rsvp(k.id, u.id, answer, answer === 'yes' ? plan : '');
     const yes = store.yesCount(k.id);
     if (yes >= k.quorum && k.status === 'proposed') {
       store.confirmMeetup(k.id);

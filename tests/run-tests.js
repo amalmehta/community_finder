@@ -598,6 +598,64 @@ group('circles: the ceiling, the hours and repeating', function () {
      'and repeating is the default, with the one-off last');
 });
 
+// Three findings about what actually turns a group chat into friendships:
+// escalating disclosure that has to be answered to go deeper, bonds between
+// particular people rather than to the group alone, and an if-then plan behind
+// every promise to turn up.
+group('circles: bonds, escalating questions and if-then plans', function () {
+  var fs = require('fs');
+  var server = fs.readFileSync(path.join(root, 'server/app.js'), 'utf8');
+  var circles = fs.readFileSync(path.join(root, 'src/circles.js'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+
+  // Aron et al. (1997): three sets, each more personal than the last. The
+  // escalation is the mechanism, so there have to be exactly three rungs and
+  // they have to be in order.
+  eq(FYC.PROMPT_SETS.length, 3, 'the questions come in three escalating sets');
+  FYC.PROMPT_SETS.forEach(function (s, i) {
+    eq(s.depth, i + 1, 'set ' + (i + 1) + ' knows its own depth');
+    ok(s.prompts.length >= 4, s.label + ' has enough questions to last');
+    ok(s.note.length > 30, s.label + ' says what it is for');
+    s.prompts.forEach(function (t) {
+      eq(FYC.promptDepth(t), s.depth, 'a question can be traced back to its set: ' + t.slice(0, 28));
+    });
+  });
+  eq(FYC.promptDepth('Something nobody wrote'), 0, 'and an invented one belongs to no set');
+  eq(FYC.PROMPTS.length, FYC.PROMPT_SETS.reduce(function (n, s) { return n + s.prompts.length; }, 0),
+     'the flat list is exactly the three sets');
+  eq(FYC.PROMPTS[0], FYC.PROMPT_SETS[0].prompts[0],
+     'and starts at the shallow end, which is what a new circle opens with');
+
+  // Reis & Shaver: disclosure only builds closeness if someone responds, so an
+  // unanswered question must not unlock anything.
+  ok(/answersToAdvance:\s*2/.test(server), 'two answered questions open the next set');
+  ok(/answeredBy:\s*2/.test(server), 'and answered means two or more people replied');
+  ok(server.indexOf('un.userId !== u.id') !== -1,
+     'the nudge about nobody replying is never shown to the person it happened to');
+  ok(circles.indexOf('respondBlock') !== -1, 'and the rest of the circle is told');
+  ok(circles.indexOf('disclosureBlock') !== -1, 'the ladder of question sets is drawn');
+  ok(css.indexOf('.ladder li.now') !== -1, 'with the rung the circle is on marked');
+
+  // Ren, Kraut & Kiesler (2007): a group thread builds attachment to the
+  // group; bonds need particular people.
+  ok(server.indexOf('sharedInterests') !== -1, 'what any two members have in common is computed');
+  ok(server.indexOf('sideThread') !== -1, 'and a one-to-one thread exists inside a circle');
+  ok(/bothSpoken:\s*true/.test(server), 'open only once both people have spoken there');
+  ok(server.indexOf("'Say something to the circle first.'") !== -1,
+     'so it can never be a cold approach');
+  ok(circles.indexOf('sideThreadBox') !== -1, 'the door is in the member list');
+
+  // Gollwitzer & Sheeran (2006): when, where and how, or it does not happen.
+  ok(/minChars:\s*12/.test(server), 'a yes carries an if-then plan');
+  ok(server.indexOf("answer === 'yes' && plan.length < INTENTION.minChars") !== -1,
+     'and only a yes — a maybe promises nothing');
+  ok(server.indexOf('setting off from') !== -1, 'the ask names where, when and how');
+  ok(server.indexOf('plan: mineR ? mineR.plan') !== -1 || server.indexOf('myPlan: mineR') !== -1,
+     'your plan is returned to you');
+  ok(circles.indexOf('planForm') !== -1, 'saying yes asks for it');
+  ok(css.indexOf('.planbox') !== -1, 'and it has somewhere to go');
+});
+
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail) {
   failures.slice(0, 25).forEach(function (f) { console.log('   ✗ ' + f); });

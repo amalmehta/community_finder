@@ -28,7 +28,10 @@ const { server, store } = createApp({
   mailer: captureMailer,
   // A circle's whole life happens in milliseconds here, so the "separate days
   // of conversation" rung is the one thing relaxed. The other three are real.
-  ready: { minDays: 1 }
+  ready: { minDays: 1 },
+  // Likewise the grace period before anyone is told that somebody answered a
+  // question and got nothing back: four hours of real time, none here.
+  disclosure: { respondAfterHours: 0 }
 });
 
 /** Minimal cookie-aware client. */
@@ -433,7 +436,8 @@ async function verifyEmail(call, email) {
     // ---- a proposal is a proposal until enough people say yes ----
     r = await gus('POST', '/api/circles/' + cid + '/meetups', {
       title: 'Sunday morning coffee and a game', place: 'Union Station, main hall',
-      startsAt: Date.now() + 5 * 86400000, orgId: 'den-x', orgName: 'Tattered Cover', orgUrl: 'https://www.tatteredcover.com/'
+      startsAt: Date.now() + 5 * 86400000, orgId: 'den-x', orgName: 'Tattered Cover', orgUrl: 'https://www.tatteredcover.com/',
+      plan: 'Light rail from Alameda at half nine'
     });
     eq(r.status, 201, 'once ready, any member can propose something');
     const mid = (await fay('GET', '/api/circles/' + cid)).data.meetups[0].id;
@@ -442,9 +446,9 @@ async function verifyEmail(call, email) {
     eq(k.yes, 1, 'with the proposer already in');
     eq(k.org.name, 'Tattered Cover', 'anchored to a real local listing');
 
-    eq((await far('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes' })).status, 403,
+    eq((await far('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes', plan: 'Flying in specially' })).status, 403,
        'a non-member cannot vote on it');
-    r = await fay('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes' });
+    r = await fay('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes', plan: 'Walking down from Curtis Park at nine' });
     eq(r.status, 200, 'a member can say yes');
     eq(r.data.status, 'on', `and at quorum (${k.quorum}) it becomes a plan`);
 
@@ -556,12 +560,13 @@ async function verifyEmail(call, email) {
 
     r = await kit('POST', '/api/circles/' + cid + '/meetups', {
       title: 'Sunday walk and a coffee', place: 'Barton Springs gate',
-      startsAt: Date.now() + 3 * 86400000, cadence: 'weekly', hours: 2
+      startsAt: Date.now() + 3 * 86400000, cadence: 'weekly', hours: 2,
+      plan: 'Cycling from home at half eight'
     });
     eq(r.status, 201, 'a dated proposal is accepted');
     eq(r.data.cadence, 'weekly', 'and can repeat');
     const mid = (await kit('GET', '/api/circles/' + cid)).data.meetups[0].id;
-    await lou('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes' });
+    await lou('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes', plan: 'Bus down South Lamar at nine' });
 
     r = await kit('GET', '/api/circles/' + cid);
     eq(r.data.meetups[0].status, 'on', 'quorum confirms it');
@@ -606,16 +611,210 @@ async function verifyEmail(call, email) {
     // ---- a one-off finishes rather than repeating ----
     r = await lou('POST', '/api/circles/' + cid + '/meetups', {
       title: 'One-off gallery thing', place: 'Blanton steps',
-      startsAt: Date.now() + 86400000, cadence: '', hours: 1
+      startsAt: Date.now() + 86400000, cadence: '', hours: 1,
+      plan: 'Straight there after work'
     });
     const oneOff = r.data.id;
-    await kit('POST', '/api/meetups/' + oneOff + '/rsvp', { answer: 'yes' });
+    await kit('POST', '/api/meetups/' + oneOff + '/rsvp', { answer: 'yes', plan: 'Walking over from campus' });
     store.db.prepare('UPDATE meetups SET starts_at = ? WHERE id = ?')
       .run(Date.now() - 86400000, oneOff);
     r = await kit('GET', '/api/circles/' + cid);
     eq(store.meetupById(oneOff).status, 'done', 'a one-off is done once it has happened');
     ok(!r.data.meetups.some((k) => k.id === oneOff), 'and drops out of the live list');
     eq(r.data.occurrences.length, 2, 'while staying in the history');
+  });
+
+  await group('circles: bonds, escalating questions and if-then plans', async () => {
+    const BIO = 'I have lived in four cities and learned that the second year is the one where you either know people or do not.';
+    const INT = [{ id: 'books' }, { id: 'music' }, { id: 'tech' }];
+    const crew = {};
+    for (const [short, username] of Object.entries({ nia: 'niac', oli: 'olic', pip: 'pipc', qui: 'quic' })) {
+      const c = client();
+      await c('POST', '/api/signup', {
+        username, password: 'hunter2hunter', display: short[0].toUpperCase() + short.slice(1),
+        city: 'Seattle', bio: BIO, ageOk: true, interests: INT
+      });
+      await verifyEmail(c, username + '@example.com');
+      crew[short] = c;
+    }
+    const { nia, oli, pip, qui } = crew;
+
+    // Somebody in another city, to check the doors from outside.
+    const outsider = client();
+    await outsider('POST', '/api/signup', {
+      username: 'outsidr', password: 'hunter2hunter', display: 'Outsidr',
+      city: 'Tucson', bio: BIO, ageOk: true, interests: INT
+    });
+    await verifyEmail(outsider, 'outsidr@example.com');
+
+    let r = await nia('POST', '/api/circles', {
+      name: 'Records and reading', city: 'Seattle', blurb: BIO,
+      question: 'What is on your turntable or your bedside table at the moment?',
+      interests: ['books', 'music'], cap: 6
+    });
+    const cid = r.data.circle.id;
+
+    for (const [who, answer] of [[oli, 'Mostly secondhand jazz records and a pile of library books I renew instead of reading. Would like people to go rummaging with.'],
+                                 [pip, 'I run out of things to say at parties but could talk about a record sleeve for an hour. Looking for the second kind of evening.'],
+                                 [qui, 'New to the city in August, know precisely two people, and both of them are colleagues. That is the whole situation.']]) {
+      await who('POST', '/api/circles/' + cid + '/apply', { answer });
+      const app = (await nia('GET', '/api/circles/' + cid)).data.applications[0];
+      await nia('POST', `/api/circles/${cid}/applications/${app.id}/approve`);
+    }
+    // Three of the four talk. Qui joins and says nothing, which is what makes
+    // them the test case for the side-thread gate.
+    for (let i = 0; i < 7; i++) {
+      await nia('POST', '/api/circles/' + cid + '/messages', { body: 'Nia ' + i });
+      await oli('POST', '/api/circles/' + cid + '/messages', { body: 'Oli ' + i });
+      await pip('POST', '/api/circles/' + cid + '/messages', { body: 'Pip ' + i });
+    }
+
+    // ---- questions that get harder as the circle earns them ----
+    // Aron et al. (1997): the escalation is the mechanism. Reis & Shaver: an
+    // unanswered question is not disclosure, so it buys nothing.
+    const SETS = globalThis.FYC.PROMPT_SETS;
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.circle.disclosure.depth, 1, 'a circle starts on the easy questions');
+    eq(r.data.circle.disclosure.label, 'Easy', 'and is told which set that is');
+    eq(r.data.circle.disclosure.needed, 2, 'two answered questions open the next one');
+    eq(r.data.circle.disclosure.answeredBy, 2, 'answered meaning two or more people replied');
+
+    // Twelve hours between prompts is real, so the clock is wound back rather
+    // than switched off.
+    const agePrompts = () => store.db.prepare(
+      `UPDATE circle_messages SET created_at = created_at - ? WHERE circle_id = ? AND kind = 'prompt'`
+    ).run(13 * 3600000, cid);
+
+    async function ask(repliers) {
+      const p = await nia('POST', '/api/circles/' + cid + '/prompt');
+      agePrompts();
+      for (const who of repliers) {
+        await who('POST', '/api/circles/' + cid + '/messages', { body: 'My answer to that one, at some length.' });
+      }
+      return p;
+    }
+
+    let p = await ask([oli, pip]);
+    eq(p.status, 201, 'anyone can put a question to the circle');
+    ok(SETS[0].prompts.indexOf(p.data.body) !== -1, 'drawn from the set the circle is on');
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.circle.disclosure.answered, 1, 'an answered question counts towards the next set');
+    eq(r.data.circle.disclosure.depth, 1, 'but one is not two');
+
+    p = await ask([oli]);
+    ok(SETS[0].prompts.indexOf(p.data.body) !== -1, 'still the easy set');
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.circle.disclosure.answered, 1, 'a question only one person answered does not count');
+
+    p = await ask([oli, pip]);
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.circle.disclosure.depth, 2, 'two answered questions open the personal set');
+    eq(r.data.circle.disclosure.label, 'Personal', 'which is what it is called');
+
+    p = await nia('POST', '/api/circles/' + cid + '/prompt');
+    agePrompts();
+    ok(SETS[1].prompts.indexOf(p.data.body) !== -1, 'and the next question comes from it');
+    eq(p.data.disclosure.depth, 2, 'the answer says which set it came from');
+    eq((await outsider('GET', '/api/circles/' + cid)).data.circle.disclosure, null,
+       'a stranger is not shown how far in the circle has got');
+
+    // ---- somebody answered and nobody replied ----
+    await pip('POST', '/api/circles/' + cid + '/messages', { body: 'Honestly? The thing I am worst at is asking people twice.' });
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.circle.respond.display, 'Pip', 'the rest of the circle is told that somebody is hanging');
+    eq((await pip('GET', '/api/circles/' + cid)).data.circle.respond, null,
+       'and the person who answered is never told that nobody replied');
+    await oli('POST', '/api/circles/' + cid + '/messages', { body: 'Same, and it is the only thing that has ever worked for me.' });
+    eq((await nia('GET', '/api/circles/' + cid)).data.circle.respond, null, 'a reply clears it');
+
+    // ---- what any two of you have in common, and a door to one person ----
+    // Ren, Kraut & Kiesler (2007): bond-based attachment needs individuals,
+    // not just a shared subject.
+    r = await nia('GET', '/api/circles/' + cid);
+    const row = (name) => r.data.members.filter((p2) => p2.display === name)[0];
+    eq(row('Oli').shared.length, 3, 'the member list says what the two of you both picked');
+    eq(row('Nia').shared.length, 0, 'and does not do it for you and yourself');
+    eq(row('Oli').canMessage, true, 'two people who have both spoken here can talk one to one');
+    eq(row('Qui').canMessage, false, 'not with someone who has said nothing yet');
+    ok(/said something/.test(row('Qui').whyNot), 'and it says why');
+
+    const oliId = row('Oli').id, quiId = row('Qui').id, niaId = row('Nia').id;
+    eq((await nia('POST', '/api/circles/' + cid + '/threads',
+      { userId: quiId, body: 'You have not said anything but hello, so this is a cold approach.' })).status, 403,
+      'the server enforces that, not just the UI');
+    eq((await outsider('POST', '/api/circles/' + cid + '/threads',
+      { userId: oliId, body: 'Butting in from another city entirely, hello there.' })).status, 403,
+      'and an outsider cannot use the door at all');
+    eq((await nia('POST', '/api/circles/' + cid + '/threads', { userId: oliId, body: 'hi' })).status, 400,
+       'a one-word opener is refused, same as everywhere else');
+
+    r = await nia('POST', '/api/circles/' + cid + '/threads',
+      { userId: oliId, body: 'That record shop you mentioned — which one was it? I am out that way on Saturday.' });
+    eq(r.status, 201, 'you can start a thread with someone you have actually talked to here');
+    const inbox = (await oli('GET', '/api/threads')).data.threads;
+    ok(inbox.some((t) => t.other_name === 'Nia'), 'it lands in Messages like any other conversation');
+    eq((await oli('GET', '/api/requests')).data.incoming.length, 0,
+       'with nothing to accept — you are already in a circle together');
+
+    // A hidden interest stays hidden, even from people in your own circle.
+    await pip('PATCH', '/api/me', {
+      city: 'Seattle', bio: BIO,
+      interests: [{ id: 'books' }, { id: 'music', visible: false }, { id: 'tech' }]
+    });
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.members.filter((p2) => p2.display === 'Pip')[0].shared.length, 2,
+       'a hidden interest is not exposed by the overlap line');
+
+    // Blocking closes the door again, as it does everywhere.
+    await oli('POST', '/api/blocks', { userId: niaId });
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.members.filter((p2) => p2.display === 'Oli')[0].canMessage, false,
+       'a block beats being in the same circle');
+    await oli('DELETE', '/api/blocks/' + niaId);
+
+    // ---- the plan behind a yes ----
+    // Gollwitzer & Sheeran (2006): naming when, where and how is most of the
+    // difference between intending and doing.
+    const proposal = {
+      title: 'Record shop crawl and a coffee', place: 'Easy Street Records, Queen Anne',
+      startsAt: Date.now() + 4 * 86400000, cadence: 'fortnightly', hours: 3
+    };
+    r = await nia('POST', '/api/circles/' + cid + '/meetups', proposal);
+    eq(r.status, 400, 'a proposal with no plan for getting there is refused');
+    ok(/setting off from/.test(r.data.error), 'and is told what is wanted');
+
+    r = await nia('POST', '/api/circles/' + cid + '/meetups',
+      Object.assign({ plan: 'Walking down from Capitol Hill at eleven' }, proposal));
+    eq(r.status, 201, 'with a plan it goes up — proposing is a yes, and a yes carries one');
+    const mid = r.data.id;
+
+    eq((await oli('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes' })).status, 400,
+       'a yes with no plan is refused too');
+    eq((await oli('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes', plan: 'soon' })).status, 400,
+       'and so is a one-word one');
+    eq((await oli('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'maybe' })).status, 200,
+       'a maybe promises nothing, so it is asked for nothing');
+    eq((await oli('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'no' })).status, 200,
+       'nor is a no');
+    r = await oli('POST', '/api/meetups/' + mid + '/rsvp',
+      { answer: 'yes', plan: 'The 13 bus from Broadway, quarter to eleven' });
+    eq(r.status, 200, 'a yes with a real plan counts');
+    eq(r.data.status, 'on', 'and at quorum it becomes a plan for everyone');
+
+    r = await oli('GET', '/api/circles/' + cid);
+    eq(r.data.meetups[0].myPlan, 'The 13 bus from Broadway, quarter to eleven',
+       'your own plan is shown back to you, which is the half that makes it work');
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.meetups[0].myPlan, 'Walking down from Capitol Hill at eleven',
+       'everyone sees their own');
+    ok(JSON.stringify(r.data.meetups[0]).indexOf('13 bus') === -1, 'and nobody else\'s');
+
+    // Each occasion needs its own cue, so a roll takes the plan with the RSVP.
+    store.db.prepare('UPDATE meetups SET starts_at = ? WHERE id = ?')
+      .run(Date.now() - 4 * 3600000, mid);
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.meetups[0].myPlan, '', 'when the series rolls on, the plan rolls off with the RSVP');
+    eq(r.data.meetups[0].yes, 0, 'so the next date is planned for on its own terms');
   });
 
   await group('production readiness', async () => {

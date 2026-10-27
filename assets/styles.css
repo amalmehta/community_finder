@@ -825,3 +825,22 @@ main:focus { outline: none; }
 
 .meetup.past { opacity: .72; }
 .meetup.past h4 { font-size: var(--t-body); font-weight: 600; }
+
+/* The escalating question sets, the plan behind a yes, and the shared
+   interests that make a group of people into particular people. */
+.ladder-box { margin-top: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--line); }
+.ladder-box .ready-head { margin-bottom: var(--s2); }
+.ladder-box .ladder { margin-bottom: var(--s2); }
+.ladder-box .hint { margin: 0; color: var(--ink-faint); font-size: var(--t-small); }
+/* "personal · 2 of 3" breaking across two lines on a phone looks broken. */
+.ladder-box .ready-head .badge { white-space: nowrap; }
+.ladder li.now::before { content: "◉"; color: var(--moss); }
+.ladder li.now { color: var(--ink); }
+.ladder li.now b { color: var(--moss); }
+
+.planbox { margin-top: var(--s3); }
+.planbox .field { margin: var(--s2) 0; }
+.planbox .hint { color: var(--ink-faint); font-size: var(--t-small); }
+.hint.plan { color: var(--ink-soft); font-style: italic; }
+
+.member .badges { margin-top: var(--s1); }
