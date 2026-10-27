@@ -396,7 +396,7 @@
       count.textContent = n + ' character' + (n === 1 ? '' : 's') + (n >= 40 ? ' — that will do' : ' — 40 or more');
     });
     return el('div', { class: 'applybox' }, [
-      el('p', { class: 'question', text: c.question }),
+      el('p', { class: 'quoted', text: c.question }),
       el('p', { class: 'hint', text: c.apply.waitlist
         ? 'The circle is full, so this joins the waiting list. The host still reads it.'
         : 'The host reads this, and so do the members. Two of them can wave you in without the host.' }),
@@ -699,6 +699,22 @@
     var pulling = false;
     var readyBox = el('div');
 
+    // Within a couple of lines of the end counts as being at the end: nobody
+    // scrolls to the exact pixel, and a fractional scrollTop is normal.
+    function atEnd() {
+      return list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+    }
+    // Gliding is for a message arriving under one you are already reading.
+    // Opening the thread, or asking to be taken to the end, jumps.
+    function toEnd(glide) {
+      list.scrollTo({ top: list.scrollHeight, behavior: glide ? 'smooth' : 'auto' });
+    }
+    var toLatest = el('button', {
+      class: 'to-latest', type: 'button', hidden: true,
+      onclick: function () { toEnd(false); toLatest.hidden = true; }
+    }, ['New messages ↓']);
+    list.addEventListener('scroll', function () { if (atEnd()) toLatest.hidden = true; });
+
     function paintReady(r) {
       readyBox.innerHTML = '';
       readyBox.appendChild(readinessBlock(r, { quiet: true }));
@@ -707,6 +723,10 @@
     async function pull() {
       if (pulling) return;
       pulling = true;
+      // Measured before anything is appended, or the new messages are already
+      // part of the height being measured against.
+      var wasAtEnd = atEnd();
+      var first = !lastId;
       try {
         var r = await api('GET', '/api/circles/' + c.id + '/messages?since=' + lastId);
         var added = 0;
@@ -750,7 +770,15 @@
           }
         });
         if (added) {
-          list.scrollTop = list.scrollHeight;
+          // Being yanked to the bottom while reading back through the week is
+          // the rudest thing a group chat does. Follow the conversation only
+          // if you were already at the end of it; otherwise offer the trip.
+          if (wasAtEnd) {
+            toEnd(!first);
+            toLatest.hidden = true;
+          } else {
+            toLatest.hidden = false;
+          }
           api('POST', '/api/circles/' + c.id + '/read', { lastId: lastId }).catch(function () {});
         }
       } catch (e) { /* transient */ } finally { pulling = false; }
@@ -764,7 +792,10 @@
         var out = await api('POST', '/api/circles/' + c.id + '/messages', { body: text });
         input.value = '';
         if (out.readiness) paintReady(out.readiness);
+        // Saying something is always a reason to be shown the end of it.
         await pull();
+        toEnd(false);
+        toLatest.hidden = true;
       } catch (e) { showErr(err, e); }
     }
 
@@ -777,7 +808,7 @@
     host.appendChild(el('article', { class: 'card' }, [
       el('h3', { text: 'The conversation' }),
       c.stale ? el('p', { class: 'hint nudge', text: 'It has gone quiet. A question restarts it faster than a hello.' }) : null,
-      list,
+      el('div', { class: 'chat-wrap' }, [list, toLatest]),
       err,
       el('div', { class: 'composer' }, [
         input,
@@ -1051,7 +1082,7 @@
           'applied ' + ago(a.at)].join(' · ') }),
         a.bio ? el('p', { class: 'blurb', text: a.bio }) : null,
         a.interests.length ? interestBadges(a.interests.slice(0, 6), c.interests) : null,
-        el('p', { class: 'question', text: c.question }),
+        el('p', { class: 'quoted', text: c.question }),
         el('p', { class: 'intro-text', text: a.answer }),
         err,
         el('div', { class: 'actions' }, isHost

@@ -335,7 +335,7 @@ npm test        # both suites
 node tests/run-tests.js
 ```
 
-7950+ assertions covering data integrity (every listing has a valid first step,
+8000+ assertions covering data integrity (every listing has a valid first step,
 a real URL, interests that exist in the taxonomy, ratings in range), city lookup
 and aliasing, the universal fallback engine, matcher behaviour (a nervous person
 gets gentle options first, budget is respected, the comfort dial actually
@@ -345,6 +345,12 @@ research says — the five rungs of the gate, 50% for one voice, 14 and 28 days,
 50/90/200 hours, three escalating question sets, two answers to climb one, eight
 people at most. Change one of those
 and this suite fails, which is the point of pinning them.
+
+It also computes contrast. Every text token is checked against every surface it
+sits on, in both palettes, and anything under 4.5:1 fails the suite — the ratio
+is the property that matters, so the test measures it rather than asserting a
+hex. That is how the faint tier was caught sitting at 3.24:1 on the readiness
+panel in light mode, having never been checked after the dark theme landed.
 
 ```bash
 node tools/check-links.js

@@ -716,6 +716,101 @@ group('circles: turn-taking, the quiet, and what a circle is for', function () {
   ok(server.indexOf('serial monologue') !== -1, 'and the reason is in the code');
 });
 
+
+// Ten fixes to how the thing feels, each of which a later change could quietly
+// undo. The contrast ones are computed rather than asserted as strings: the
+// property that matters is the ratio, not the hex.
+group('polish: the type, the colour and the motion', function () {
+  var fs = require('fs');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+  var social = fs.readFileSync(path.join(root, 'src/social.js'), 'utf8');
+  var circles = fs.readFileSync(path.join(root, 'src/circles.js'), 'utf8');
+  var match = fs.readFileSync(path.join(root, 'src/match.js'), 'utf8');
+
+  // 1. The circles quote used to be called .question, which is also the class
+  //    on the twenty-question intake card — so the whole form rendered in the
+  //    serif meant for one quoted line, buttons and inputs included.
+  ok(css.indexOf('.quoted {') !== -1, 'the quoted joining question has a class of its own');
+  ok(!/\n\.question \{\n\s*font-family: var\(--serif\)/.test(css),
+     'and .question is no longer redefined as serif');
+  ok(circles.indexOf("class: 'quoted'") !== -1, 'circles.js asks for the quote class');
+  ok(circles.indexOf("class: 'question'") === -1, 'and never for the intake card class');
+
+  // 2. A caveat in the reasons list wore the same green tick as the reasons.
+  ok(match.indexOf('function caveatsFor') !== -1, 'caveats are built apart from reasons');
+  ok(!/reasons\.push\('Over your budget'\)/.test(match), 'and are not pushed into reasons');
+  ok(/caveats\.push\('Over your budget'\)/.test(match), 'the budget warning is a caveat');
+  ok(app.indexOf("class: 'caveat'") !== -1, 'the card marks them');
+  ok(/\.why li\.caveat::before \{[^}]*content: "!"/.test(css), 'with a different mark');
+
+  // 3. Both palettes, computed. --ink-faint carries 13px text on every one of
+  //    these surfaces; the old values measured 3.24:1 and 3.86:1.
+  function tokens(block) {
+    var out = {};
+    (block.match(/--[a-z-]+:\s*#[0-9a-f]{6}/g) || []).forEach(function (d) {
+      var bits = d.split(':');
+      out[bits[0].trim()] = bits[1].trim();
+    });
+    return out;
+  }
+  function lum(hex) {
+    var c = [1, 3, 5].map(function (i) {
+      var v = parseInt(hex.substr(i, 2), 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  }
+  function ratio(a, b) {
+    var x = lum(a), y = lum(b), hi = Math.max(x, y), lo = Math.min(x, y);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+  var light = tokens(css.slice(css.indexOf(':root {'), css.indexOf('/* Dark theme')));
+  var dark = tokens(css.slice(css.indexOf(':root[data-theme="dark"] {')));
+  [['light', light], ['dark', dark]].forEach(function (pair) {
+    var name = pair[0], t = pair[1];
+    ['--bg', '--bg-raised', '--bg-sunk', '--moss-soft', '--accent-soft'].forEach(function (surface) {
+      ['--ink', '--ink-soft', '--ink-faint'].forEach(function (text) {
+        if (!t[text] || !t[surface]) return;
+        var r = ratio(t[text], t[surface]);
+        ok(r >= 4.5, name + ': ' + text + ' on ' + surface + ' is ' + r.toFixed(2) + ':1');
+      });
+    });
+  });
+
+  // 4. Six tabs do not fit on a phone, and the strip never showed the one you
+  //    had just chosen.
+  ok(app.indexOf('function keepTabInView') !== -1, 'the chosen tab is scrolled into the strip');
+  ok(app.indexOf('getBoundingClientRect') !== -1 && app.indexOf('strip.scrollLeft +') !== -1,
+     'measured rather than read off offsetLeft, which belongs to the sticky header');
+  ok(social.indexOf('window.FYC_TAB_IN_VIEW') !== -1, 'and the signed-in switcher does it too');
+
+  // 5 + 6. The intake is one card being filled in, not twenty arriving.
+  ok(app.indexOf('function settleHeight') !== -1, 'the card changes height rather than jumping');
+  ok(css.indexOf('#intake.settling') !== -1, 'and is only clipped while it moves');
+  ok(/#intake \{[^}]*transition: height/.test(css), 'the height is animated');
+  ok(app.indexOf("bar.setAttribute('data-to'") !== -1, 'the progress bar is given somewhere to go');
+  ok(app.indexOf('void bar.offsetWidth') !== -1,
+     'and started with a reflow, not requestAnimationFrame, which a background tab throttles');
+
+  // 7. It used to offer results from the first question, where there were none.
+  ok(/enough \? el\('button'/.test(app), 'the escape hatch is conditional');
+  ok(app.indexOf('var enough = !!(sofar.location && sofar.interests.length)') !== -1,
+     'on there being something to show');
+
+  // 8 + 9. Motion that was declared but never happened.
+  ok(/\.org:hover[^{]*\{[^}]*transform: translateY\(-2px\)/.test(css), 'cards actually lift');
+  ok(/\.pill:active[^{]*\{[^}]*transform: translateY\(1px\)/.test(css), 'and options press in');
+
+  // 10. A group chat that yanks you to the bottom while you are reading back.
+  ok(circles.indexOf('var wasAtEnd = atEnd()') !== -1, 'following is conditional on being at the end');
+  ok(circles.indexOf('function toEnd(') !== -1, 'and each scroll says whether it glides');
+  ok(css.indexOf('.to-latest') !== -1 && circles.indexOf("class: 'to-latest'") !== -1,
+     'with a way back to the newest message');
+  ok(!/scroll-behavior: smooth;[^}]*\}\s*$/m.test(css.slice(css.indexOf('.msg-list'), css.indexOf('.msg-list') + 220)),
+     'the list itself does not glide, or opening a thread would ride the whole history');
+});
+
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail) {
   failures.slice(0, 25).forEach(function (f) { console.log('   ✗ ' + f); });

@@ -772,6 +772,7 @@
       view.hidden = !on;
       tab.setAttribute('aria-selected', on ? 'true' : 'false');
     });
+    if (window.FYC_TAB_IN_VIEW) window.FYC_TAB_IN_VIEW(which);
     stopPolling();
     if (window.FYC_CIRCLES) {
       window.FYC_CIRCLES.stop();

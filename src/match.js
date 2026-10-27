@@ -111,7 +111,6 @@
     }
     // Ease, cost and commitment all have badges. Repeating them here printed
     // the same three lines under every card and buried the one that differed.
-    if (org.cost > (p.budget == null ? 2 : p.budget)) reasons.push('Over your budget');
     if (parts.schedule === 1 && p.when && p.when.length && p.when.indexOf('flexible') === -1) {
       var labels = (org.when || [])
         .filter(function (w) { return p.when.indexOf(w) !== -1; })
@@ -122,6 +121,17 @@
     // Commitment has a badge of its own; saying it twice buried the reason
     // that actually differed between cards.
     return reasons.slice(0, 3);
+  }
+
+  /**
+   * The things on the card that are not reasons to go. Kept apart from the
+   * reasons because the card ticks every line in that list, and a green tick
+   * next to "Over your budget" reads as a recommendation.
+   */
+  function caveatsFor(org, p) {
+    var caveats = [];
+    if (org.cost > (p.budget == null ? 2 : p.budget)) caveats.push('Over your budget');
+    return caveats;
   }
 
   /** 1–3 "how hard is this to walk into" rating, used for the ease badge. */
@@ -165,7 +175,7 @@
     }
     var r = {
       org: org, score: total, parts: parts,
-      reasons: explain(org, p, parts), ease: ease(org),
+      reasons: explain(org, p, parts), caveats: caveatsFor(org, p), ease: ease(org),
       overlap: overlapCount(org, p.interests),
       learned: learned
     };

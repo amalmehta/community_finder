@@ -83,12 +83,20 @@
     return session;
   }
 
+  // Where the progress bar was left, so the next one can move rather than
+  // appear already full. A fresh element set straight to its final width has
+  // nothing to transition from.
+  var lastPct = 0;
+
   function questionCard(q) {
     var prog = I.progress(session);
     var box = el('article', { class: 'card question' });
 
     var bar = el('i');
-    bar.style.width = Math.round((prog.asked / prog.total) * 100) + '%';
+    var pct = Math.round((prog.asked / prog.total) * 100);
+    bar.style.width = lastPct + '%';
+    bar.setAttribute('data-to', pct + '%');   // moved to once it is on the page
+    lastPct = pct;
     box.appendChild(el('div', { class: 'q-head' }, [
       el('span', { class: 'q-count', text: 'Question ' + (prog.asked + 1) + ' of ' + prog.total }),
       el('div', { class: 'progress' }, [bar])
@@ -99,6 +107,8 @@
 
     var answer = null;
     var previous = session.answers[q.id];      // set when they came back to it
+    var sofar = I.toProfile(session);
+    var enough = !!(sofar.location && sofar.interests.length);
 
     if (q.kind === 'text') {
       var input = el('input', { type: 'text', placeholder: q.placeholder || '', 'aria-label': q.prompt });
@@ -158,10 +168,14 @@
         class: 'btn ghost sm', type: 'button',
         onclick: function () { submit(q.kind === 'many' ? [] : null); }
       }, ['Skip']),
-      el('button', {
+      // Only offered once it would actually produce something. It used to be
+      // on every question, including the first, where it led to a card that
+      // said "Not enough to go on." — a button that promises results and
+      // delivers a wall is worse than no button.
+      enough ? el('button', {
         class: 'btn ghost sm', type: 'button',
         onclick: function () { finish(true); }
-      }, ['Enough — show me results'])
+      }, ['Enough — show me results']) : null
     ]);
     box.appendChild(actions);
     box.appendChild(el('p', { class: 'q-keys' }, [
@@ -226,13 +240,52 @@
     paintIntake();
   }
 
+  /**
+   * Take the host from the height it had to the height it needs, then hand the
+   * height back to the layout. Without this the card's frame snaps to the new
+   * size on the same frame the new question fades in, and twenty questions
+   * read as twenty cards rather than one form being filled in.
+   */
+  function settleHeight(host, from) {
+    host.style.height = '';
+    host.classList.remove('settling');
+    var to = host.scrollHeight;
+    if (!from || from === to) return;
+    host.classList.add('settling');
+    host.style.height = from + 'px';
+    void host.offsetHeight;                   // read, so there is a start value
+    host.style.height = to + 'px';
+    var done = function (e) {
+      if (e && e.propertyName !== 'height') return;
+      host.style.height = '';
+      host.classList.remove('settling');
+      host.removeEventListener('transitionend', done);
+    };
+    host.addEventListener('transitionend', done);
+    // A transition that never fires — reduced motion, a hidden tab — must not
+    // leave the card pinned to a stale height.
+    setTimeout(done, 400);
+  }
+
   function paintIntake() {
     var host = $('#intake');
+    var from = host.firstChild ? host.offsetHeight : 0;
     host.innerHTML = '';
     if (I.done(session)) return finish(false);
     var q = I.nextQuestion(session);
     if (!q) return finish(false);
     host.appendChild(questionCard(q));
+
+    // Start the bar moving. A forced reflow rather than requestAnimationFrame:
+    // rAF is throttled in a background tab, which would leave someone who
+    // switched away mid-form looking at the previous question's progress.
+    var bar = host.querySelector('.progress i');
+    if (bar) {
+      void bar.offsetWidth;
+      bar.style.width = bar.getAttribute('data-to');
+    }
+
+    settleHeight(host, from);
 
     // Move focus to the new question, so keyboard and screen-reader users are
     // not left behind at the button they just pressed.
@@ -255,6 +308,8 @@
     if (FYC.prefs && FYC.prefs.isEnabled()) p.learned = FYC.prefs.profile();
 
     var host = $('#intake');
+    host.style.height = '';
+    host.classList.remove('settling');
     host.innerHTML = '';
     host.appendChild(el('div', { class: 'actions intake-done' }, [
       el('span', { class: 'hint', text: session.asked.length + ' of ' + I.TOTAL + ' questions answered' +
@@ -371,7 +426,9 @@
       el('span', { class: 'badge', text: COST_LABEL[org.cost] || '' })
     ]);
 
-    var why = el('ul', { class: 'why' }, r.reasons.map(function (t) { return el('li', { text: t }); }));
+    var why = el('ul', { class: 'why' },
+      r.reasons.map(function (t) { return el('li', { text: t }); })
+        .concat((r.caveats || []).map(function (t) { return el('li', { class: 'caveat', text: t }); })));
 
     // --- first step panel ---
     var step = el('div', { class: 'first-step' }, [
@@ -410,7 +467,7 @@
 
     body.appendChild(head);
     body.appendChild(badges);
-    if (r.reasons.length) body.appendChild(why);
+    if (r.reasons.length || (r.caveats || []).length) body.appendChild(why);
 
     if (opts.starter) {
       body.appendChild(step);
@@ -758,9 +815,32 @@
   }
 
   // ---------- tabs ----------
+  /**
+   * The tab strip scrolls on a phone — six tabs do not fit in 375px. Without
+   * this, choosing Circles leaves the strip showing Find, My plan and You,
+   * and nothing on screen says which tab you are on.
+   */
+  function keepTabInView(which) {
+    var tab = $('#tab-' + which);
+    var strip = tab && tab.parentElement;
+    if (!tab || !strip || strip.scrollWidth <= strip.clientWidth) return;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Measured, not offsetLeft: the strip is not the offset parent — the
+    // sticky header is — so offsetLeft carries the brand's width with it and
+    // scrolls to the wrong place.
+    var stripBox = strip.getBoundingClientRect();
+    var tabBox = tab.getBoundingClientRect();
+    var to = strip.scrollLeft + (tabBox.left - stripBox.left)
+      - (strip.clientWidth - tabBox.width) / 2;
+    var max = strip.scrollWidth - strip.clientWidth;
+    strip.scrollTo({ left: Math.max(0, Math.min(max, to)), behavior: reduce ? 'auto' : 'smooth' });
+  }
+  window.FYC_TAB_IN_VIEW = keepTabInView;
+
   function showTab(which) {
     // With a backend there are more tabs than these three; social.js owns the
     // switching in that case so every view is hidden correctly.
+    keepTabInView(which);
     if (window.FYC_SHOW) return window.FYC_SHOW(which);
     ['find', 'plan', 'you'].forEach(function (name) {
       var on = which === name;
