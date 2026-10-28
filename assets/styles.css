@@ -105,43 +105,85 @@ a { color: var(--accent-ink); }
 
 .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
 
-/* ---------- header ---------- */
-.site-header {
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-raised);
+/* ---------- the app bar ----------
+   One row, translucent, always there. On a phone the tab strip leaves it and
+   becomes a bottom bar; the buttons are the same elements either way. */
+.appbar {
   position: sticky; top: 0; z-index: 30;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  -webkit-backdrop-filter: saturate(1.8) blur(14px);
+  backdrop-filter: saturate(1.8) blur(14px);
 }
-.site-header .wrap {
-  display: flex; align-items: center; gap: 16px;
-  min-height: 62px; flex-wrap: wrap;
+@supports not (backdrop-filter: blur(1px)) { .appbar { background: var(--bg); } }
+.appbar-in {
+  max-width: var(--maxw); margin: 0 auto; padding: 0 20px;
+  display: flex; align-items: center; gap: var(--s5);
+  min-height: 56px;
 }
-.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
-.brand b { font-family: var(--serif); font-size: 21px; font-weight: 600; letter-spacing: -.01em; }
-.brand span { color: var(--ink-faint); font-size: 13px; }
-.tabs { display: flex; gap: 4px; }
+.brand {
+  font-weight: 650; font-size: 16px; letter-spacing: -.012em;
+  color: var(--ink); white-space: nowrap;
+}
+
+.tabs { display: flex; gap: 2px; }
 .tab {
-  border: 0; background: none; font: inherit; font-size: 14.5px; cursor: pointer;
-  color: var(--ink-soft); padding: 7px 13px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: var(--s2);
+  border: 0; background: none; font: inherit; font-size: 14px; cursor: pointer;
+  color: var(--ink-soft); padding: 7px 11px; border-radius: 9px;
+  transition: background .14s ease, color .14s ease;
+}
+/* Line icons. Scoped to .ti alone, not .tab .ti: the theme control uses the
+   same class and was drawing unstroked, unfilled paths. */
+.ti {
+  width: 17px; height: 17px; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round;
 }
 .tab:hover { background: var(--bg-sunk); color: var(--ink); }
-.tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.tab[aria-selected="true"] { color: var(--accent-ink); font-weight: 600; }
+.tab[aria-selected="true"] .ti { stroke-width: 2; }
 .tab .count {
-  font-size: 12px; background: var(--accent); color: #fff; border-radius: 999px;
-  padding: 0 6px; margin-left: 6px; font-weight: 700;
+  font-size: 11px; font-style: normal; background: var(--accent); color: var(--bg-raised);
+  border-radius: 999px; min-width: 17px; height: 17px; padding: 0 5px;
+  display: inline-grid; place-items: center; font-weight: 700;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tab .count { color: #171512; } }
-:root[data-theme="dark"] .tab .count { color: #171512; }
 
-/* ---------- intro ---------- */
-.intro { padding: var(--s7) 0 var(--s5); }
-.intro h1 {
-  font-family: var(--serif); font-size: var(--t-h1);
-  line-height: 1.08; margin: 0 0 var(--s3); letter-spacing: -.025em; font-weight: 600;
-  max-width: 18ch; text-wrap: balance;
-}
-.intro p {
-  margin: 0; color: var(--ink-soft); max-width: 46ch;
-  font-size: var(--t-lead); line-height: 1.5; text-wrap: pretty;
+/* Bottom bar. A phone reaches the thumb, not the top of the screen. */
+@media (max-width: 720px) {
+  /* The blur has to go here. backdrop-filter makes an element the containing
+     block for its fixed-position descendants, so with it on the app bar the
+     tab strip's `bottom: 0` resolved against the bar itself and the bottom
+     bar rendered across the top of the screen. The bottom bar keeps the blur;
+     the thin top bar does not need it. */
+  .appbar {
+    background: var(--bg);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  .appbar-in { padding: 0 var(--s4); gap: var(--s3); }
+  .brand { margin-right: auto; }
+  .tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    margin: 0; gap: 0; justify-content: space-around;
+    border-top: 1px solid var(--line);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    -webkit-backdrop-filter: saturate(1.8) blur(14px);
+    backdrop-filter: saturate(1.8) blur(14px);
+    padding: var(--s1) var(--s1) calc(var(--s1) + env(safe-area-inset-bottom));
+  }
+  @supports not (backdrop-filter: blur(1px)) { .tabs { background: var(--bg-raised); } }
+  .tab {
+    flex: 1 1 0; min-width: 0; flex-direction: column; gap: 2px;
+    font-size: 10.5px; letter-spacing: .01em; padding: var(--s2) 2px var(--s1);
+    border-radius: 0; position: relative;
+  }
+  .tab:hover { background: none; }
+  .tab .ti { width: 23px; height: 23px; }
+  .tab .count {
+    position: absolute; top: 2px; left: 50%; margin-left: 5px;
+    font-size: 10px; min-width: 15px; height: 15px;
+  }
+  body { padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
 }
 
 /* ---------- form ---------- */
@@ -272,16 +314,14 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 .starter h3 { font-size: calc(var(--t-h3) * 1.26); letter-spacing: -.02em; }
 .starter .blurb { font-size: var(--t-lead); line-height: 1.55; }
 .starter-flag {
-  display: inline-block; font-size: var(--t-micro); font-weight: 800; letter-spacing: .1em;
-  text-transform: uppercase; color: var(--accent-ink); background: var(--accent-soft);
-  padding: 4px 10px; border-radius: 999px; margin-bottom: var(--s3);
+  display: block; font-size: var(--t-micro); font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--accent-ink); margin-bottom: var(--s2);
 }
 
 .org { margin: var(--s3) 0; }
 .org-top { display: flex; gap: var(--s4); align-items: flex-start; }
 .org h3 { margin: 0 0 var(--s1); font-size: var(--t-h3); letter-spacing: -.015em; line-height: 1.25; }
-.org h3 a { color: inherit; text-decoration: none; border-bottom: 1.5px solid var(--line-strong); }
-.org h3 a:hover { border-color: var(--accent); color: var(--accent-ink); }
+
 .org .where {
   font-size: var(--t-small); color: var(--ink-faint); margin: 0 0 var(--s3);
   letter-spacing: .01em;
@@ -297,14 +337,6 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 .badge.ease3 { background: var(--moss-soft); color: var(--moss); border-color: transparent; font-weight: 600; }
 .badge.ease2 { background: var(--bg-sunk); color: var(--ink-soft); }
 .badge.ease1 { background: var(--accent-soft); color: var(--accent-ink); }
-
-.why { margin: 0 0 var(--s4); padding: 0; list-style: none; display: grid; gap: var(--s1); }
-.why li { font-size: var(--t-meta); color: var(--ink-soft); padding-left: 18px; position: relative; }
-.why li::before { content: "✓"; position: absolute; left: 0; color: var(--moss); font-weight: 700; }
-/* Not everything on this list is a reason to go. The one line that is a
-   caveat used to carry the same green tick as the reasons above it. */
-.why li.caveat { color: var(--accent-ink); }
-.why li.caveat::before { content: "!"; color: var(--accent); }
 
 .first-step {
   background: var(--bg-sunk); border-radius: var(--radius-sm);
@@ -332,11 +364,6 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 }
 .copied { font-size: 13px; color: var(--moss); margin-left: 8px; font-weight: 600; }
 
-.toggle {
-  font: inherit; font-size: 14px; background: none; border: 0; color: var(--accent-ink);
-  cursor: pointer; padding: 0; font-weight: 600;
-}
-.toggle:hover { text-decoration: underline; }
 
 /* ---------- plan ---------- */
 .plan-item { margin: 14px 0; }
@@ -355,7 +382,7 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 
 /* ---------- feedback ---------- */
 .fb-tab {
-  position: fixed; right: 18px; bottom: 18px; z-index: 40;
+  position: fixed; right: 18px; bottom: 18px; z-index: 39;
   font: inherit; font-size: 13.5px; cursor: pointer;
   background: var(--bg-raised); color: var(--ink-soft);
   border: 1px solid var(--line-strong); border-radius: 999px;
@@ -385,10 +412,10 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 .fb-thanks { font-size: 14px; color: var(--moss); font-weight: 600; }
 
 footer.site-footer {
-  border-top: 1px solid var(--line); margin-top: 40px; padding: 22px 0 80px;
-  color: var(--ink-faint); font-size: 13px;
+  border-top: 1px solid var(--line); margin-top: var(--s7); padding: var(--s5) 0 var(--s7);
+  color: var(--ink-faint); font-size: var(--t-small);
 }
-footer.site-footer p { margin: 0 0 6px; }
+footer.site-footer p { margin: 0 0 var(--s2); max-width: 62ch; }
 
 [hidden] { display: none !important; }
 .sr-only {
@@ -397,20 +424,11 @@ footer.site-footer p { margin: 0 0 6px; }
 }
 
 @media (max-width: 560px) {
-  .intro { padding-top: 26px; }
   .card { padding: 17px; }
   .submit-bar { margin: 16px -17px -17px; padding: 12px 17px; }
   .submit-bar #surprise { margin-right: 0; }
   .picked { order: 3; width: 100%; padding-right: 96px; } /* clear the Feedback tab */
-  /* Keep the header to a single row on a phone — it is sticky, so every
-     wrapped line is permanently stolen from the content. */
-  .site-header .wrap { min-height: 52px; gap: 8px; padding: 0 14px; flex-wrap: nowrap; }
-  .brand span { display: none; }
-  .brand b { font-size: 17px; }
-  .tab { padding: 6px 10px; font-size: 14px; }
   .wrap { padding: 0 14px; }
-  .fb-tab { right: 12px; bottom: 12px; padding: 7px 13px; }
-  .fb-panel { right: 12px; bottom: 54px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -530,7 +548,6 @@ footer.site-footer p { margin: 0 0 6px; }
 /* ---------- adaptive intake ---------- */
 .question { max-width: 640px; }
 .q-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
-.q-count { font-size: 12.5px; color: var(--ink-faint); white-space: nowrap; letter-spacing: .03em; }
 .q-head .progress { flex: 1; margin: 0; }
 .q-prompt {
   font-family: var(--serif); font-size: clamp(21px, 3vw, 26px); line-height: 1.25;
@@ -542,23 +559,24 @@ footer.site-footer p { margin: 0 0 6px; }
 .question .choice b { font-size: 16px; }
 .question .pills { margin-top: 6px; }
 .question .actions { margin-top: 18px; }
-.intake-done { margin: 8px 0 4px; gap: 12px; }
-.intake-done .hint { margin: 0; }
 
 .share-wrap { display: inline-flex; align-items: center; gap: 6px; }
 
-/* ---------- theme toggle ---------- */
+/* ---------- theme toggle ----------
+   An icon button. The state is still announced — the label is read, not shown. */
 .theme-btn {
-  border: 1px solid var(--line-strong); background: var(--bg-raised); color: var(--ink-soft);
-  font: inherit; font-size: 13px; cursor: pointer; border-radius: 999px;
-  padding: 5px 11px; margin-left: 4px; white-space: nowrap;
+  /* Pushed right from here rather than by an auto margin on the tab strip,
+     which the sign-in gate hides — and the control then slid to the middle. */
+  flex: none; margin-left: auto; border: 0; background: none; color: var(--ink-soft);
+  font: inherit; font-size: 15px; cursor: pointer; border-radius: 9px;
+  width: 32px; height: 32px; display: grid; place-items: center;
+  transition: background .14s ease, color .14s ease;
 }
-.theme-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
-.theme-btn .theme-icon { margin-right: 5px; }
-@media (max-width: 560px) {
-  .theme-btn { padding: 5px 8px; font-size: 12.5px; }
-  .theme-btn .theme-label { display: none; }
-  .theme-btn .theme-icon { margin-right: 0; }
+.theme-btn:hover { background: var(--bg-sunk); color: var(--ink); }
+.theme-btn .ti { width: 18px; height: 18px; }
+.theme-btn .theme-label {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 
 /* ---------- editorial pass: rhythm, motion, restraint ---------- */
@@ -571,12 +589,6 @@ body { font-size: var(--t-body); }
 .results { padding-bottom: var(--s8); }
 .notice { margin: var(--s4) 0; padding: var(--s3) var(--s4); font-size: var(--t-meta); }
 
-/* The expand control should read as a quiet affordance, not a button. */
-.toggle {
-  font-size: var(--t-meta); letter-spacing: .01em;
-  padding: var(--s1) 0; margin-top: var(--s1);
-}
-
 /* What to expect: supporting detail, visibly subordinate to the step itself. */
 .expect { margin: var(--s4) 0 0; gap: var(--s2); }
 .expect li { font-size: var(--t-meta); line-height: 1.5; color: var(--ink-soft); }
@@ -588,13 +600,6 @@ body { font-size: var(--t-body); }
 .question .choices { gap: var(--s3); }
 .question .choice { padding: var(--s3) var(--s4); }
 .question .actions { margin-top: var(--s5); }
-.intake-done {
-  margin: 0 0 var(--s2); align-items: center;
-}
-.intake-done .hint {
-  flex: 1 1 100%; min-width: 0; margin: 0 0 var(--s2);
-  font-size: var(--t-small); color: var(--ink-faint);
-}
 
 /* Motion: results arrive rather than appear. Short, staggered, and only for
    the first few so a long list never feels slow. */
@@ -659,25 +664,7 @@ body { font-size: var(--t-body); }
   .card { padding: var(--s4); }
   .starter { padding: var(--s5) var(--s4); }
   .question { padding: var(--s5) var(--s4); }
-  .intro { padding: var(--s5) 0 var(--s4); }
   .results-head { margin: var(--s5) 0 var(--s3); }
-}
-
-/* With accounts there are six tabs plus the theme control, which wraps onto a
-   second line on a phone and permanently steals height from a sticky header.
-   Scroll it instead. */
-@media (max-width: 620px) {
-  .site-header .wrap { gap: var(--s2); }
-  .tabs {
-    flex: 1 1 auto; min-width: 0;
-    overflow-x: auto; flex-wrap: nowrap;
-    scrollbar-width: none; -ms-overflow-style: none;
-    -webkit-overflow-scrolling: touch;
-    mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);
-  }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab { flex: 0 0 auto; }
-  .brand b { font-size: 16px; }
 }
 
 /* ---------- friendlier mechanics ---------- */
@@ -714,22 +701,17 @@ body { font-size: var(--t-body); }
 @keyframes fyc-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
 
-/* A quiet line of keyboard help under the question, for people who want it. */
-.q-keys {
-  margin: var(--s3) 0 0; font-size: var(--t-small); color: var(--ink-faint);
-}
-.q-keys kbd {
-  font: inherit; font-size: var(--t-micro); padding: 1px 5px; border-radius: 4px;
-  background: var(--bg-sunk); border: 1px solid var(--line); color: var(--ink-soft);
-}
-@media (hover: none) { .q-keys { display: none; } }
-
 /* ---------- skip link, legal pages ---------- */
 .skip {
   position: absolute; left: -9999px; top: 0; z-index: 100;
   background: var(--accent); color: #fff; padding: 10px 16px;
   border-radius: 0 0 var(--radius-sm) 0; font-size: var(--t-meta); font-weight: 600;
 }
+/* The dark palette's accent is a light orange, so white on it measured
+   2.82:1 — the first thing a keyboard user lands on, below the floor.
+   Flipped to dark text the way the filled buttons already are. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .skip { color: #171512; } }
+:root[data-theme="dark"] .skip { color: #171512; }
 .skip:focus { left: 0; }
 main:focus { outline: none; }
 
@@ -920,3 +902,163 @@ main:focus { outline: none; }
 .msg.prompt.for-me { border-left-color: var(--accent); background: var(--accent-soft); }
 .msg.prompt.for-me .prompt-tag { color: var(--accent-ink); }
 .msg.prompt.for-me .prompt-to { color: var(--accent-ink); font-style: normal; font-weight: 600; }
+
+/* The feedback tab has to clear the bottom bar once there is one. */
+@media (max-width: 720px) {
+  .fb-tab { right: var(--s3); bottom: calc(68px + env(safe-area-inset-bottom)); padding: 7px 13px; }
+  .fb-panel { right: var(--s3); bottom: calc(108px + env(safe-area-inset-bottom)); }
+}
+
+/* ---------- segmented control ----------
+   Two halves of one tab (the inbox), the way an app does it: a single
+   control, not two destinations. */
+.seg {
+  display: inline-flex; gap: 2px; margin: var(--s5) 0 var(--s4);
+  padding: 3px; border-radius: 10px; background: var(--bg-sunk);
+}
+.seg-btn {
+  font: inherit; font-size: var(--t-meta); font-weight: 500; cursor: pointer;
+  border: 0; background: none; color: var(--ink-soft);
+  padding: var(--s2) var(--s4); border-radius: 8px;
+  transition: background .15s ease, color .15s ease;
+}
+.seg-btn[aria-selected="true"] {
+  background: var(--bg-raised); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 2px rgba(34, 31, 27, .08);
+}
+
+/* ---------- a fold ----------
+   For the thing worth seeing once. Closed by default so the list is the page. */
+.fold {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg-raised); margin-bottom: var(--s4);
+}
+.fold > summary {
+  cursor: pointer; list-style: none; user-select: none;
+  padding: var(--s3) var(--s4); font-size: var(--t-meta); color: var(--ink-soft);
+  display: flex; align-items: center; gap: var(--s2);
+}
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: "⌄"; margin-left: auto; color: var(--ink-faint); }
+.fold[open] > summary::after { content: "⌃"; }
+.fold > summary:hover { color: var(--ink); }
+.fold > :not(summary) { padding: 0 var(--s4) var(--s4); }
+
+/* The gate is a screen of its own, so it carries the name. */
+.gate-title {
+  font-family: var(--serif); font-size: var(--t-h1); font-weight: 600;
+  letter-spacing: -.025em; margin: var(--s7) 0 var(--s4); max-width: 16ch;
+}
+.gate-head { margin: 0 0 var(--s4); font-size: var(--t-h3); }
+
+.signout-row { margin-top: var(--s5); }
+
+/* ---------- the question card ----------
+   A back arrow and a bar. The bar is the count, so nothing says the count. */
+.q-back {
+  flex: none; width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--bg-raised); color: var(--ink-soft);
+  font: inherit; font-size: 15px; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+  transition: border-color .15s ease, color .15s ease;
+}
+.q-back:hover { border-color: var(--accent); color: var(--accent-ink); }
+
+/* Ways out of a question. Quiet on purpose: they are escapes, not offers. */
+.q-outs { display: flex; gap: var(--s4); margin-top: var(--s4); }
+.linkish {
+  border: 0; background: none; padding: 0; font: inherit;
+  font-size: var(--t-meta); color: var(--ink-faint); cursor: pointer;
+  text-underline-offset: 3px;
+}
+.linkish:hover { color: var(--accent-ink); text-decoration: underline; }
+
+/* What the results are built from, as chips rather than a sentence. */
+.recap {
+  display: flex; align-items: flex-start; gap: var(--s4);
+  margin: 0 0 var(--s2);
+}
+.recap-chips { display: flex; flex-wrap: wrap; gap: var(--s2); flex: 1 1 auto; min-width: 0; }
+.recap .linkish { flex: none; padding-top: 3px; }
+.rchip {
+  font-size: var(--t-small); color: var(--ink-soft);
+  background: var(--bg-sunk); border-radius: 999px; padding: 3px var(--s3);
+  white-space: nowrap;
+}
+
+/* One line, in the warning colour, for anything true of this listing that
+   cuts against what you asked for. */
+.caveat-line {
+  margin: 0 0 var(--s4); font-size: var(--t-meta); color: var(--accent-ink);
+}
+.list-foot {
+  margin: var(--s6) 0 0; font-size: var(--t-small); color: var(--ink-faint);
+}
+
+/* ---------- a card you can tap ----------
+   The card is the control. The chevron says so without a label. */
+.tappable { cursor: pointer; position: relative; }
+.tappable .org-body { position: relative; }
+.tappable .chev {
+  position: absolute; right: 0; top: 2px;
+  font-size: 19px; line-height: 1; color: var(--ink-faint);
+  transition: transform .2s ease, color .2s ease;
+}
+.tappable:hover .chev { color: var(--accent-ink); }
+.tappable[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.tappable h3, .tappable .blurb, .tappable .where { padding-right: var(--s5); }
+.tappable[aria-expanded="true"] { border-color: var(--line-strong); }
+/* Inside the opened panel the pointer is back to normal — those are controls
+   of their own, not more of the card. */
+.tappable .first-step { cursor: auto; }
+@media (prefers-reduced-motion: reduce) { .tappable .chev { transition: none; } }
+
+/* Content needs air under a translucent bar, and room above the bottom one. */
+main { padding: var(--s6) 0 var(--s7); }
+@media (max-width: 720px) { main { padding: var(--s5) 0 var(--s5); } }
+
+/* ---------- screen headers ----------
+   A title and, where there is one, the action that screen is for. */
+.screen-head {
+  display: flex; align-items: center; gap: var(--s4);
+  margin: 0 0 var(--s4);
+}
+.screen-head h2 {
+  font-family: var(--serif); font-size: var(--t-h2); margin: 0; flex: 1 1 auto;
+  font-weight: 600; letter-spacing: -.02em; line-height: 1.15;
+}
+
+/* A detail screen: back, then what you opened. */
+.detail-head {
+  display: flex; align-items: flex-start; gap: var(--s3);
+  margin: 0 0 var(--s4);
+}
+.back-btn {
+  flex: none; width: 32px; height: 32px; margin-top: 1px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--bg-raised); color: var(--ink-soft);
+  font: inherit; font-size: 15px; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+  transition: border-color .15s ease, color .15s ease;
+}
+.back-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+.detail-title { min-width: 0; }
+.detail-title h2 {
+  font-family: var(--serif); font-size: var(--t-h2); margin: 0 0 2px;
+  font-weight: 600; letter-spacing: -.02em; line-height: 1.15;
+}
+.detail-title p { margin: 0; color: var(--ink-faint); font-size: var(--t-small); }
+
+/* Inside a detail screen the segmented control sits right under the title. */
+.detail-head + .seg { margin-top: 0; }
+
+/* A fold can carry a badge on its summary line, right of the label. */
+.fold > summary .badge { margin-left: auto; margin-right: var(--s3); }
+.fold > summary > span:first-child { flex: 0 1 auto; }
+.fold.ladder-box { margin-top: var(--s4); }
+
+/* Safety actions, kept to the right and kept quiet. */
+.quiet-acts { display: inline-flex; gap: var(--s4); margin-left: auto; }
+
+/* The legal pages borrow the app bar and label themselves. */
+.brand { text-decoration: none; }
+.page-tag { color: var(--ink-faint); font-size: var(--t-small); }

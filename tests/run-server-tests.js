@@ -1071,6 +1071,18 @@ async function verifyEmail(call, email) {
     eq((await fetch(base + '/assets/styles.css')).status, 200, 'the stylesheet is served');
     eq((await fetch(base + '/src/match.js')).status, 200, 'front-end scripts are served');
 
+    // Assets are cached for five minutes with must-revalidate, which needs a
+    // validator to revalidate against. Without one a deploy handed people the
+    // new page driving the old scripts.
+    const asset = await fetch(base + '/src/match.js');
+    const tag = asset.headers.get('etag');
+    ok(!!tag, 'a static asset carries an ETag (' + tag + ')');
+    const again = await fetch(base + '/src/match.js', { headers: { 'If-None-Match': tag } });
+    eq(again.status, 304, 'and a conditional GET is answered with a 304');
+    eq(again.headers.get('etag'), tag, 'the 304 repeats the tag');
+    const changed = await fetch(base + '/src/match.js', { headers: { 'If-None-Match': '"nonsense"' } });
+    eq(changed.status, 200, 'a stale tag gets the file');
+
     // Only the front end is public. Everything else in the repo stays private,
     // whether or not it exists today.
     for (const p of ['/server/db.js', '/server/app.js', '/package.json', '/.gitignore',

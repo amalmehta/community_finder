@@ -290,9 +290,10 @@ and to `server/data/outbox/`, so the whole flow works with no provider, no API
 key and no cost — open the link in the file to finish verifying. Swapping in a
 real sender means one transport in `server/mail.js`.
 
-**The alignment graph** on the People tab draws you, your visible interests, and
-the people who share them, so you can see *why* someone is recommended. It is
-bipartite on purpose: it exposes nothing that discovery does not already show.
+**The alignment graph** under People draws you, your visible interests, and the
+people who share them, so you can see *why* someone is recommended. It is
+bipartite on purpose: it exposes nothing that discovery does not already show,
+and it is folded shut by default — the list is the page.
 
 **Messaging without a request** is unlocked by strong alignment: 3+ shared
 interests, the same city, and both people verified. The recipient can switch it
@@ -300,6 +301,11 @@ off, blocking always wins, and the daily caps still apply.
 
 **Circles** live on their own tab, and the finder's results offer them
 alongside the places you would go alone — the other door into the same city.
+
+**Static files carry an ETag** and answer a conditional GET with a 304. They
+are cached for five minutes with `must-revalidate`, which without a validator
+had nothing to revalidate against — so a deploy served the new `index.html`
+(which is `no-cache`) alongside five-minute-old JavaScript.
 
 See [server/README.md](server/README.md) for the API, the safety rules and how
 to change the rate limits. In short: contact is request-then-accept, a new
@@ -335,7 +341,7 @@ npm test        # both suites
 node tests/run-tests.js
 ```
 
-8000+ assertions covering data integrity (every listing has a valid first step,
+8090+ assertions covering data integrity (every listing has a valid first step,
 a real URL, interests that exist in the taxonomy, ratings in range), city lookup
 and aliasing, the universal fallback engine, matcher behaviour (a nervous person
 gets gentle options first, budget is respected, the comfort dial actually
@@ -349,8 +355,10 @@ and this suite fails, which is the point of pinning them.
 It also computes contrast. Every text token is checked against every surface it
 sits on, in both palettes, and anything under 4.5:1 fails the suite — the ratio
 is the property that matters, so the test measures it rather than asserting a
-hex. That is how the faint tier was caught sitting at 3.24:1 on the readiness
-panel in light mode, having never been checked after the dark theme landed.
+hex. That is how the faint tier was caught sitting at 3.24:1 on the readiness panel
+in light mode, having never been checked after the dark theme landed — and how
+the skip link was caught at 2.82:1 in the dark palette, white text on an accent
+that is a light orange there. It is the first thing a keyboard user reaches.
 
 ```bash
 node tools/check-links.js
@@ -374,7 +382,7 @@ each week. You can also run it on demand from the Actions tab.
 node tests/run-server-tests.js
 ```
 
-311 assertions against a real HTTP server on a throwaway database: signup and
+315 assertions against a real HTTP server on a throwaway database: signup and
 sign-in, session isolation, that a hidden interest cannot be used to find you,
 the request/accept/message flow, outsiders being locked out of other people's
 threads, blocking, reporting, rate limits, the whole life of a circle — vetting,
@@ -419,7 +427,7 @@ src/
   preferences.js      on-device preference tracker (pure functions, injectable storage)
   social.js           accounts, people and messaging UI (inert without a backend)
   match.js            the scoring engine (pure functions, no DOM)
-  app.js              DOM rendering, plan, feedback
+  app.js              DOM rendering, saved list, feedback
 tests/run-tests.js    the test suite
 tools/check-links.js  the link checker
 tools/moderate.js     moderation console: reports, suspensions
@@ -468,6 +476,30 @@ Listings deliberately carry **no** pre-written messages. An earlier version
 shipped a copy-and-paste introduction for each one; it was cut, along with the
 reassurance copy, on the grounds that the audience is perfectly capable of
 writing their own sentence.
+
+### The shell
+
+One frame, five tabs: **Find · Saved · Circles · Inbox · You**. On a wide screen
+the tabs sit in the app bar; at 720px and under the same buttons become a bottom
+bar, which is where a thumb is. Signing out is an account action and lives on
+the You tab, not in the navigation. People and Chats are two halves of one
+Inbox, switched with a segmented control rather than being two destinations.
+
+An open circle is three panes — **Chat · People · Plan** — and opens on the
+chat, scrolled to the latest message. The readiness count rides on the Plan
+tab's label and ticks over as you send, so the gate is visible without a copy
+of it sitting under the composer.
+
+A result card is itself the control: tap anywhere to open the first step. The
+name used to be a link to the same page as the button four lines below it,
+which made the card ambiguous about what a click would do.
+
+Nothing on screen explains why the product is built the way it is. The rule is
+**state and instruction, never justification**: a circle says "4 of 5" and
+"all five before anyone can propose a meetup", and says nothing about
+conversational turn-taking and collective intelligence. The reasoning is in the
+source comments and in this file, where it belongs — it was roughly 1,200
+characters of commentary on the circles screen alone.
 
 ### Theme
 

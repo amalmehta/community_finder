@@ -553,7 +553,7 @@ group('circles: the chat-first wiring', function () {
   ok(/said < 1/.test(server), 'a vouch requires that the two of you have actually talked');
 
   ok(social.indexOf("window.FYC_CIRCLES.render()") !== -1, 'social.js routes the circles tab');
-  ok(social.indexOf("'circles', 'people', 'messages'") !== -1, 'and shows the tab once signed in');
+  ok(social.indexOf("['circles', 'messages']") !== -1, 'and shows the tab once signed in');
   ok(appjs.indexOf('FYC_CIRCLES.resultsStrip') !== -1,
      'the finder offers circles alongside the places to go alone');
   ok(circles.indexOf('readinessBlock') !== -1, 'the readiness gate is drawn, not just enforced');
@@ -675,8 +675,10 @@ group('circles: turn-taking, the quiet, and what a circle is for', function () {
   ok(db.indexOf('GROUP BY sender_id ORDER BY n DESC LIMIT 1') !== -1,
      'the loudest single voice is measured');
   ok(circles.indexOf('c.max !== undefined') !== -1, 'and the front end draws the ceiling too');
-  ok(circles.indexOf('all five are met') !== -1, 'the gate says there are five of them');
-  ok(circles.indexOf('one dominant voice') !== -1, 'and says why the fifth one is there');
+  ok(circles.indexOf('All five before anyone can propose a meetup') !== -1,
+     'the gate says there are five of them');
+  ok(circles.indexOf("'Plan \\u00b7 ' + r.done + '/' + r.of") !== -1,
+     'and the count is on the tab, where you can see it without opening the gate');
 
   // Preece, Nonnecke & Andrews (2004): the usual reason somebody never posts
   // is that nobody asked them anything. The fix is an invitation, which has
@@ -741,8 +743,9 @@ group('polish: the type, the colour and the motion', function () {
   ok(match.indexOf('function caveatsFor') !== -1, 'caveats are built apart from reasons');
   ok(!/reasons\.push\('Over your budget'\)/.test(match), 'and are not pushed into reasons');
   ok(/caveats\.push\('Over your budget'\)/.test(match), 'the budget warning is a caveat');
-  ok(app.indexOf("class: 'caveat'") !== -1, 'the card marks them');
-  ok(/\.why li\.caveat::before \{[^}]*content: "!"/.test(css), 'with a different mark');
+  ok(app.indexOf("class: 'caveat-line'") !== -1, 'the card marks them');
+  ok(/\.caveat-line \{[^}]*color: var\(--accent-ink\)/.test(css),
+     'in the warning colour, apart from the facts above it');
 
   // 3. Both palettes, computed. --ink-faint carries 13px text on every one of
   //    these surfaces; the old values measured 3.24:1 and 3.86:1.
@@ -809,6 +812,138 @@ group('polish: the type, the colour and the motion', function () {
      'with a way back to the newest message');
   ok(!/scroll-behavior: smooth;[^}]*\}\s*$/m.test(css.slice(css.indexOf('.msg-list'), css.indexOf('.msg-list') + 220)),
      'the list itself does not glide, or opening a thread would ride the whole history');
+});
+
+
+// ------------------------------------------------- the app shell, and silence
+group('the shell: one frame, and nothing explaining itself', function () {
+  var fs = require('fs');
+  var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+  var social = fs.readFileSync(path.join(root, 'src/social.js'), 'utf8');
+  var circles = fs.readFileSync(path.join(root, 'src/circles.js'), 'utf8');
+  var server = fs.readFileSync(path.join(root, 'server/app.js'), 'utf8');
+
+  // 1. An app bar, not a masthead, and no landing block in front of the work.
+  ok(html.indexOf('class="appbar"') !== -1, 'the chrome is an app bar');
+  ok(html.indexOf('class="site-header"') === -1, 'the old masthead is gone');
+  ok(html.indexOf('<h1>Find your people.</h1>') === -1, 'and so is the landing headline');
+  ok(!/class="intro" id="intro"/.test(html), 'and the paragraph under it');
+  ok(/<div id="intake"><\/div>/.test(html), 'the first thing in the page is the first question');
+  ok(html.indexOf('real groups, real first steps') === -1, 'the tagline is gone');
+  ok(html.indexOf('>Community Finder<') !== -1, 'the name is set as a name, not a path');
+
+  // 2. Five tabs, each with an icon, and the two that were not sections are out.
+  ok((html.match(/role="tab"/g) || []).length === 5, 'five tabs');
+  ok((html.match(/class="ti"/g) || []).length === 5, 'each one carries an icon');
+  ok(html.indexOf('id="tab-people"') === -1, 'People is no longer a tab of its own');
+  ok(html.indexOf('id="tab-signout"') === -1, 'and signing out is not a section');
+  ok(social.indexOf("} }, ['Sign out'])") !== -1, 'sign out lives on the You tab');
+
+  // 3. On a phone the strip becomes a bottom bar.
+  var mob = css.slice(css.indexOf('@media (max-width: 720px)'));
+  ok(/\.tabs \{[^}]*position: fixed/.test(mob), 'the tabs are fixed to the bottom');
+  ok(/\.tabs \{[^}]*bottom: 0/.test(mob), 'at the bottom edge');
+  ok(/body \{ padding-bottom: calc\(66px/.test(mob), 'and the page leaves room for them');
+  // backdrop-filter makes an element the containing block for fixed children,
+  // which put the "bottom" bar across the top of the screen.
+  ok(/\.appbar \{[^}]*backdrop-filter: none/.test(mob),
+     'the app bar drops its blur there, or the bar is not fixed to the viewport');
+  ok(css.indexOf('env(safe-area-inset-bottom)') !== -1, 'and it clears the home indicator');
+
+  // 4. People and Chats are two halves of one tab.
+  ok(social.indexOf('function segBar(') !== -1, 'the inbox has a segmented control');
+  ok(social.indexOf("var inboxSeg = 'chats'") !== -1, 'which half is showing is remembered');
+  ok(css.indexOf('.seg-btn') !== -1, 'and it is styled as one control');
+
+  // 5. A circle is three panes, opening on the conversation.
+  ok(/var panes = \{ chat:/.test(circles), 'a circle has panes');
+  ok(circles.indexOf("S.pane && panes[S.pane] ? S.pane : 'chat'") !== -1, 'and opens on the chat');
+  ok(circles.indexOf('function planLabel(') !== -1, 'the gate count rides on the Plan tab');
+  ok(circles.indexOf('S.onReadiness = function (r)') !== -1, 'and ticks over as you send');
+  ok(css.indexOf('.detail-head') !== -1, 'with a back control and a title');
+  ok(!/el\('h3', \{ text: 'The conversation' \}\)/.test(circles),
+     'and the chat card does not announce that it is the chat');
+
+  // 6. A result card is the control, and its name is not a second link to the
+  //    same page as the button four lines below it.
+  ok(app.indexOf("class: 'card org tappable'") !== -1, 'the whole card expands');
+  ok(app.indexOf("'aria-expanded': 'false'") !== -1, 'and says so');
+  ok(!/el\('h3', \{\}, \[el\('a', \{ href: org\.url/.test(app), 'the name is no longer a link');
+  ok(css.indexOf('.tappable .chev') !== -1, 'a chevron stands in for the word Details');
+
+  // 7. The question card counts with a bar, not a sentence, and the keyboard
+  //    legend is gone.
+  ok(app.indexOf("'Question ' + (prog.asked + 1)") !== -1, 'the count is still announced');
+  ok(app.indexOf("class: 'q-count'") === -1, 'but not printed');
+  ok(app.indexOf("class: 'q-keys'") === -1, 'and the keyboard legend is gone');
+  ok(css.indexOf('.q-keys') === -1, 'including its styles');
+  ok(app.indexOf("class: 'recap-chips'") !== -1, 'what it knows is shown as chips');
+  ok(app.indexOf('questions answered') === -1, 'not as a sentence about the form');
+
+  // 8. The matcher no longer narrates its own scoring on every card.
+  ok(app.indexOf("class: 'why'") === -1, 'the reasons list is gone from the card');
+  ok(css.indexOf('.why li') === -1, 'and from the stylesheet');
+  ok(app.indexOf("' groups'") !== -1, 'the heading counts rather than explains');
+  ok(app.indexOf('easiest to walk into first') === -1, 'the sort order is not narrated');
+
+  // 9. The lines that explained why the product is built the way it is.
+  var src = app + social + circles;
+  [
+    'one dominant voice',
+    'think better together',
+    'A group thread builds attachment',
+    'Disclosure only brings people closer',
+    'fifty-odd hours',
+    'roughly fifty hours',
+    'is not something an app can write for you',
+    'the research is unkind',
+    'Groups that talk online for a long time',
+    'because being answered is the whole point',
+    'Lines run through the interests you have in common',
+    'Circles set the tier they will accept',
+    'Ranked by what you have in common',
+    'Small local groups that talk first and decide to meet later',
+    'What this has worked out about you',
+    'never exposed or searchable',
+    'Blocking always wins'
+  ].forEach(function (phrase) {
+    ok(src.indexOf(phrase) === -1, 'no longer explains itself: "' + phrase.slice(0, 38) + '"');
+  });
+
+  // 10. The claim that there is no server, made on a page served by one.
+  ok(app.indexOf('There is no account and nothing is sent anywhere') === -1,
+     'the You tab no longer promises there is no server');
+  ok(app.indexOf('kept on this device only') !== -1,
+     'it says what is actually true of what it keeps');
+
+  // 11. Static assets carry a validator. Without one "must-revalidate" has
+  //     nothing to revalidate against, so a deploy served new HTML with the
+  //     old JavaScript for five minutes.
+  ok(server.indexOf("'ETag': tag") !== -1, 'static files carry an ETag');
+  ok(server.indexOf("req.headers['if-none-match'] === tag") !== -1, 'and answer a conditional GET');
+  ok(/res\.writeHead\(304/.test(server), 'with a 304');
+
+  // 12. Small truths the old copy got wrong.
+  ok(circles.indexOf("p.said === 1 ? '1 message'") !== -1, 'one message is not "1 messages"');
+  ok(circles.indexOf("p.vouches ? (p.vouches === 1") !== -1, 'and zeroes are left off the line');
+  ok(circles.indexOf('} else if (c.readiness.ready && (!meetups') !== -1,
+     '"anyone can propose something" only where proposing is open');
+
+  // 13. One word for one thing. The tab is Saved, so the button is Save.
+  ok(app.indexOf("'Add to my plan'") === -1, 'the save button does not name a tab that is gone');
+  ok(app.indexOf("}, ['Save']),") !== -1, 'it says Save, like the tab it fills');
+
+  // 14. The dark accent is a light orange; white on it measured 2.82:1, on
+  //     the first thing a keyboard user reaches.
+  ok(/:root\[data-theme="dark"\] \.skip \{ color: #171512; \}/.test(css),
+     'the skip link takes dark text on the dark palette');
+
+  // 15. The feedback pill is not floated over a conversation.
+  ok(app.indexOf('function onTabShown(') !== -1, 'something runs on every tab change');
+  ok(/noisy = which === 'circles' \|\| which === 'messages'/.test(app),
+     'and hides the pill on the screens you type into');
 });
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');

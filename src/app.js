@@ -98,8 +98,12 @@
     bar.setAttribute('data-to', pct + '%');   // moved to once it is on the page
     lastPct = pct;
     box.appendChild(el('div', { class: 'q-head' }, [
-      el('span', { class: 'q-count', text: 'Question ' + (prog.asked + 1) + ' of ' + prog.total }),
-      el('div', { class: 'progress' }, [bar])
+      I.canGoBack(session) ? el('button', {
+        class: 'q-back', type: 'button', 'aria-label': 'Back', title: 'Back', onclick: goBack
+      }, ['\u2190']) : null,
+      el('div', { class: 'progress', role: 'progressbar',
+        'aria-valuenow': String(prog.asked), 'aria-valuemin': '0', 'aria-valuemax': String(prog.total),
+        'aria-label': 'Question ' + (prog.asked + 1) + ' of ' + prog.total }, [bar])
     ]));
 
     box.appendChild(el('h2', { class: 'q-prompt', text: q.prompt }));
@@ -157,15 +161,16 @@
       answer = function () { return picked; };
     }
 
-    var actions = el('div', { class: 'actions' }, [
-      (q.kind !== 'one') ? el('button', {
-        class: 'btn', type: 'button', onclick: function () { submit(answer()); }
-      }, ['Next']) : null,
-      I.canGoBack(session) ? el('button', {
-        class: 'btn ghost sm', type: 'button', onclick: goBack
-      }, ['← Back']) : null,
+    // A single-choice question needs no Next — picking is answering. The rest
+    // of the row is quiet: skipping and leaving early are ways out, not offers.
+    if (q.kind !== 'one') {
+      box.appendChild(el('div', { class: 'actions' }, [
+        el('button', { class: 'btn', type: 'button', onclick: function () { submit(answer()); } }, ['Continue'])
+      ]));
+    }
+    box.appendChild(el('div', { class: 'q-outs' }, [
       el('button', {
-        class: 'btn ghost sm', type: 'button',
+        class: 'linkish', type: 'button',
         onclick: function () { submit(q.kind === 'many' ? [] : null); }
       }, ['Skip']),
       // Only offered once it would actually produce something. It used to be
@@ -173,17 +178,8 @@
       // said "Not enough to go on." — a button that promises results and
       // delivers a wall is worse than no button.
       enough ? el('button', {
-        class: 'btn ghost sm', type: 'button',
-        onclick: function () { finish(true); }
-      }, ['Enough — show me results']) : null
-    ]);
-    box.appendChild(actions);
-    box.appendChild(el('p', { class: 'q-keys' }, [
-      q.kind === 'text' ? el('span', {}, [el('kbd', { text: 'Enter' }), ' to continue']) :
-        el('span', {}, [el('kbd', { text: '1' }), '–', el('kbd', { text: String(Math.min(9, q.options.length)) }), ' to choose']),
-      document.createTextNode(' · '),
-      el('kbd', { text: 'Backspace' }),
-      document.createTextNode(' to go back')
+        class: 'linkish', type: 'button', onclick: function () { finish(true); }
+      }, ['See results now']) : null
     ]));
     box.appendChild(el('p', { class: 'err', id: 'q-error', hidden: true }));
     return box;
@@ -311,24 +307,28 @@
     host.style.height = '';
     host.classList.remove('settling');
     host.innerHTML = '';
-    host.appendChild(el('div', { class: 'actions intake-done' }, [
-      el('span', { class: 'hint', text: session.asked.length + ' of ' + I.TOTAL + ' questions answered' +
-        (p.interests.length ? ' · ' + p.interests.map(function (id) { return (FYC.INTERESTS[id] || {}).label || id; }).join(', ') : '') }),
-      el('button', { class: 'btn ghost sm', type: 'button', onclick: function () {
-        newSession(); $('#results').hidden = true; paintIntake();
-      } }, ['Start over']),
-      // Only offered when questions actually remain.
-      (!I.done(session)) ? el('button', { class: 'btn ghost sm', type: 'button', onclick: function () {
+    // What it is working from, as chips rather than a sentence about the form.
+    // One way back in: carry on where you stopped, or start again if there is
+    // nothing left to answer. The label says which.
+    var more = !I.done(session);
+    host.appendChild(el('div', { class: 'recap' }, [
+      el('div', { class: 'recap-chips' }, [p.location ? el('span', { class: 'rchip', text: p.location }) : null]
+        .concat(p.interests.map(function (id) {
+          var i = FYC.INTERESTS[id] || {};
+          return el('span', { class: 'rchip', text: (i.icon ? i.icon + ' ' : '') + (i.label || id) });
+        }))),
+      el('button', { class: 'linkish', type: 'button', onclick: function () {
+        if (!more) newSession();
         $('#results').hidden = true;
         paintIntake();
-      } }, ['Keep answering']) : null
+      } }, [more ? 'Change answers' : 'Start over'])
     ]));
 
     if (!p.interests.length) {
       $('#results').innerHTML = '';
       $('#results').appendChild(el('div', { class: 'card empty' }, [
-        el('h2', { text: 'Not enough to go on.' }),
-        el('p', { text: 'Answer a few more questions, or start over.' })
+        el('h2', { text: 'Not enough to go on yet.' }),
+        el('p', { text: 'A few more answers and this fills in.' })
       ]));
       $('#results').hidden = false;
       return;
@@ -412,23 +412,30 @@
     var org = r.org;
     var body = el('div', { class: 'org-body' });
 
+    // The name is not a link any more. It used to go to the same page as
+    // "Open the page →" four lines below it, which made the card ambiguous:
+    // one of two identical links opened the site and the other expanded it.
     var head = el('div', {}, [
       opts.starter ? el('span', { class: 'starter-flag', text: 'Start here' }) : null,
-      el('h3', {}, [el('a', { href: org.url, target: '_blank', rel: 'noopener noreferrer', text: org.name })]),
+      el('h3', { text: org.name }),
       el('p', { class: 'where', text: [org.neighborhood, org.cityName].filter(Boolean).join(' · ') }),
       el('p', { class: 'blurb', text: org.blurb })
     ]);
 
+    // Three facts about the group, not four plus a list of why it ranked.
+    // What it costs, how often, and how hard it is to walk into are things a
+    // person is choosing between; the matcher's own reasoning is not.
     var badges = el('div', { class: 'badges' }, [
       el('span', { class: 'badge ease' + r.ease.level, text: r.ease.label }),
-      el('span', { class: 'badge', text: STRUCTURE_LABEL[org.structure] || org.structure }),
       el('span', { class: 'badge', text: COMMIT_LABEL[org.commitment] || org.commitment }),
       el('span', { class: 'badge', text: COST_LABEL[org.cost] || '' })
     ]);
 
-    var why = el('ul', { class: 'why' },
-      r.reasons.map(function (t) { return el('li', { text: t }); })
-        .concat((r.caveats || []).map(function (t) { return el('li', { class: 'caveat', text: t }); })));
+    // Caveats stay: "over your budget" is a fact about this listing against
+    // what you said, and you would want to know it before you click.
+    var flags = (r.caveats || []).length
+      ? el('p', { class: 'caveat-line', text: r.caveats.join(' · ') })
+      : null;
 
     // --- first step panel ---
     var step = el('div', { class: 'first-step' }, [
@@ -444,7 +451,7 @@
         el('button', {
           class: 'btn ghost sm', type: 'button',
           onclick: function (e) { addToPlan(org, e.currentTarget); }
-        }, ['Add to my plan']),
+        }, ['Save']),
         (function () {
           var note = el('span', { class: 'copied', hidden: true });
           var btn = el('button', {
@@ -467,27 +474,41 @@
 
     body.appendChild(head);
     body.appendChild(badges);
-    if (r.reasons.length || (r.caveats || []).length) body.appendChild(why);
+    if (flags) body.appendChild(flags);
 
     if (opts.starter) {
       body.appendChild(step);
-    } else {
-      var wrapStep = el('div', { hidden: true }, [step]);
-      var toggle = el('button', {
-        class: 'toggle', type: 'button', 'aria-expanded': 'false',
-        onclick: function (e) {
-          var open = wrapStep.hidden;
-          if (open) track('expand', org);
-          wrapStep.hidden = !open;
-          e.currentTarget.setAttribute('aria-expanded', open ? 'true' : 'false');
-          e.currentTarget.textContent = open ? 'Hide' : 'Details';
-        }
-      }, ['Details']);
-      body.appendChild(toggle);
-      body.appendChild(wrapStep);
+      return el('article', { class: 'card org starter' }, [body]);
     }
 
-    return el('article', { class: 'card org' + (opts.starter ? ' starter' : '') }, [body]);
+    // The whole card opens it. A nine-pixel "Details" link in the corner was
+    // the only way in, on a card the size of a postcard.
+    var wrapStep = el('div', { hidden: true }, [step]);
+    body.appendChild(el('span', { class: 'chev', 'aria-hidden': 'true', text: '\u2304' }));
+    body.appendChild(wrapStep);
+
+    var card = el('article', {
+      class: 'card org tappable', role: 'button', tabindex: '0',
+      'aria-expanded': 'false',
+      onclick: function (e) {
+        // Anything inside the opened panel does its own job.
+        if (wrapStep.contains(e.target)) return;
+        toggleCard();
+      },
+      onkeydown: function (e) {
+        if (wrapStep.contains(e.target)) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCard(); }
+      }
+    }, [body]);
+
+    function toggleCard() {
+      var open = wrapStep.hidden;
+      if (open) track('expand', org);
+      wrapStep.hidden = !open;
+      card.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    return card;
   }
 
   function render(m, p) {
@@ -514,8 +535,8 @@
 
     if (!primary.length) {
       host.appendChild(el('div', { class: 'empty' }, [
-        el('h2', { text: 'No matches.' }),
-        el('p', { text: 'Loosen the budget or timing filters, or pick more interests.' })
+        el('h2', { text: 'Nothing matched.' }),
+        el('p', { text: 'Try a wider budget, or a few more interests.' })
       ]));
       host.hidden = false;
       return;
@@ -523,27 +544,20 @@
 
     var where = m.cityMatched ? m.city.name : (p.location || 'your area');
     host.appendChild(el('div', { class: 'results-head' }, [
-      el('h2', { text: hasCurated ? 'Places to start in ' + where : 'Ways in, near ' + where }),
-      el('p', { text: primary.length + ' matches, easiest to walk into first' })
+      el('h2', { text: where }),
+      el('p', { text: primary.length + (primary.length === 1 ? ' group' : ' groups') })
     ]));
 
     // Say outright which interests this city has no hand-picked listing for.
     if (m.cityMatched && m.uncovered && m.uncovered.length) {
-      var missing = joinList(labels(m.uncovered));
       host.appendChild(el('div', { class: 'notice' }, [
-        el('b', { text: 'No hand-picked ' + missing + ' listings in ' + where + ' yet. ' }),
-        hasCurated
-          ? 'The groups below match your other interests. For ' + missing +
-            ', use the national routes further down — they are live searches, not guesses.'
-          : 'Rather than show you groups that match none of that, here are the national routes for it.'
+        'Nothing hand-picked for ' + joinList(labels(m.uncovered)) + ' in ' + where + ' yet.'
       ]));
     }
 
     if (!m.cityMatched) {
       host.appendChild(el('div', { class: 'notice' }, [
-        el('b', { text: 'No hand-picked list for ' + where + ' yet. ' }),
-        'These are national directories and programmes that exist almost everywhere, pointed at your city and your interests. ' +
-        'Every link below is a live search or finder, not a guess.'
+        'No hand-picked list for ' + where + ' yet — these work anywhere.'
       ]));
     }
 
@@ -552,14 +566,9 @@
     });
 
     if (hasCurated && uni.length) {
-      var uncoveredLabels = labels(m.uncovered || []);
       host.appendChild(el('div', { class: 'results-head' }, [
-        el('h2', { text: 'Works anywhere' }),
-        el('p', {
-          text: uncoveredLabels.length
-            ? 'Including ' + joinList(uncoveredLabels)
-            : 'National routes in, if none of the above fits'
-        })
+        el('h2', { text: 'Anywhere' }),
+        el('p', { text: uni.length + (uni.length === 1 ? ' route' : ' routes') })
       ]));
       uni.forEach(function (r) { host.appendChild(orgCard(r, p, {})); });
     }
@@ -570,6 +579,9 @@
       window.FYC_CIRCLES.resultsStrip(host, p);
     }
 
+    // The data is a snapshot. Said once, at the end, where it is about the
+    // listings rather than about the product.
+    host.appendChild(el('p', { class: 'list-foot', text: 'Details change — check before you go.' }));
     host.hidden = false;
   }
 
@@ -583,7 +595,7 @@
 
   function addToPlan(org, btn) {
     if (plan.some(function (x) { return x.id === org.id; })) {
-      if (btn) btn.textContent = 'Already in your plan';
+      if (btn) btn.textContent = 'Saved';
       return;
     }
     track('plan', org);
@@ -607,7 +619,7 @@
     save(KEY.plan, plan);
     paintPlanCount();
     renderPlan();
-    if (btn) { btn.textContent = 'Added ✓'; btn.disabled = true; }
+    if (btn) { btn.textContent = 'Saved \u2713'; btn.disabled = true; }
   }
 
   function paintPlanCount() {
@@ -620,17 +632,15 @@
     var host = $('#plan-body');
     host.innerHTML = '';
     if (!plan.length) {
-      host.appendChild(el('div', { class: 'empty' }, [
-        el('h2', { text: 'Nothing saved.' }),
-        el('p', { text: 'Add something from the Find tab.' })
+      host.appendChild(el('div', { class: 'screen-head' }, [el('h2', { text: 'Saved' })]));
+      host.appendChild(el('div', { class: 'card empty' }, [
+        el('h2', { text: 'Nothing saved yet.' }),
+        el('p', { text: 'Add something from Find.' })
       ]));
       return;
     }
 
-    host.appendChild(el('div', { class: 'results-head' }, [
-      el('h2', { text: 'My plan' }),
-      el('p', { text: plan.length + (plan.length === 1 ? ' saved' : ' saved') })
-    ]));
+    host.appendChild(el('div', { class: 'screen-head' }, [el('h2', { text: 'Saved' })]));
 
     plan.forEach(function (item, idx) {
       var steps = PLAN_STEPS.map(function (s, i) { return i === 1 ? item.stepLabel : s; });
@@ -735,81 +745,50 @@
     var profile = FYC.prefs.profile();
     var enabled = profile.enabled;
 
-    host.appendChild(el('div', { class: 'results-head' }, [
-      el('h2', { text: 'What this has worked out about you' }),
-      el('p', { text: profile.count + (profile.count === 1 ? ' action' : ' actions') + ' noticed, all of it on this device' })
-    ]));
+    host.appendChild(el('div', { class: 'screen-head' }, [el('h2', { text: 'You' })]));
 
-    if (!profile.ready) {
-      host.appendChild(el('div', { class: 'card empty' }, [
-        el('h2', { text: enabled ? 'Not enough to go on yet.' : 'Tracking is paused.' }),
-        el('p', {
-          text: enabled
-            ? 'Open a few first steps, save something to your plan, and this page will start showing what you are drawn to in practice — which is often not what you ticked in the form.'
-            : 'Turn it back on below if you want results to adapt to what you actually do.'
-        })
-      ]));
-    } else {
-      var summary = FYC.prefs.summary(profile);
-      host.appendChild(el('article', { class: 'card' }, [
-        el('h3', { class: 'you-summary', text: summary ? 'So far: ' + summary + '.' : 'Still forming a picture.' }),
-        el('p', { class: 'hint', text: 'This nudges your results. It never overrides the city, interests or budget you choose.' }),
-        el('div', { class: 'conf' }, [
-          el('span', { class: 'conf-label', text: 'How much it leans on this' }),
-          el('div', { class: 'conf-bar' }, [(function () {
-            var i = el('i');
-            i.style.width = Math.round(profile.confidence * 100) + '%';
-            return i;
-          })()])
-        ])
-      ]));
-
-      var chart = affinityChart(profile);
-      if (chart) {
-        host.appendChild(el('article', { class: 'card' }, [
-          el('h3', { text: 'What you actually click' }),
-          el('p', { class: 'hint', text: 'Bars to the right are things you open and save. To the left, things you back away from.' }),
-          chart
-        ]));
-      }
-
-      var leanings = [
-        leaning('How gentle you like it', profile.gentleness, 1, 5, 'will brave the intense ones', 'the gentlest options'),
-        leaning('What you will pay', profile.cost, 0, 2, 'free only', 'cost is no object'),
-        leaning('Going alone', profile.solo, 1, 5, 'prefers company', 'happy to turn up alone')
-      ].filter(Boolean);
-      if (leanings.length) {
-        host.appendChild(el('article', { class: 'card' }, [
-          el('h3', { text: 'Your leanings' })
-        ].concat(leanings)));
-      }
-    }
-
-    // When signed in, the profile editor belongs here too.
+    // Your profile is what this tab is for, so it comes first. It used to sit
+    // under two cards of the app analysing you, which is not the thing you
+    // came here to change.
     if (window.FYC_SOCIAL && window.FYC_SOCIAL.profileCard) {
       var pc = window.FYC_SOCIAL.profileCard();
       if (pc) host.appendChild(pc);
     }
 
-    host.appendChild(el('article', { class: 'card' }, [
-      el('h3', { text: 'Your data' }),
-      el('p', { class: 'hint', text: 'This never leaves your browser. There is no account and nothing is sent anywhere. Erasing it here erases it completely.' }),
+    // What it has picked up, folded away — and only once there is something
+    // in it. An empty card explaining why it is empty is worse than no card.
+    if (profile.ready) {
+      var summary = FYC.prefs.summary(profile);
+      var fold = el('details', { class: 'fold' }, [
+        el('summary', { text: 'What you tend to go for' }),
+        el('p', { class: 'you-summary', text: summary ? summary.charAt(0).toUpperCase() + summary.slice(1) + '.' : 'Still forming a picture.' })
+      ]);
+      var chart = affinityChart(profile);
+      if (chart) fold.appendChild(chart);
+      [
+        leaning('How gentle you like it', profile.gentleness, 1, 5, 'will brave the intense ones', 'the gentlest options'),
+        leaning('What you will pay', profile.cost, 0, 2, 'free only', 'cost is no object'),
+        leaning('Going alone', profile.solo, 1, 5, 'prefers company', 'happy to turn up alone')
+      ].filter(Boolean).forEach(function (n) { fold.appendChild(n); });
+      host.appendChild(fold);
+    }
+
+    host.appendChild(el('details', { class: 'fold' }, [
+      el('summary', { text: enabled ? 'What this device remembers' : 'Remembering is paused' }),
+      // True with or without an account: the learned preferences are local
+      // either way. The footer says what the server holds.
+      el('p', { class: 'hint', text: profile.count
+        ? profile.count + (profile.count === 1 ? ' action' : ' actions') + ', kept on this device only.'
+        : 'Nothing yet. Kept on this device only.' }),
       el('div', { class: 'actions' }, [
         el('button', {
           class: 'btn ghost sm', type: 'button',
-          onclick: function () {
-            FYC.prefs.setEnabled(!enabled);
-            renderYou();
-          }
-        }, [enabled ? 'Pause tracking' : 'Resume tracking']),
-        el('button', {
+          onclick: function () { FYC.prefs.setEnabled(!enabled); renderYou(); }
+        }, [enabled ? 'Pause' : 'Resume']),
+        profile.count ? el('button', {
           class: 'btn ghost sm', type: 'button',
-          onclick: function () {
-            if (!profile.count) return;
-            FYC.prefs.clear();
-            renderYou();
-          }
-        }, ['Erase what it has learned'])
+          onclick: function () { FYC.prefs.clear(); renderYou(); }
+        }, ['Erase it']) : null
       ])
     ]));
   }
@@ -817,7 +796,7 @@
   // ---------- tabs ----------
   /**
    * The tab strip scrolls on a phone — six tabs do not fit in 375px. Without
-   * this, choosing Circles leaves the strip showing Find, My plan and You,
+   * this, choosing Circles leaves the strip showing Find, Saved and You,
    * and nothing on screen says which tab you are on.
    */
   function keepTabInView(which) {
@@ -835,7 +814,23 @@
     var max = strip.scrollWidth - strip.clientWidth;
     strip.scrollTo({ left: Math.max(0, Math.min(max, to)), behavior: reduce ? 'auto' : 'smooth' });
   }
-  window.FYC_TAB_IN_VIEW = keepTabInView;
+  /** Called whenever a tab is shown, by whichever file is doing the showing. */
+  function onTabShown(which) {
+    keepTabInView(which);
+    // The feedback pill sits bottom-right, which is on top of a conversation.
+    // It belongs on the screens you browse, not the ones you type into.
+    var fb = $('#fb-tab');
+    var panel = $('#fb-panel');
+    if (fb) {
+      var noisy = which === 'circles' || which === 'messages' || which === 'people';
+      fb.hidden = noisy;
+      if (noisy && panel && !panel.hidden) {
+        panel.hidden = true;
+        fb.setAttribute('aria-expanded', 'false');
+      }
+    }
+  }
+  window.FYC_TAB_IN_VIEW = onTabShown;
 
   function showTab(which) {
     // With a backend there are more tabs than these three; social.js owns the
@@ -856,10 +851,13 @@
   // Three states, because "follow the system" is a real preference and not the
   // same as picking light.
   var THEMES = ['auto', 'light', 'dark'];
+  // Drawn rather than typed. The glyphs (☀ ☾ ◐) render at wildly different
+  // weights across platforms, and at 15px the sun was a smudge.
   var THEME_UI = {
-    auto: { icon: '\u25D0', label: 'Auto' },
-    light: { icon: '\u2600', label: 'Light' },
-    dark: { icon: '\u263E', label: 'Dark' }
+    auto: { label: 'Auto', paths: ['M12 4a8 8 0 100 16 8 8 0 000-16z', 'M12 4v16a8 8 0 000-16z'], fill: 1 },
+    light: { label: 'Light', paths: ['M12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z',
+      'M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4'] },
+    dark: { label: 'Dark', paths: ['M19.5 14.6A8.2 8.2 0 019.4 4.5a7.7 7.7 0 1010.1 10.1z'] }
   };
 
   function currentTheme() {
@@ -884,7 +882,10 @@
     var t = currentTheme();
     var ui = THEME_UI[t];
     btn.innerHTML = '';
-    btn.appendChild(el('span', { class: 'theme-icon', 'aria-hidden': 'true', text: ui.icon }));
+    btn.appendChild(svg('svg', { class: 'ti theme-icon', viewBox: '0 0 24 24', 'aria-hidden': 'true' },
+      ui.paths.map(function (d, i) {
+        return svg('path', { d: d, fill: (ui.fill && i === 1) ? 'currentColor' : 'none' });
+      })));
     btn.appendChild(el('span', { class: 'theme-label', text: ui.label }));
     btn.setAttribute('title', 'Theme: ' + ui.label + ' (click to change)');
     btn.setAttribute('aria-label', 'Colour theme: ' + ui.label);

@@ -1,6 +1,6 @@
 {
-  "name": "community_finder",
-  "short_name": "community",
+  "name": "Community Finder",
+  "short_name": "Community",
   "description": "Real local groups and the concrete first step into each.",
   "start_url": "./",
   "scope": "./",

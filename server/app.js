@@ -1460,9 +1460,20 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
       if (err) return fail(res, 404, 'Not found');
       // The HTML must always be revalidated or a deploy never reaches anyone;
       // the assets it references are safe to cache for a short while.
+      //
+      // They also need an ETag. Without one "must-revalidate" has nothing to
+      // revalidate against, so a changed script stayed invisible for the full
+      // five minutes — and because the page itself does revalidate, a deploy
+      // handed people new HTML driving old JavaScript.
       const isPage = rel.endsWith('.html');
+      const tag = '"' + crypto.createHash('sha1').update(data).digest('base64url').slice(0, 22) + '"';
+      if (req.headers['if-none-match'] === tag) {
+        res.writeHead(304, { 'ETag': tag, 'Cache-Control': isPage ? 'no-cache' : 'public, max-age=300, must-revalidate' });
+        return res.end();
+      }
       send(res, 200, data, {
         'Content-Type': MIME[path.extname(target)] || 'application/octet-stream',
+        'ETag': tag,
         'Cache-Control': isPage ? 'no-cache' : 'public, max-age=300, must-revalidate'
       });
     });

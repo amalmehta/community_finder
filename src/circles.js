@@ -15,11 +15,13 @@
     user: null,
     poll: null,
     openId: null,
+    pane: 'chat',          // which pane of an open circle is showing
     trust: null,
     rule: null,
     capRange: { min: 4, max: 8, default: 6 },
     wantsRule: { maxChars: 140, minChars: 8 },
     safety: [],
+    onReadiness: null,     // set while a circle is open; keeps the Plan tab's count live
     planAsk: 'Say how you will get there: where you are setting off from, when, and how.'
   };
 
@@ -116,9 +118,7 @@
       d.metBefore
         ? 'It has been ' + days(d.days) + ' since you last did anything together.'
         : 'You have been able to meet for ' + days(d.days) + ' and have not.',
-      el('p', { class: 'hint', text: drifting
-        ? 'Groups that talk online for a long time and then meet do worse than groups that meet early — and worse than groups that never meet at all. The conversation has done its job. Propose something small.'
-        : 'The research is unkind about long online-only runs: the longer the wait, the worse the first meeting tends to go. Something short and local is enough.' })
+      el('p', { class: 'hint', text: 'Propose something small.' })
     ]);
   }
 
@@ -145,8 +145,8 @@
           + (mine.reached ? ' You are past ' + mine.reached.label + '.' : '')
         : 'Past 200 hours — close friends, by the numbers.' }),
       el('p', { class: 'hint', text: c.met
-        ? 'The circle has ' + hoursText(c.hours.circle) + ' between it, across ' + c.met + (c.met === 1 ? ' meetup' : ' meetups') + '.'
-        : 'None yet. Messages do not count towards this, which is the point.' })
+        ? hoursText(c.hours.circle) + ' across ' + c.met + (c.met === 1 ? ' meetup' : ' meetups') + '.'
+        : 'Only time together counts, not messages.' })
     ]);
   }
 
@@ -162,10 +162,10 @@
     var d = c.disclosure;
     if (!d) return null;
     var list = sets && sets.length ? sets : FYC.PROMPT_SETS;
-    return el('div', { class: 'ladder-box' }, [
-      el('div', { class: 'ready-head' }, [
-        el('b', { text: 'How deep the questions go' }),
-        el('span', { class: 'badge', text: d.label.toLowerCase() + ' · ' + d.depth + ' of ' + d.of })
+    return el('details', { class: 'fold ladder-box' }, [
+      el('summary', {}, [
+        el('span', { text: 'How deep the questions go' }),
+        el('span', { class: 'badge', text: d.label.toLowerCase() + ' \u00b7 ' + d.depth + ' of ' + d.of })
       ]),
       el('ol', { class: 'ladder' }, list.map(function (s) {
         return el('li', { class: s.depth < d.depth ? 'done' : s.depth === d.depth ? 'now' : '' }, [
@@ -174,10 +174,9 @@
         ]);
       })),
       el('p', { class: 'hint', text: d.needed
-        ? d.answered + ' of ' + d.needed + ' questions at this level answered by '
-          + d.answeredBy + ' or more of you. That is what opens the next one — a '
-          + 'question nobody replies to does not count, because being answered is the whole point of asking.'
-        : 'Every set is open. There is nothing left for the app to hold back.' })
+        ? d.answered + ' of ' + d.needed + ' answered by ' + d.answeredBy
+          + ' or more of you opens the next set.'
+        : 'Every set is open.' })
     ]);
   }
 
@@ -191,8 +190,7 @@
     if (!r) return null;
     return el('div', { class: 'notice drift' }, [
       el('b', { text: r.display + ' answered and nobody replied. ' }),
-      'That was ' + ago(r.at) + '.',
-      el('p', { class: 'hint', text: 'Answering a question is the easy half. Disclosure only brings people closer when somebody responds to it, so this one is on the rest of you.' })
+      'That was ' + ago(r.at) + '. Say something back.'
     ]);
   }
 
@@ -248,11 +246,8 @@
           }))
         : null,
       el('p', { class: 'hint', text: said.length
-        ? said.length + ' of the ' + all.length + ' of you have said what you came for. '
-          + 'A set of people starts to feel like a group when it has shared goals and a '
-          + 'history behind it, and the first of those is not something an app can write for you.'
-        : 'Nobody has said what they came for yet. The host wrote what the circle is — '
-          + 'this is the part the rest of you write, a line each.' }),
+        ? said.length + ' of ' + all.length + ' have said what they came for.'
+        : 'Nobody has said what they came for yet.' }),
       err,
       el('label', { class: 'field' }, [
         el('span', { text: me && me.wants ? 'Your line' : 'Add yours' }), want
@@ -301,21 +296,15 @@
       { tier: 2, label: 'Introduced', note: 'city, three interests and a couple of sentences about you' },
       { tier: 3, label: 'Vouched for', note: 'two people who have talked with you in a circle' }
     ];
-    return el('article', { class: 'card trust' }, [
-      el('div', { class: 'person-top' }, [
-        el('h3', { text: 'Your standing: ' + t.label }),
-        el('span', { class: 'badge', text: 'tier ' + t.tier + ' of 3' })
-      ]),
-      el('p', { class: 'hint', text: 'Circles set the tier they will accept. This is what each one takes.' }),
+    return el('details', { class: 'fold trust' }, [
+      el('summary', { text: 'Your standing: ' + t.label }),
       el('ol', { class: 'ladder' }, steps.map(function (s) {
         return el('li', { class: t.tier >= s.tier ? 'done' : '' }, [
           el('b', { text: s.label }),
           el('span', { text: ' — ' + s.note })
         ]);
       })),
-      t.missing.length ? el('div', { class: 'notice' }, [
-        el('b', { text: 'Next: ' }), t.missing[0]
-      ]) : null
+      t.missing.length ? el('p', { class: 'hint nudge', text: 'Next: ' + t.missing[0] }) : null
     ]);
   }
 
@@ -342,8 +331,8 @@
         ]);
       })),
       o.quiet ? null : el('p', { class: 'hint', text: r.ready
-        ? 'Anyone here can propose something now. It happens once enough of you say yes.'
-        : 'Nobody can propose a meetup until all five are met. The last one is why: groups where the turns are shared out think better together than groups with one dominant voice, so twenty messages mostly from one person is not a conversation yet.' })
+        ? 'Anyone can propose something now.'
+        : 'All five before anyone can propose a meetup.' })
     ]);
   }
 
@@ -383,7 +372,7 @@
       respondBlock(c),
       driftBlock(c),
       c.stale && (!c.drift || c.drift.stage === 'none' || c.drift.stage === 'ok')
-        ? el('p', { class: 'hint nudge', text: 'Nobody has said anything for a while. Open it and post a prompt.' }) : null
+        ? el('p', { class: 'hint nudge', text: 'Quiet for a while. Post a question.' }) : null
     ]);
   }
 
@@ -495,14 +484,14 @@
     var err = errLine();
     var form = el('article', { class: 'card' }, [
       el('h3', { text: 'Start a circle' }),
-      el('p', { class: 'hint', text: 'You host it: you read the answers, you decide who comes in, and you keep the conversation alive. Keep it small — ' + S.capRange.min + ' to ' + S.capRange.max + ' people.' }),
+      el('p', { class: 'hint', text: 'You read the answers and decide who comes in. Keep it small — ' + S.capRange.min + ' to ' + S.capRange.max + ' people.' }),
       el('label', { class: 'field' }, [el('span', { text: 'Name' }), name]),
       el('label', { class: 'field' }, [el('span', { text: 'City' }), city]),
       el('label', { class: 'field' }, [el('span', { text: 'What it is' }), blurb]),
       el('label', { class: 'field' }, [
         el('span', { text: 'The joining question' }),
         question,
-        el('p', { class: 'hint', text: 'This is the vetting. Ask something a bot or a drive-by cannot answer: "what brought you here", "what do you actually want out of this".' })
+        el('p', { class: 'hint', text: 'Ask something a drive-by cannot answer.' })
       ]),
       el('div', { class: 'field' }, [el('span', { text: 'Interests (up to four)' }), pills]),
       el('div', { class: 'row2' }, [
@@ -534,6 +523,8 @@
   async function renderList() {
     stop();
     S.openId = null;
+    S.pane = 'chat';
+    S.onReadiness = null;
     var host = $('#circles-body');
     host.innerHTML = '';
     host.appendChild(loading('Looking for circles near you…'));
@@ -555,10 +546,23 @@
     var unreadBy = {};
     (unread.byCircle || []).forEach(function (r) { unreadBy[r.circle_id] = r.unread; });
 
-    host.appendChild(el('div', { class: 'results-head' }, [
+    // Starting one is the action this screen offers, so it sits in the header
+    // rather than under twelve cards at the bottom of the page.
+    var slot = el('div');
+    var startBtn = data.trust.tier >= 2
+      ? el('button', { class: 'btn sm', type: 'button', onclick: function (ev) {
+          ev.currentTarget.hidden = true;
+          slot.appendChild(createForm({ city: data.me.city || '', question: FYC.PROMPTS[0] },
+            function (id) { openCircle(id); }));
+          slot.scrollIntoView({ block: 'center' });
+        } }, ['Start a circle'])
+      : null;
+
+    host.appendChild(el('div', { class: 'screen-head' }, [
       el('h2', { text: 'Circles' }),
-      el('p', { text: 'Small local groups that talk first and decide to meet later. Joining means answering a question, not pressing a button.' })
+      startBtn
     ]));
+    host.appendChild(slot);
 
     if (data.mine.length) {
       host.appendChild(el('div', { class: 'results-head sub' }, [el('h2', { text: 'Yours' })]));
@@ -566,14 +570,15 @@
     }
 
     host.appendChild(el('div', { class: 'results-head sub' }, [
-      el('h2', { text: data.mine.length ? 'Others near you' : 'Open to you' }),
-      el('p', { text: 'Ranked by what you have in common, whether it is in your city, and whether anyone is actually talking.' })
+      el('h2', { text: data.mine.length ? 'Others near you' : 'Open to you' })
     ]));
 
     if (!data.circles.length) {
       host.appendChild(el('div', { class: 'card empty' }, [
-        el('h2', { text: 'Nothing here yet.' }),
-        el('p', { text: 'No circle in your city matches what you are into. The honest fix is to start one — they begin at three people.' })
+        el('h2', { text: 'Nothing open to you yet.' }),
+        el('p', { text: data.trust.tier >= 2
+          ? 'Start one — they begin at three people.'
+          : 'Verify your email on the You tab to start one.' })
       ]));
     } else {
       data.circles.slice(0, 12).forEach(function (c) {
@@ -581,22 +586,8 @@
       });
     }
 
+    // Reference, not news: folded away under what it currently says about you.
     host.appendChild(trustCard(data.trust));
-
-    if (data.trust.tier >= 2) {
-      var slot = el('div');
-      host.appendChild(el('div', { class: 'actions' }, [
-        el('button', { class: 'btn sm', type: 'button', onclick: function (ev) {
-          ev.currentTarget.hidden = true;
-          var seedCity = data.me.city || '';
-          slot.appendChild(createForm({ city: seedCity, question: FYC.PROMPTS[0] }, function (id) { openCircle(id); }));
-          slot.scrollIntoView({ block: 'center' });
-        } }, ['Start a circle'])
-      ]));
-      host.appendChild(slot);
-    } else {
-      host.appendChild(el('p', { class: 'hint', text: 'Hosting a circle needs the "Introduced" tier — a verified email and a filled-in profile. The You tab has both.' }));
-    }
 
     refreshBadge();
   }
@@ -626,51 +617,95 @@
     if (d.wants) S.wantsRule = d.wants;
     var c = d.circle;
 
-    host.appendChild(el('div', { class: 'actions' }, [
-      el('button', { class: 'btn ghost sm', type: 'button', onclick: function () { renderList(); } }, ['← All circles'])
-    ]));
-
-    host.appendChild(el('div', { class: 'results-head' }, [
-      el('h2', { text: c.name }),
-      el('p', { text: c.city + ' · ' + liveLine(c) + ' · host ' + (c.hostName || '—') + (c.status === 'closed' ? ' · closed' : '') })
-    ]));
-    host.appendChild(el('article', { class: 'card' }, [
-      el('p', { class: 'blurb', text: c.blurb }),
-      interestBadges(c.interests, c.overlapIds),
-      c.myRole ? respondBlock(c) : null,
-      c.myRole ? driftBlock(c) : null,
-      readinessBlock(c.readiness, {}),
-      c.myRole ? disclosureBlock(c, d.promptSets) : null,
-      c.myRole && c.readiness.ready ? hoursBlock(c) : null
+    host.appendChild(el('div', { class: 'detail-head' }, [
+      el('button', { class: 'back-btn', type: 'button', 'aria-label': 'All circles',
+        onclick: function () { renderList(); } }, ['\u2190']),
+      el('div', { class: 'detail-title' }, [
+        el('h2', { text: c.name }),
+        el('p', { text: c.city + ' · ' + liveLine(c) + (c.status === 'closed' ? ' · closed' : '') })
+      ])
     ]));
 
     if (!c.myRole) {
       // The shopfront. No conversation, no member list.
-      var slot = el('div');
+      host.appendChild(el('article', { class: 'card' }, [
+        el('p', { class: 'blurb', text: c.blurb }),
+        interestBadges(c.interests, c.overlapIds),
+        readinessBlock(c.readiness, { quiet: true })
+      ]));
       host.appendChild(el('article', { class: 'card' }, [
         el('h3', { text: 'To join' }),
-        el('p', { class: 'hint', text: 'You answer the circle’s question. The host reads it; two members can also wave you in.' }),
+        el('p', { class: 'hint', text: 'Answer the circle’s question.' }),
         c.apply.ok ? applyBox(c, function () { openCircle(id); })
-          : el('p', { class: 'hint locked', text: c.apply.why || 'Not open to you right now.' }),
-        slot
+          : el('p', { class: 'hint locked', text: c.apply.why || 'Not open to you right now.' })
       ]));
       return;
     }
 
-    if (d.confirm && d.confirm.length) confirmCard(host, c, d.confirm);
-    storyCard(host, c, d.members);
-    chatCard(host, c);
-    meetupCard(host, c, d.meetups, d.occurrences, d.cadences);
-    if (d.applications && d.applications.length) applicationsCard(host, c, d.applications);
-    membersCard(host, c, d.members);
-    hostTools(host, c);
+    // Three panes instead of one scroll. The conversation is the circle, so
+    // it opens there; the gate, the ladder and the hours are things you go
+    // and look at, not things you read past on the way to the chat.
+    var panes = { chat: el('div'), people: el('div'), plan: el('div') };
+    var current = S.pane && panes[S.pane] ? S.pane : 'chat';
+
+    var ready = c.readiness;
+    function planLabel(r) { return r.ready ? 'Plan' : 'Plan \u00b7 ' + r.done + '/' + r.of; }
+    var planBtn = null;
+    var bar = el('div', { class: 'seg', role: 'tablist' }, [
+      ['chat', 'Chat'], ['people', 'People'], ['plan', planLabel(ready)]
+    ].map(function (pair) {
+      var b = el('button', {
+        class: 'seg-btn', type: 'button', role: 'tab',
+        'aria-selected': current === pair[0] ? 'true' : 'false',
+        onclick: function () { S.pane = pair[0]; openCircle(id); }
+      }, [pair[1]]);
+      if (pair[0] === 'plan') planBtn = b;
+      return b;
+    }));
+    host.appendChild(bar);
+    S.onReadiness = function (r) { if (planBtn) planBtn.textContent = planLabel(r); };
+
+    // Anything that needs answering follows you between panes.
+    var alerts = el('div', {}, [
+      respondBlock(c),
+      driftBlock(c)
+    ]);
+    if (alerts.childNodes.length) host.appendChild(alerts);
+
+    Object.keys(panes).forEach(function (k) {
+      panes[k].hidden = k !== current;
+      host.appendChild(panes[k]);
+    });
+
+    // --- chat ---
+    if (d.confirm && d.confirm.length) confirmCard(panes.chat, c, d.confirm);
+    chatCard(panes.chat, c);
+    // Which levels exist and what is left to unlock: worth one look, not a
+    // standing fixture under every conversation.
+    var ladder = disclosureBlock(c, d.promptSets);
+    if (ladder) panes.chat.appendChild(ladder);
+
+    // --- people ---
+    storyCard(panes.people, c, d.members);
+    if (d.applications && d.applications.length) applicationsCard(panes.people, c, d.applications);
+    membersCard(panes.people, c, d.members);
+
+    // --- plan ---
+    panes.plan.appendChild(el('article', { class: 'card' }, [
+      el('p', { class: 'blurb', text: c.blurb }),
+      interestBadges(c.interests, c.overlapIds),
+      readinessBlock(ready, {}),
+      ready.ready ? hoursBlock(c) : null
+    ]));
+    meetupCard(panes.plan, c, d.meetups, d.occurrences, d.cadences);
+    hostTools(panes.plan, c);
   }
 
   function confirmCard(host, c, list) {
     var err = errLine();
     host.appendChild(el('article', { class: 'card' }, [
       el('h3', { text: list.length === 1 ? 'Were you there?' : 'Were you at these?' }),
-      el('p', { class: 'hint', text: 'An RSVP is an intention. This is the record, and it is the only thing that adds to your hours.' }),
+      el('p', { class: 'hint', text: 'Only what you confirm counts towards your hours.' }),
       err
     ].concat(list.map(function (o) {
       function mark(yes, text, ghost) {
@@ -697,7 +732,6 @@
     var lastId = 0;
     var seen = Object.create(null);
     var pulling = false;
-    var readyBox = el('div');
 
     // Within a couple of lines of the end counts as being at the end: nobody
     // scrolls to the exact pixel, and a fractional scrollTop is normal.
@@ -715,9 +749,11 @@
     }, ['New messages ↓']);
     list.addEventListener('scroll', function () { if (atEnd()) toLatest.hidden = true; });
 
+    // Sending a message can move the gate. The count lives on the Plan tab
+    // now, so that is what ticks over rather than a second copy of the gate
+    // sitting under the composer.
     function paintReady(r) {
-      readyBox.innerHTML = '';
-      readyBox.appendChild(readinessBlock(r, { quiet: true }));
+      if (S.onReadiness) S.onReadiness(r);
     }
 
     async function pull() {
@@ -805,9 +841,10 @@
 
     paintReady(c.readiness);
 
-    host.appendChild(el('article', { class: 'card' }, [
-      el('h3', { text: 'The conversation' }),
-      c.stale ? el('p', { class: 'hint nudge', text: 'It has gone quiet. A question restarts it faster than a hello.' }) : null,
+    // No heading. The pane is called Chat; a card inside it headed "The
+    // conversation" is the page describing itself.
+    host.appendChild(el('article', { class: 'card chat-card' }, [
+      c.stale ? el('p', { class: 'hint nudge', text: 'Quiet for a while. Post a question.' }) : null,
       el('div', { class: 'chat-wrap' }, [list, toLatest]),
       err,
       el('div', { class: 'composer' }, [
@@ -825,8 +862,7 @@
           ? 'Post a ' + c.disclosure.label.toLowerCase() + ' question'
           : 'Post a question for everyone'])
       ]),
-      c.disclosure ? el('p', { class: 'hint', text: 'The questions get more personal as the circle answers them. You are on "' + c.disclosure.label + '".' }) : null,
-      readyBox
+      c.disclosure ? el('p', { class: 'hint', text: 'On "' + c.disclosure.label.toLowerCase() + '".' }) : null
     ]));
 
     pull();
@@ -889,7 +925,7 @@
         var box = el('div', { class: 'planbox' }, [
           el('p', { class: 'hint', text: S.planAsk }),
           el('label', { class: 'field' }, [el('span', { text: 'How you will get there' }), field]),
-          el('p', { class: 'hint', text: 'Only you ever see this. It is here because writing it down is what makes people turn up.' }),
+          el('p', { class: 'hint', text: 'Only you see this.' }),
           el('div', { class: 'actions' }, [
             el('button', { class: 'btn sm', type: 'button', onclick: function () {
               answer('yes', field.value);
@@ -935,7 +971,7 @@
         el('p', { class: 'hint', text: k.going.length ? 'Going: ' + k.going.join(', ') : 'Nobody has said yes yet.' }),
         k.recurring
           ? el('p', { class: 'hint', text: 'Repeats ' + k.cadenceLabel.toLowerCase() + '. You say yes or no to each one as it comes round.' })
-          : el('p', { class: 'hint', text: 'One-off. Seeing the same people again is what turns a nice evening into a friendship, so a repeating one is usually worth more.' }),
+          : el('p', { class: 'hint', text: 'One-off' }),
         k.myRsvp === 'yes' && k.myPlan
           ? el('p', { class: 'hint plan', text: 'Your plan: ' + k.myPlan + ' — only you see this.' }) : null,
         err,
@@ -963,8 +999,11 @@
         } }, ['Propose something'])
       ]));
       body.push(slot);
-    } else if (!meetups || !meetups.length) {
-      body.push(el('p', { class: 'hint', text: 'When the circle is ready, anyone here can propose a thing to do. It only happens once enough of you say yes — never because one person pushed. Repeating beats one-off: fifty-odd hours together is what a friendship costs.' }));
+    } else if (c.readiness.ready && (!meetups || !meetups.length)) {
+      // Only when proposing is actually open. Saying "anyone here can propose
+      // something" directly under "locked until the circle has talked" told
+      // people two different things about the same button.
+      body.push(el('p', { class: 'hint', text: 'Anyone here can propose something. It happens once enough of you say yes.' }));
     }
 
     if (occurrences && occurrences.length) {
@@ -1009,7 +1048,7 @@
     });
 
     return el('div', { class: 'proposal' }, [
-      el('p', { class: 'hint', text: 'A proposal, not a plan. It becomes real when enough people say yes.' }),
+      el('p', { class: 'hint', text: 'It becomes real when enough people say yes.' }),
       orgs.length ? el('label', { class: 'field' }, [
         el('span', { text: 'Anchor it to a real local thing' }),
         pick,
@@ -1021,7 +1060,7 @@
       el('div', { class: 'row2' }, [
         el('label', { class: 'field' }, [
           el('span', { text: 'How often' }), cadence,
-          el('p', { class: 'hint', text: 'Seeing the same people repeatedly is what builds a friendship — roughly fifty hours of it. One evening builds nothing.' })
+          el('p', { class: 'hint', text: 'A repeating one is worth more than a single evening.' })
         ]),
         el('label', { class: 'field' }, [
           el('span', { text: 'Roughly how long' }), hours,
@@ -1031,7 +1070,7 @@
       el('label', { class: 'field' }, [el('span', { text: 'Details' }), details]),
       el('label', { class: 'field' }, [
         el('span', { text: 'How you will get there' }), plan,
-        el('p', { class: 'hint', text: 'Proposing it is your yes, so it carries a plan like anyone else’s. ' + S.planAsk + ' Only you see it.' })
+        el('p', { class: 'hint', text: 'Proposing it is your yes. ' + S.planAsk + ' Only you see it.' })
       ]),
       err,
       el('div', { class: 'actions' }, [
@@ -1104,7 +1143,7 @@
       placeholder: 'Something only worth saying to ' + p.display + '…' });
     var done = el('p', { class: 'hint', hidden: true });
     var box = el('div', { class: 'applybox' }, [
-      el('p', { class: 'hint', text: 'This starts an ordinary conversation in Messages — the two of you, nobody else in the circle. Blocking and reporting work there exactly as they do everywhere else.' }),
+      el('p', { class: 'hint', text: 'Just the two of you, in your inbox.' }),
       text, done,
       el('div', { class: 'actions' }, [
         el('button', { class: 'btn sm', type: 'button', onclick: async function (ev) {
@@ -1128,22 +1167,26 @@
   function membersCard(host, c, members) {
     host.appendChild(el('article', { class: 'card' }, [
       el('h3', { text: 'Who is here' }),
-      el('p', { class: 'hint', text: 'Vouch for someone once you have actually talked. Two vouches move them up a trust tier, which is what gets them into other circles.' }),
-      el('p', { class: 'hint', text: 'A group thread builds attachment to the group. Attachment to the people in it needs knowing something about them one at a time — which is what the shared interests and the one-to-one threads are for.' })
+      el('p', { class: 'hint', text: 'Two vouches move someone up a trust tier.' })
     ].concat(members.map(function (p) {
       var err = errLine();
       var slot = el('div');
       return el('div', { class: 'member' }, [
         el('div', { class: 'person-top' }, [
           el('h4', { text: p.display + (p.role === 'host' ? ' · host' : '') }),
-          el('span', { class: 'badge', text: p.said + ' messages' })
+          el('span', { class: 'badge', text: p.said === 1 ? '1 message' : p.said + ' messages' })
         ]),
         p.bio ? el('p', { class: 'blurb', text: p.bio }) : null,
-        el('p', { class: 'where', text: [p.city, p.verified ? 'verified' : 'unverified',
-          p.vouches === 1 ? '1 vouch' : p.vouches + ' vouches',
-          hoursText(p.hours) + ' together', 'joined ' + ago(p.joinedAt)].join(' · ') }),
-        p.shared && p.shared.length ? el('p', { class: 'hint', text: p.shared.length === 1
-          ? 'You both picked:' : 'The ' + p.shared.length + ' things you both picked:' }) : null,
+        // Zeroes are not facts worth a slot. A line that always reads
+        // "0 vouches · 0 hours together" teaches people to skip the line.
+        el('p', { class: 'where', text: [
+          p.city,
+          p.verified ? 'verified' : 'unverified',
+          p.vouches ? (p.vouches === 1 ? '1 vouch' : p.vouches + ' vouches') : null,
+          p.hours ? hoursText(p.hours) + ' together' : null,
+          'joined ' + ago(p.joinedAt)
+        ].filter(Boolean).join(' · ') }),
+        p.shared && p.shared.length ? el('p', { class: 'hint', text: 'In common' }) : null,
         p.shared && p.shared.length ? interestBadges(p.shared, p.shared) : null,
         err,
         p.whyNot && !p.canMessage ? el('p', { class: 'hint locked', text: p.whyNot }) : null,
