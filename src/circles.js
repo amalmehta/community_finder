@@ -57,6 +57,14 @@
 
   function label(id) { return (FYC.INTERESTS[id] || {}).label || id; }
   function icon(id) { return (FYC.INTERESTS[id] || {}).icon || ''; }
+  /* The drawn half, guarded: a missing drawing is null and el() drops it. */
+  function art() { return window.FYC_ART || null; }
+  function faceFor(id) { var A = art(); return A ? A.avatar(id) : null; }
+  /* The emoji stays as the fallback, so a chip is never label-only. */
+  function pic(id) {
+    var A = art();
+    return (A && A.pictogram(id)) || el('span', { 'aria-hidden': 'true', text: icon(id) });
+  }
 
   function ago(ts) {
     if (!ts) return 'never';
@@ -352,7 +360,9 @@
   function interestBadges(ids, mineIds) {
     return el('div', { class: 'badges' }, ids.map(function (i) {
       var on = (mineIds || []).indexOf(i) !== -1;
-      return el('span', { class: 'badge' + (on ? ' hit' : ''), text: icon(i) + ' ' + label(i) });
+      return el('span', { class: 'badge' + (on ? ' hit' : '') }, [
+        pic(i), el('span', { text: label(i) })
+      ]);
     }));
   }
 
@@ -480,7 +490,7 @@
             onclick: function () {
               btn.setAttribute('aria-pressed', btn.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
             }
-          }, [el('span', { 'aria-hidden': 'true', text: i.icon }), el('span', { text: i.label })]);
+          }, [pic(i.id), el('span', { text: i.label })]);
           return btn;
         }))
       ]);
@@ -580,6 +590,7 @@
 
     if (!data.circles.length) {
       host.appendChild(el('div', { class: 'card empty' }, [
+        (art() && art().scene('circles')) || null,
         el('h2', { text: 'Nothing open to you yet.' }),
         el('p', { text: data.trust.tier >= 2
           ? 'Start one — they begin at three people.'
@@ -1180,6 +1191,7 @@
       var slot = el('div');
       return el('div', { class: 'member' }, [
         el('div', { class: 'person-top' }, [
+          faceFor('person-' + p.id),
           el('h4', { text: p.display + (p.role === 'host' ? ' · host' : '') }),
           el('span', { class: 'badge', text: p.said === 1 ? '1 message' : p.said + ' messages' })
         ]),

@@ -485,8 +485,8 @@ group('front-end wiring', function () {
    'src/data/city-philadelphia.js', 'src/data/city-dc.js', 'src/data/city-la.js',
    'src/data/city-sandiego.js', 'src/data/city-denver.js', 'src/data/city-portland.js',
    'src/data/city-minneapolis.js', 'src/data/universal.js',
-   'src/preferences.js', 'src/intake.js', 'src/match.js', 'src/app.js', 'src/social.js',
-   'src/circles.js', 'assets/styles.css'].forEach(function (f) {
+   'src/preferences.js', 'src/intake.js', 'src/match.js', 'src/art.js', 'src/app.js',
+   'src/social.js', 'src/circles.js', 'assets/styles.css'].forEach(function (f) {
     ok(html.indexOf(f) !== -1, 'index.html loads ' + f);
     ok(fs.existsSync(path.join(root, f)), f + ' exists on disk');
   });
@@ -1021,6 +1021,97 @@ group('browse: the list, the pane, and the facts that stopped being chips', func
   ].forEach(function (phrase) {
     ok((app + social + circles + html).indexOf(phrase) === -1, 'gone: "' + phrase + '"');
   });
+});
+
+// --------------------------------------------------------------- the drawing
+// art.js builds DOM, so it gets the smallest document that lets it run. The
+// stub records what was asked for, which is all these assertions read.
+group('the drawn half: faces, pictograms, scenes and the guide', function () {
+  var fs = require('fs');
+  var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var appjs = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+  var social = fs.readFileSync(path.join(root, 'src/social.js'), 'utf8');
+  var circles = fs.readFileSync(path.join(root, 'src/circles.js'), 'utf8');
+
+  function Node(tag) {
+    this.tag = tag; this.attrs = {}; this.kids = []; this.style = {};
+    this.classList = { contains: function () { return false; } };
+  }
+  Node.prototype.setAttribute = function (k, v) { this.attrs[k] = String(v); };
+  Node.prototype.appendChild = function (c) { this.kids.push(c); return c; };
+  Object.defineProperty(Node.prototype, 'className', {
+    set: function (v) { this.attrs['class'] = v; }, get: function () { return this.attrs['class'] || ''; }
+  });
+  Object.defineProperty(Node.prototype, 'textContent', {
+    set: function (v) { this.text = String(v); }, get: function () { return this.text || ''; }
+  });
+  var prevDoc = global.document;
+  global.document = {
+    createElementNS: function (ns, tag) { var n = new Node(tag); n.ns = ns; return n; },
+    createElement: function (tag) { return new Node(tag); }
+  };
+  delete require.cache[require.resolve(path.join(root, 'src/art.js'))];
+  require(path.join(root, 'src/art.js'));
+  var ART = globalThis.FYC_ART;
+
+  function walk(n, fn) { fn(n); (n.kids || []).forEach(function (k) { walk(k, fn); }); }
+  function count(n, tag) { var c = 0; walk(n, function (x) { if (x.tag === tag) c++; }); return c; }
+
+  // 1. Every interest the taxonomy knows about can be drawn. Without this a
+  //    new city's new interest silently falls back to a blank slot.
+  var missing = Object.keys(FYC.INTERESTS).filter(function (id) { return !ART.hasPictogram(id); });
+  eq(missing.length, 0, 'every interest has a pictogram (' + missing.join(', ') + ')');
+  ok(Object.keys(FYC.INTERESTS).length >= 32, 'and there are at least 32 of them');
+
+  // 2. A face has to be the same face every time, or a member list reshuffles
+  //    identities on each render.
+  eq(ART.hash('member-7'), ART.hash('member-7'), 'the seed is stable');
+  ok(ART.hash('member-7') !== ART.hash('member-8'), 'and different people differ');
+  var hues = {};
+  for (var i = 0; i < 300; i++) {
+    var a = ART.avatar('member-' + i);
+    walk(a, function (n) { if (n.tag === 'circle' && n.attrs.r === '20') hues[n.attrs.fill] = 1; });
+  }
+  eq(Object.keys(hues).length, 6, 'and the set reaches all six hues');
+
+  // 3. The guide drew its torso twice: once filled as .g-body and again as a
+  //    stroked path repeated in the pose array.
+  ['wave', 'look', 'cheer'].forEach(function (pose) {
+    var gfx = ART.guide(pose);
+    eq(count(gfx, 'path'), 5, pose + ': four limbs and one jumper, no repeated torso');
+    eq(count(gfx, 'circle'), 1, pose + ': one head');
+  });
+
+  // 4. All of it is decorative — the name or label beside it is what is read.
+  [ART.avatar('x'), ART.pictogram('books'), ART.scene('inbox'), ART.guide('wave')].forEach(function (n) {
+    eq(n.attrs['aria-hidden'], 'true', n.tag + ' drawing is hidden from the a11y tree');
+    eq(n.attrs.focusable, 'false', 'and is not focusable');
+  });
+
+  // 5. Each scene exists and is more than a single shape.
+  ['welcome', 'saved', 'inbox', 'circles', 'search'].forEach(function (n) {
+    var sc = ART.scene(n);
+    ok(sc && sc.kids.length >= 3, 'scene "' + n + '" is drawn');
+  });
+  eq(ART.scene('nope'), null, 'an unknown scene is null rather than a broken drawing');
+
+  // 6. Every caller treats a missing drawing as null, so the app runs without
+  //    art.js at all. That is the only reason these are guarded accessors.
+  ok(appjs.indexOf('function art() { return window.FYC_ART || null; }') !== -1,
+     'app.js reaches for the art defensively');
+  ok(social.indexOf('function art() { return window.FYC_ART || null; }') !== -1, 'so does social.js');
+  ok(circles.indexOf('function art() { return window.FYC_ART || null; }') !== -1, 'and circles.js');
+
+  // 7. The emoji in the taxonomy is the fallback, never shown beside a drawing.
+  ok(circles.indexOf("pic(i.id)") !== -1, 'circles chips ask for the drawing');
+  ok(!/text: icon\(i\) \+ ' ' \+ label\(i\)/.test(circles), 'and no longer concatenate an emoji');
+
+  // 8. Pictograms and the guide inherit text colour, which is what lets them
+  //    work in both themes without a single dark-mode rule.
+  ok(/\.pic, \.guide \{[^}]*stroke: currentColor/.test(css), 'the line art is stroked in currentColor');
+
+  global.document = prevDoc;
 });
 
 // ------------------------------------------------------- the footer is gone

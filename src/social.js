@@ -78,7 +78,11 @@
             var on = btn.getAttribute('aria-pressed') === 'true';
             btn.setAttribute('aria-pressed', on ? 'false' : 'true');
           }
-        }, [el('span', { 'aria-hidden': 'true', text: i.icon }), el('span', { text: i.label })]);
+        }, [
+          (art() && art().pictogram(i.id)) ||
+            el('span', { 'aria-hidden': 'true', text: i.icon }),
+          el('span', { text: i.label })
+        ]);
         pills.appendChild(btn);
       });
       box.appendChild(el('div', { class: 'group' }, [el('h3', { text: grp.label }), pills]));
@@ -358,6 +362,7 @@
 
     if (!S.people.length) {
       host.appendChild(el('div', { class: 'card empty' }, [
+        sceneFor('welcome'),
         el('h2', { text: 'Nobody yet.' }),
         el('p', { text: 'Show a few more interests on the You tab.' })
       ]));
@@ -380,6 +385,7 @@
 
       var card = el('article', { class: 'card person', id: 'person-' + p.id }, [
         el('div', { class: 'person-top' }, [
+          faceFor('person-' + p.id),
           el('h3', { text: p.display }),
           el('span', { class: 'badge', text: p.shared + ' shared' })
         ]),
@@ -496,6 +502,7 @@
     }
     if (!threads.length) {
       host.appendChild(el('div', { class: 'card empty' }, [
+        sceneFor('inbox'),
         el('h2', { text: 'No conversations yet.' }),
         el('p', { text: 'Say hello to someone under People.' })
       ]));
@@ -508,12 +515,20 @@
         onclick: function () { openThread(t); },
         onkeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openThread(t); } }
       }, [
-        el('h3', { text: t.other_name }),
+        el('div', { class: 'who' }, [
+          faceFor('person-' + (t.other_id || t.other_name)),
+          el('h3', { class: 'who-name', text: t.other_name })
+        ]),
         el('p', { class: 'where', text: [t.other_city, t.last_at ? ago(t.last_at) : 'no messages yet'].filter(Boolean).join(' · ') }),
         t.last_body ? el('p', { class: 'blurb', text: t.last_body }) : null
       ]));
     });
   }
+
+  /* The drawn half, guarded: a missing drawing is null and el() drops it. */
+  function art() { return window.FYC_ART || null; }
+  function faceFor(id) { var A = art(); return A ? A.avatar(id) : null; }
+  function sceneFor(n) { var A = art(); return A ? A.scene(n) : null; }
 
   function stopPolling() {
     if (S.poll) { clearInterval(S.poll); S.poll = null; }

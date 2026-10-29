@@ -36,6 +36,24 @@
   }
 
   /** Note an action against a listing, if tracking is on. */
+  /* The drawn half. Guarded: every caller treats a missing drawing as null,
+     and el() drops null children, so the app still runs if art.js does not. */
+  function art() { return window.FYC_ART || null; }
+
+  /** A listing's first interest is the one it is mostly about. */
+  function orgPic(org, cls) {
+    var A = art();
+    if (!A) return null;
+    var id = (org.interests || [])[0];
+    return id ? A.pictogram(id, cls) : null;
+  }
+
+  /** A drawing for a screen with nothing on it yet. */
+  function sceneFor(name) {
+    var A = art();
+    return A ? A.scene(name) : null;
+  }
+
   function track(type, org) {
     if (FYC.prefs) FYC.prefs.record(type, org);
   }
@@ -98,6 +116,13 @@
     bar.style.width = lastPct + '%';
     bar.setAttribute('data-to', pct + '%');   // moved to once it is on the page
     lastPct = pct;
+    // Once, at the top of the form. On question two it would be furniture.
+    if (prog.asked === 0 && art()) {
+      box.appendChild(el('div', { class: 'intake-guide' }, [
+        art().guide('wave'),
+        el('p', { text: 'Twenty short questions. Skip any of them.' })
+      ]));
+    }
     box.appendChild(el('div', { class: 'q-head' }, [
       I.canGoBack(session) ? el('button', {
         class: 'q-back', type: 'button', 'aria-label': 'Back', title: 'Back', onclick: goBack
@@ -320,6 +345,7 @@
     if (!p.interests.length) {
       $('#results').innerHTML = '';
       $('#results').appendChild(el('div', { class: 'card empty' }, [
+        sceneFor('search'),
         el('h2', { text: 'Not enough to go on yet.' }),
         el('p', { text: 'A few more answers and this fills in.' })
       ]));
@@ -419,6 +445,7 @@
       el('button', {
         class: 'back-btn', type: 'button', 'aria-label': 'Back to the list', onclick: onBack
       }, ['\u2190']),
+      el('span', { class: 'pic-badge' }, [orgPic(org)]),
       el('div', { class: 'detail-title' }, [
         el('h2', { text: org.name }),
         el('p', { class: 'where', text: [org.neighborhood, org.cityName].filter(Boolean).join(' \u00b7 ') })
@@ -499,6 +526,7 @@
 
     if (!primary.length) {
       host.appendChild(el('div', { class: 'empty' }, [
+        sceneFor('search'),
         el('h2', { text: 'Nothing matched.' }),
         el('p', { text: 'Try a wider budget, or a few more interests.' })
       ]));
@@ -550,8 +578,11 @@
         class: 'row', type: 'button', 'aria-current': 'false',
         onclick: function () { pick(i, true); }
       }, [
-        el('span', { class: 'row-name', text: it.r.org.name }),
-        el('span', { class: 'row-sub', text: it.r.org.neighborhood || it.r.org.cityName || '' })
+        orgPic(it.r.org, 'row-pic'),
+        el('span', { class: 'row-text' }, [
+          el('span', { class: 'row-name', text: it.r.org.name }),
+          el('span', { class: 'row-sub', text: it.r.org.neighborhood || it.r.org.cityName || '' })
+        ])
       ]);
       buttons.push(b);
       rows.appendChild(el('li', {}, [b]));
@@ -646,6 +677,7 @@
     if (!plan.length) {
       host.appendChild(el('div', { class: 'screen-head' }, [el('h2', { text: 'Saved' })]));
       host.appendChild(el('div', { class: 'card empty' }, [
+        sceneFor('saved'),
         el('h2', { text: 'Nothing saved yet.' }),
         el('p', { text: 'Add something from Find.' })
       ]));

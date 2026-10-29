@@ -18,9 +18,15 @@
   --moss: #2f6b56;
   --moss-soft: #e2efe9;
   --focus: #2f6b56;
-  --radius: 14px;
-  --radius-sm: 9px;
-  --shadow: 0 1px 2px rgba(34, 31, 27, .05), 0 6px 20px -12px rgba(34, 31, 27, .25);
+  /* Warmth pass: the corners were 14/9, which read as panels. Rounder reads
+     as something you can pick up. Everything that uses them softens at once,
+     which is the point of their being tokens. */
+  --radius: 18px;
+  --radius-sm: 12px;
+  --radius-pill: 999px;
+  /* Softer and warmer than the old flat grey: the shadow now has the page's
+     own brown in it, so a raised card looks lit rather than cut out. */
+  --shadow: 0 1px 2px rgba(92, 61, 34, .05), 0 10px 26px -14px rgba(92, 61, 34, .30);
   --maxw: 880px;
   /* Find is two panes, so it gets more room than a column of prose needs. */
   --maxw-wide: 1120px;
@@ -963,7 +969,7 @@ main { padding: var(--s6) 0 var(--s7); }
   transition: border-color .15s ease, color .15s ease;
 }
 .back-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
-.detail-title { min-width: 0; }
+.detail-title { min-width: 0; flex: 1 1 auto; }
 .detail-title h2 {
   font-family: var(--serif); font-size: var(--t-h2); margin: 0 0 2px;
   font-weight: 600; letter-spacing: -.02em; line-height: 1.15;
@@ -1015,11 +1021,18 @@ main { padding: var(--s6) 0 var(--s7); }
   color: var(--ink-faint); font-weight: 700;
 }
 .row {
-  display: block; width: 100%; text-align: left;
+  /* Was display:block with the two lines stacked. The listing's subject is
+     drawn to the left of them now, so the row is a flex line with a text
+     column; min-width:0 is what keeps .row-sub's ellipsis working. */
+  display: flex; align-items: center; gap: var(--s3);
+  width: 100%; text-align: left;
   border: 0; background: none; font: inherit; color: inherit;
   padding: var(--s3); border-radius: var(--radius-sm); cursor: pointer;
   transition: background-color .12s ease;
 }
+.row-text { min-width: 0; flex: 1 1 auto; }
+.row-pic { color: var(--ink-faint); }
+.row[aria-current="true"] .row-pic { color: var(--moss); }
 .row:hover { background: var(--bg-sunk); }
 .row-name { display: block; font-weight: 600; font-size: var(--t-meta); line-height: 1.35; }
 .row-sub {
@@ -1129,3 +1142,98 @@ main { padding: var(--s6) 0 var(--s7); }
 .question input[type="text"] { font-size: var(--t-lead); padding: var(--s3) var(--s4); }
 .q-outs { margin-top: var(--s4); }
 
+
+/* ===================================================================
+   The drawn half. Everything src/art.js builds is styled here, so the
+   module stays geometry and this file stays colour.
+   =================================================================== */
+
+/* Avatars. The hue is baked into the drawing because a face has to be the
+   same face in both themes; all this does is size and seat it. */
+.av { width: 36px; height: 36px; border-radius: 50%; display: block; flex: 0 0 auto; }
+.av.sm { width: 26px; height: 26px; }
+.av.lg { width: 52px; height: 52px; }
+
+/* A circle drawn as the people in it. The ring is the page behind them, so
+   the overlap reads as depth rather than as a stack of stickers. */
+.av-stack { display: inline-flex; align-items: center; vertical-align: middle; }
+.av-stack .av {
+  width: 26px; height: 26px; margin-right: -9px;
+  box-shadow: 0 0 0 2px var(--bg-raised); border-radius: 50%;
+}
+.av-stack .av:last-of-type { margin-right: 0; }
+.av-more {
+  margin-left: var(--s3); font-size: var(--t-small); font-weight: 600;
+  color: var(--ink-faint);
+}
+
+/* Pictograms and the guide are stroked in currentColor: they take the colour
+   of the text beside them, which is why neither needs a dark-mode rule. */
+.pic, .guide {
+  fill: none; stroke: currentColor; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.pic { width: 20px; height: 20px; flex: 0 0 auto; }
+.pic.lg { width: 26px; height: 26px; }
+
+/* The one interest drawing that is filled rather than stroked: it sits on the
+   result card as the card's subject, so it carries a tint. */
+.pic-badge {
+  width: 40px; height: 40px; border-radius: 12px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: var(--moss-soft); color: var(--moss);
+}
+.pic-badge .pic { width: 22px; height: 22px; }
+.pic-badge.warm { background: var(--accent-soft); color: var(--accent-ink); }
+
+/* The guide. Line everywhere except the jumper, which is the one place the
+   accent lands, so the figure reads as a person and not a pictogram. */
+.guide { width: 44px; height: 44px; color: var(--ink-soft); }
+.guide .g-head { fill: var(--bg-raised); stroke: currentColor; stroke-width: 1.6; }
+.guide .g-body { fill: var(--accent-soft); stroke: currentColor; stroke-width: 1.6; }
+.guide.lg { width: 64px; height: 64px; }
+
+/* Spot illustrations. Four classes carry the whole set. */
+.scene { width: 180px; height: 124px; display: block; margin: 0 auto var(--s4); }
+.sc-line {
+  fill: none; stroke: var(--line-strong); stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.sc-ground { fill: none; stroke: var(--line); stroke-width: 2; stroke-linecap: round; }
+.sc-fill { fill: currentColor; }
+.sc-dash {
+  fill: none; stroke: var(--line-strong); stroke-width: 2; stroke-dasharray: 4 4;
+}
+.sc-glass {
+  fill: var(--bg-raised); fill-opacity: .55;
+  stroke: var(--accent); stroke-width: 2;
+}
+
+/* An empty screen is now a drawing, a line and a way out, in that order. */
+.empty .scene { margin-bottom: var(--s5); }
+.empty .actions { justify-content: center; margin-top: var(--s4); }
+
+/* The guide's seat on the intake: a small presence beside the progress bar,
+   not a screen of its own. The first question is still the first thing. */
+.intake-guide { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s4); }
+.intake-guide p { margin: 0; font-size: var(--t-small); color: var(--ink-faint); }
+
+/* A person on a row: face, then name, then whatever the row is about. */
+.who { display: flex; align-items: center; gap: var(--s3); }
+.who-name { font-weight: 600; }
+
+/* A badge carrying a drawing is a flex line, not a string with an emoji in
+   it. 13px keeps the pictogram the height of the text beside it. */
+.badge { display: inline-flex; align-items: center; gap: 5px; }
+.badge .pic { width: 13px; height: 13px; }
+
+/* .person-top was baseline-aligned for a heading and a badge. With a face at
+   the front it centres instead, and the heading takes the slack so the badge
+   stays pinned right. */
+.person-top { align-items: center; }
+.person-top > .av { flex: 0 0 auto; }
+.person-top > h3, .person-top > h4 { flex: 1 1 auto; min-width: 0; }
+
+/* A conversation is with somebody, so the row leads with their face. */
+.thread .who { margin-bottom: 2px; }
+.thread .who h3 { margin: 0; font-size: 18px; }
