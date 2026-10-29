@@ -1023,6 +1023,24 @@ group('browse: the list, the pane, and the facts that stopped being chips', func
   });
 });
 
+// ------------------------------------------------------- the footer is gone
+group('the footer came off every screen', function () {
+  var fs = require('fs');
+  var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var appjs = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+
+  ok(html.indexOf('site-footer') === -1, 'there is no footer element left');
+  ok(css.indexOf('footer.site-footer') === -1, 'and no rules describing one');
+  ok(css.indexOf('.foot-links') === -1, 'nor the link row it used to hold');
+
+  // Removing it outright would have orphaned the two legal pages: the footer
+  // was the only thing in the app that linked to them.
+  ok(appjs.indexOf("href: 'privacy.html'") !== -1, 'Privacy is reachable from You');
+  ok(appjs.indexOf("href: 'terms.html'") !== -1, 'and so is Terms');
+  ok(css.indexOf('.you-legal') !== -1, 'the row they moved to is styled');
+});
+
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail) {
   failures.slice(0, 25).forEach(function (f) { console.log('   ✗ ' + f); });

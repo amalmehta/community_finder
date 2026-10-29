@@ -806,6 +806,17 @@
         }, ['Erase it']) : null
       ])
     ]));
+
+    // Privacy and Terms used to ride a footer under every screen. The footer
+    // is gone and these are the only way into those pages, so they land here,
+    // beside the rest of what the app holds about you.
+    host.appendChild(el('p', { class: 'you-legal' }, [
+      el('a', { href: 'privacy.html', text: 'Privacy' }),
+      ' · ',
+      el('a', { href: 'terms.html', text: 'Terms' }),
+      ' · ',
+      el('a', { href: 'https://github.com/amalmehta/community_finder', text: 'Source' })
+    ]));
   }
 
   // ---------- tabs ----------

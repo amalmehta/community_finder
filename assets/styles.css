@@ -376,11 +376,11 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 .fb-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
 .fb-thanks { font-size: 14px; color: var(--moss); font-weight: 600; }
 
-footer.site-footer {
-  border-top: 1px solid var(--line); margin-top: var(--s7); padding: var(--s5) 0 var(--s7);
-  color: var(--ink-faint); font-size: var(--t-small);
+/* Privacy and Terms sit on You now. There is no footer. */
+.you-legal {
+  margin: var(--s5) 0 0; color: var(--ink-faint); font-size: var(--t-small);
 }
-footer.site-footer p { margin: 0 0 var(--s2); max-width: 62ch; }
+.you-legal a { color: inherit; }
 
 [hidden] { display: none !important; }
 .sr-only {
@@ -671,9 +671,6 @@ body { font-size: var(--t-body); }
 .skip:focus { left: 0; }
 main:focus { outline: none; }
 
-.foot-links { margin-top: var(--s3); }
-.foot-links a { color: var(--ink-faint); margin-right: var(--s2); }
-.foot-links a:hover { color: var(--accent-ink); }
 
 .legal { max-width: 62ch; padding-bottom: var(--s8); }
 .legal h1 { font-family: var(--serif); font-size: var(--t-h1); margin: var(--s7) 0 var(--s3); letter-spacing: -.025em; }
@@ -1132,7 +1129,3 @@ main { padding: var(--s6) 0 var(--s7); }
 .question input[type="text"] { font-size: var(--t-lead); padding: var(--s3) var(--s4); }
 .q-outs { margin-top: var(--s4); }
 
-/* The footer is three links now. The sentence above them was about where
-   your data lives, which is a thing about you, and it moved to You. */
-footer.site-footer { margin-top: var(--s6); padding: var(--s4) 0 var(--s6); }
-footer.site-footer p { margin: 0; }
