@@ -315,7 +315,9 @@
     return el('div', { class: 'ready' + (r.ready ? ' is-ready' : '') }, [
       el('div', { class: 'ready-head' }, [
         el('b', { text: r.ready ? 'Ready to plan something' : 'Talking first' }),
-        el('span', { class: 'badge', text: r.done + ' of ' + r.of })
+        // On a card in the list the raw count is noise: the circle's own Plan
+        // tab carries it, labelled, where it is the thing you are working on.
+        o.quiet ? null : el('span', { class: 'badge', text: r.done + ' of ' + r.of })
       ]),
       o.quiet ? null : el('ul', { class: 'ready-list' }, r.checks.map(function (c) {
         // Four of them are floors. The last one is a ceiling, and it is the
@@ -337,10 +339,12 @@
   }
 
   function liveLine(c) {
+    // How many people, and whether it has gone quiet. It used to also print
+    // the week's message count and how many of them had spoken · numbers the
+    // app had because it could count them, not because anyone wanted them.
     var bits = [c.members + ' of ' + c.cap + ' people'];
-    if (c.live.week > 0) bits.push(c.live.week + ' messages this week from ' + c.live.speakers);
-    else if (c.live.messages > 0) bits.push('quiet this week · last spoke ' + ago(c.live.lastAt));
-    else bits.push('no conversation yet');
+    if (c.live.messages === 0) bits.push('no conversation yet');
+    else if (c.live.week === 0) bits.push('quiet since ' + ago(c.live.lastAt));
     return bits.join(' · ');
   }
 
@@ -367,7 +371,8 @@
         ])
       ]),
       el('p', { class: 'where', text: c.city + ' · ' + liveLine(c) + (c.myRole === 'host' ? ' · you host' : '') }),
-      interestBadges(c.interests, c.overlapIds),
+      // No interest chips here. You are in this circle; you know what it is
+      // about, and the row of labels repeated its own name back at you.
       readinessBlock(c.readiness, { quiet: true }),
       respondBlock(c),
       driftBlock(c),
@@ -691,9 +696,11 @@
     membersCard(panes.people, c, d.members);
 
     // --- plan ---
+    // The chips stay on the cards where they are a comparison \u2014 which of
+    // these interests you share with a circle you are deciding about. Here you
+    // are already in it, under its own blurb, so they only restated it.
     panes.plan.appendChild(el('article', { class: 'card' }, [
       el('p', { class: 'blurb', text: c.blurb }),
-      interestBadges(c.interests, c.overlapIds),
       readinessBlock(ready, {}),
       ready.ready ? hoursBlock(c) : null
     ]));

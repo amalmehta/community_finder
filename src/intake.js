@@ -72,7 +72,6 @@
       id: 'easier', kind: 'one', base: 70,
       when: function (s) { return s.dims.comfort === 1; },
       prompt: 'What would make that easier?',
-      hint: 'You said a room of strangers is hard — this decides what gets ranked first.',
       options: [
         pick('task', 'Having a job to do', { prefer: { structure: 'shift' }, goals: ['impact'] }),
         pick('dropin', 'Being able to leave whenever', { prefer: { commitment: 'one-off' } }),
@@ -294,7 +293,6 @@
       id: 'repeat', kind: 'one', base: 46,
       when: function (s) { return (s.dims.goals || []).indexOf('friends') !== -1; },
       prompt: 'Same faces every week, or new ones each time?',
-      hint: 'You said you want friends — this is the single biggest predictor.',
       options: [
         pick('same', 'Same faces', { commitment: 'weekly', goals: ['routine'] }),
         pick('new', 'New ones', { commitment: 'one-off' })
@@ -377,7 +375,6 @@
     {
       id: 'probe-give', kind: 'one', base: 32, when: notPulled('give'),
       prompt: 'A single volunteer shift, no strings?',
-      hint: 'It is the most reliable way to be in a room with people and not have to perform.',
       options: [
         pick('yes', 'Go on then', i({ volunteering: 2 })),
         pick('no', 'No', {})
@@ -394,7 +391,6 @@
     {
       id: 'avoid', kind: 'many', max: 3, base: 38,
       prompt: 'Anything here you would actively avoid?',
-      hint: 'Worth saying — it pushes these down rather than just not boosting them.',
       options: [
         pick('loud', 'Loud, high-energy things', i({ fitness: -3, dance: -2, sports: -2 })),
         pick('perform', 'Anything performed in front of people', i({ theater: -3, music: -2 })),

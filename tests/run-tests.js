@@ -802,7 +802,7 @@ group('polish: the type, the colour and the motion', function () {
      'on there being something to show');
 
   // 8 + 9. Motion that was declared but never happened.
-  ok(/\.org:hover[^{]*\{[^}]*transform: translateY\(-2px\)/.test(css), 'cards actually lift');
+  ok(/\.plan-item:hover[^{]*\{[^}]*transform: translateY\(-2px\)/.test(css), 'cards actually lift');
   ok(/\.pill:active[^{]*\{[^}]*transform: translateY\(1px\)/.test(css), 'and options press in');
 
   // 10. A group chat that yanks you to the bottom while you are reading back.
@@ -866,12 +866,11 @@ group('the shell: one frame, and nothing explaining itself', function () {
   ok(!/el\('h3', \{ text: 'The conversation' \}\)/.test(circles),
      'and the chat card does not announce that it is the chat');
 
-  // 6. A result card is the control, and its name is not a second link to the
-  //    same page as the button four lines below it.
-  ok(app.indexOf("class: 'card org tappable'") !== -1, 'the whole card expands');
-  ok(app.indexOf("'aria-expanded': 'false'") !== -1, 'and says so');
+  // 6. Results are a list and a detail pane, not a column of cards that open
+  //    in place. The accordion is gone along with the card it expanded.
+  ok(app.indexOf("class: 'card org tappable'") === -1, 'the expanding result card is gone');
+  ok(app.indexOf("el('div', { class: 'browse' })") !== -1, 'results are a browse layout');
   ok(!/el\('h3', \{\}, \[el\('a', \{ href: org\.url/.test(app), 'the name is no longer a link');
-  ok(css.indexOf('.tappable .chev') !== -1, 'a chevron stands in for the word Details');
 
   // 7. The question card counts with a bar, not a sentence, and the keyboard
   //    legend is gone.
@@ -879,13 +878,13 @@ group('the shell: one frame, and nothing explaining itself', function () {
   ok(app.indexOf("class: 'q-count'") === -1, 'but not printed');
   ok(app.indexOf("class: 'q-keys'") === -1, 'and the keyboard legend is gone');
   ok(css.indexOf('.q-keys') === -1, 'including its styles');
-  ok(app.indexOf("class: 'recap-chips'") !== -1, 'what it knows is shown as chips');
-  ok(app.indexOf('questions answered') === -1, 'not as a sentence about the form');
+  ok(app.indexOf("class: 'recap-chips'") === -1, 'and the wall of answer chips is gone');
+  ok(app.indexOf('questions answered') === -1, 'as is the sentence about the form');
 
   // 8. The matcher no longer narrates its own scoring on every card.
   ok(app.indexOf("class: 'why'") === -1, 'the reasons list is gone from the card');
   ok(css.indexOf('.why li') === -1, 'and from the stylesheet');
-  ok(app.indexOf("' groups'") !== -1, 'the heading counts rather than explains');
+  ok(app.indexOf("' groups'") === -1, 'the heading no longer counts the list beside it');
   ok(app.indexOf('easiest to walk into first') === -1, 'the sort order is not narrated');
 
   // 9. The lines that explained why the product is built the way it is.
@@ -944,6 +943,84 @@ group('the shell: one frame, and nothing explaining itself', function () {
   ok(app.indexOf('function onTabShown(') !== -1, 'something runs on every tab change');
   ok(/noisy = which === 'circles' \|\| which === 'messages'/.test(app),
      'and hides the pill on the screens you type into');
+});
+
+
+// ------------------------------------- a list you can see all of, and silence
+group('browse: the list, the pane, and the facts that stopped being chips', function () {
+  var fs = require('fs');
+  var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+  var social = fs.readFileSync(path.join(root, 'src/social.js'), 'utf8');
+  var circles = fs.readFileSync(path.join(root, 'src/circles.js'), 'utf8');
+
+  // 1. Find is two panes: every result in a column, and the one you chose
+  //    open beside it. It used to be one card at a time in a 1180px window.
+  ok(app.indexOf("el('ol', { class: 'rows' })") !== -1, 'the results are a list');
+  ok(app.indexOf("el('section', { class: 'browse-detail' })") !== -1, 'with a detail pane');
+  ok(app.indexOf('function detailPane(') !== -1, 'which is rendered on its own');
+  ok(app.indexOf('function orgCard(') === -1, 'and the card that expanded in place is gone');
+  ok(/grid-template-columns: minmax\(250px, 320px\) minmax\(0, 1fr\)/.test(css),
+     'two columns above the breakpoint');
+  ok(/\.browse-list, \.browse-detail \{[^}]*overflow-y: auto/.test(css),
+     'each scrolling on its own');
+  ok(/height: calc\(100dvh - 56px - var\(--s6\) - var\(--s7\)\)/.test(css),
+     'and together filling the frame under the bar');
+
+  // 2. Below the breakpoint there is room for one, so choosing is navigating.
+  ok(/\.browse\.on-detail \.browse-list \{ display: none; \}/.test(css),
+     'the list steps aside for the detail on a phone');
+  ok(/\.browse-detail \.back-btn \{ display: none; \}/.test(css),
+     'and the back button is hidden where both panes are on screen');
+  ok(app.indexOf('function back()') !== -1, 'the back control goes to the list');
+  ok(/if \(push\) \{/.test(app), 'and the first paint does not count as a navigation');
+
+  // 3. The three chips above every result, and the three bullets below them.
+  ok(app.indexOf("class: 'badges'") === -1, 'a result no longer carries a row of chips');
+  ok(app.indexOf('function factLine(') !== -1, 'the same three facts are one line');
+  ok(!/el\('ul', \{ class: 'expect' \}/.test(app), 'what to expect is no longer a bulleted list');
+  ok(/class: 'expect' \},\s*\n\s*org\.expect\.map/.test(app), 'but it is all still there');
+  ok(app.indexOf("el('h4', { text: 'First step' })") === -1, 'the FIRST STEP eyebrow is gone');
+  ok(app.indexOf("class: 'starter-flag'") === -1, 'and so is START HERE');
+
+  // 4. The app no longer opens by reading your own answers back to you.
+  ok(app.indexOf("class: 'rchip'") === -1, 'no chip wall of what you said');
+  ok(app.indexOf("class: 'browse-bar'") !== -1, 'the city heads the list instead');
+  ok(/\[more \? 'Change answers' : 'Start over'\]/.test(app), 'with the way back in beside it');
+
+  // 5. A question is the screen, not a card floating in the middle of one.
+  ok(/\.question \{[^}]*border: 0; background: none; box-shadow: none;/.test(css),
+     'the question card has no chrome left');
+  ok(/#intake \.question \{[^}]*min-height: calc\(100dvh/.test(css), 'it fills the frame');
+  // A hint that says how to answer stays; the four that said why the question
+  // was worth asking are out of the question set itself.
+  var intake = fs.readFileSync(path.join(root, 'src/intake.js'), 'utf8');
+  ok(app.indexOf("class: 'hint', text: q.hint") !== -1, 'a question can still say how to answer it');
+  ok(intake.indexOf('Up to three.') !== -1, 'and the ones that do are still there');
+  ok(!/hint: '(You said|It is the most reliable|Worth saying)/.test(intake),
+     'but none of them argues for the question');
+
+  // 6. Counting things the app could count, rather than things anyone asked for.
+  ok(circles.indexOf("' messages this week from '") === -1,
+     'a circle does not report its own message volume');
+  ok(circles.indexOf("o.quiet ? null : el('span', { class: 'badge', text: r.done") !== -1,
+     'and the gate count rides the Plan tab, not every card in the list');
+
+  // 7. The footer said where your data lives, under every screen in the app.
+  ok(html.indexOf('Nothing leaves this browser.') === -1, 'the footer claim is out of the page');
+  ok(social.indexOf('window.FYC_STORAGE_NOTE') !== -1, 'the online version is published instead');
+  ok(app.indexOf('window.FYC_STORAGE_NOTE ||') !== -1, 'and You reads it');
+  ok(social.indexOf(".site-footer .wrap p') ") === -1, 'nothing writes into the footer any more');
+
+  // 8. Phrases the interface used to say about itself.
+  [
+    'this is the single biggest predictor',
+    'Ranked by',
+    'questions answered'
+  ].forEach(function (phrase) {
+    ok((app + social + circles + html).indexOf(phrase) === -1, 'gone: "' + phrase + '"');
+  });
 });
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');

@@ -65,6 +65,7 @@
     budget: null
   };
   var MAX_INTERESTS = 6;
+  var browsePick = 0;   // which listing the detail pane is showing
   var plan = load(KEY.plan, []);
 
   // ---------- the adaptive intake ----------
@@ -106,6 +107,10 @@
         'aria-label': 'Question ' + (prog.asked + 1) + ' of ' + prog.total }, [bar])
     ]));
 
+    // A hint says how to answer \u2014 "up to three", "anywhere works". Four of
+    // them used to say why the question was worth asking instead, which is an
+    // argument with the person in the middle of them doing what it wants.
+    // Those are gone from the question set; this still draws the rest.
     box.appendChild(el('h2', { class: 'q-prompt', text: q.prompt }));
     if (q.hint) box.appendChild(el('p', { class: 'hint', text: q.hint }));
 
@@ -303,26 +308,14 @@
     save(KEY.profile, p);
     if (FYC.prefs && FYC.prefs.isEnabled()) p.learned = FYC.prefs.profile();
 
+    // Nothing is printed here any more. A wall of chips restating the answers,
+    // above a count of them, was two lines of the app describing its own input
+    // before it showed a single result. The city heads the list column and the
+    // way back in sits beside it.
     var host = $('#intake');
     host.style.height = '';
     host.classList.remove('settling');
     host.innerHTML = '';
-    // What it is working from, as chips rather than a sentence about the form.
-    // One way back in: carry on where you stopped, or start again if there is
-    // nothing left to answer. The label says which.
-    var more = !I.done(session);
-    host.appendChild(el('div', { class: 'recap' }, [
-      el('div', { class: 'recap-chips' }, [p.location ? el('span', { class: 'rchip', text: p.location }) : null]
-        .concat(p.interests.map(function (id) {
-          var i = FYC.INTERESTS[id] || {};
-          return el('span', { class: 'rchip', text: (i.icon ? i.icon + ' ' : '') + (i.label || id) });
-        }))),
-      el('button', { class: 'linkish', type: 'button', onclick: function () {
-        if (!more) newSession();
-        $('#results').hidden = true;
-        paintIntake();
-      } }, [more ? 'Change answers' : 'Start over'])
-    ]));
 
     if (!p.interests.length) {
       $('#results').innerHTML = '';
@@ -407,108 +400,79 @@
   var COMMIT_LABEL = { 'one-off': 'One-off', 'weekly': 'Weekly-ish', 'seasonal': 'Season-long' };
   var COST_LABEL = ['Free', 'Low cost', 'Costs money'];
 
-  function orgCard(r, p, opts) {
-    opts = opts || {};
+  // Three facts are worth knowing before you click: how hard it is to walk
+  // into, how often it runs, what it costs. They were three chips in a row
+  // above a three-bullet list. One line says the same thing.
+  function factLine(r) {
+    return [
+      r.ease.label,
+      COMMIT_LABEL[r.org.commitment] || r.org.commitment,
+      COST_LABEL[r.org.cost] || ''
+    ].filter(Boolean).join('  \u00b7  ');
+  }
+
+  function detailPane(r, p, onBack) {
     var org = r.org;
-    var body = el('div', { class: 'org-body' });
+    var pane = el('div', { class: 'detail' });
 
-    // The name is not a link any more. It used to go to the same page as
-    // "Open the page →" four lines below it, which made the card ambiguous:
-    // one of two identical links opened the site and the other expanded it.
-    var head = el('div', {}, [
-      opts.starter ? el('span', { class: 'starter-flag', text: 'Start here' }) : null,
-      el('h3', { text: org.name }),
-      el('p', { class: 'where', text: [org.neighborhood, org.cityName].filter(Boolean).join(' · ') }),
-      el('p', { class: 'blurb', text: org.blurb })
-    ]);
+    pane.appendChild(el('div', { class: 'detail-head' }, [
+      el('button', {
+        class: 'back-btn', type: 'button', 'aria-label': 'Back to the list', onclick: onBack
+      }, ['\u2190']),
+      el('div', { class: 'detail-title' }, [
+        el('h2', { text: org.name }),
+        el('p', { class: 'where', text: [org.neighborhood, org.cityName].filter(Boolean).join(' \u00b7 ') })
+      ])
+    ]));
 
-    // Three facts about the group, not four plus a list of why it ranked.
-    // What it costs, how often, and how hard it is to walk into are things a
-    // person is choosing between; the matcher's own reasoning is not.
-    var badges = el('div', { class: 'badges' }, [
-      el('span', { class: 'badge ease' + r.ease.level, text: r.ease.label }),
-      el('span', { class: 'badge', text: COMMIT_LABEL[org.commitment] || org.commitment }),
-      el('span', { class: 'badge', text: COST_LABEL[org.cost] || '' })
-    ]);
+    pane.appendChild(el('p', { class: 'blurb', text: org.blurb }));
+    pane.appendChild(el('p', { class: 'facts', text: factLine(r) }));
+    // "Over your budget" is a fact about this listing against what you said,
+    // and you would want it before you click, not after.
+    if ((r.caveats || []).length) {
+      pane.appendChild(el('p', { class: 'caveat-line', text: r.caveats.join(' \u00b7 ') }));
+    }
 
-    // Caveats stay: "over your budget" is a fact about this listing against
-    // what you said, and you would want to know it before you click.
-    var flags = (r.caveats || []).length
-      ? el('p', { class: 'caveat-line', text: r.caveats.join(' · ') })
-      : null;
-
-    // --- first step panel ---
-    var step = el('div', { class: 'first-step' }, [
-      el('h4', { text: 'First step' }),
-      el('p', { class: 'do', text: org.firstStep.label }),
+    var note = el('span', { class: 'copied', hidden: true });
+    pane.appendChild(el('div', { class: 'step-box' }, [
+      el('h3', { text: org.firstStep.label }),
       org.firstStep.when ? el('p', { class: 'when', text: org.firstStep.when }) : null,
       el('div', { class: 'actions' }, [
         el('a', {
-          class: 'btn sm', href: org.firstStep.url || org.url,
+          class: 'btn', href: org.firstStep.url || org.url,
           target: '_blank', rel: 'noopener noreferrer',
           onclick: function () { track('open', org); }
-        }, [org.universal ? 'Open the directory →' : 'Open the page →']),
+        }, [org.universal ? 'Open the directory \u2192' : 'Open the page \u2192']),
         el('button', {
-          class: 'btn ghost sm', type: 'button',
+          class: 'btn ghost', type: 'button',
           onclick: function (e) { addToPlan(org, e.currentTarget); }
         }, ['Save']),
-        (function () {
-          var note = el('span', { class: 'copied', hidden: true });
-          var btn = el('button', {
-            class: 'btn ghost sm', type: 'button',
-            onclick: function () {
-              shareOrg(org).then(function (how) {
-                if (how === 'cancelled') return;
-                track('share', org);
-                note.textContent = how === 'shared' ? 'Shared' : how === 'copied' ? 'Copied' : 'Could not copy';
-                note.hidden = false;
-                setTimeout(function () { note.hidden = true; }, 2000);
-              });
-            }
-          }, ['Share']);
-          return el('span', { class: 'share-wrap' }, [btn, note]);
-        })()
-      ]),
-      el('ul', { class: 'expect' }, org.expect.map(function (t) { return el('li', { text: t }); }))
-    ]);
+        el('span', { class: 'share-wrap' }, [
+          el('button', { class: 'btn ghost', type: 'button', onclick: function () {
+            shareOrg(org).then(function (how) {
+              if (how === 'cancelled') return;
+              track('share', org);
+              note.textContent = how === 'shared' ? 'Shared' : how === 'copied' ? 'Copied' : 'Could not copy';
+              note.hidden = false;
+              setTimeout(function () { note.hidden = true; }, 2000);
+            });
+          } }, ['Share']),
+          note
+        ])
+      ])
+    ]));
 
-    body.appendChild(head);
-    body.appendChild(badges);
-    if (flags) body.appendChild(flags);
-
-    if (opts.starter) {
-      body.appendChild(step);
-      return el('article', { class: 'card org starter' }, [body]);
+    // What the place is like, in its own right. Plain lines: three bullets
+    // under three chips read as a spec sheet, which is not what they are.
+    if ((org.expect || []).length) {
+      pane.appendChild(el('div', { class: 'expect' },
+        org.expect.map(function (t) { return el('p', { text: t }); })));
     }
 
-    // The whole card opens it. A nine-pixel "Details" link in the corner was
-    // the only way in, on a card the size of a postcard.
-    var wrapStep = el('div', { hidden: true }, [step]);
-    body.appendChild(el('span', { class: 'chev', 'aria-hidden': 'true', text: '\u2304' }));
-    body.appendChild(wrapStep);
-
-    var card = el('article', {
-      class: 'card org tappable', role: 'button', tabindex: '0',
-      'aria-expanded': 'false',
-      onclick: function (e) {
-        // Anything inside the opened panel does its own job.
-        if (wrapStep.contains(e.target)) return;
-        toggleCard();
-      },
-      onkeydown: function (e) {
-        if (wrapStep.contains(e.target)) return;
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCard(); }
-      }
-    }, [body]);
-
-    function toggleCard() {
-      var open = wrapStep.hidden;
-      if (open) track('expand', org);
-      wrapStep.hidden = !open;
-      card.setAttribute('aria-expanded', open ? 'true' : 'false');
-    }
-
-    return card;
+    // The data is a snapshot. Said where it is about the listing in front of
+    // you rather than about the product.
+    pane.appendChild(el('p', { class: 'list-foot', text: 'Details change \u2014 check before you go.' }));
+    return pane;
   }
 
   function render(m, p) {
@@ -516,7 +480,7 @@
     host.innerHTML = '';
 
     // A curated city with nothing matching the chosen interests is not a
-    // curated result — fall through to the national routes rather than
+    // curated result \u2014 fall through to the national routes rather than
     // padding the page with groups that match nothing the person asked for.
     var hasCurated = m.cityMatched && m.results.length > 0;
     var curated = m.results.slice(0, 8);
@@ -543,45 +507,93 @@
     }
 
     var where = m.cityMatched ? m.city.name : (p.location || 'your area');
-    host.appendChild(el('div', { class: 'results-head' }, [
-      el('h2', { text: where }),
-      el('p', { text: primary.length + (primary.length === 1 ? ' group' : ' groups') })
-    ]));
+
+    // One row per listing in a column you can see all of, with the chosen one
+    // open beside it. The page used to give a 1180px window to one card.
+    var items = primary.map(function (r) { return { r: r, head: null }; });
+    if (hasCurated && uni.length) {
+      uni.forEach(function (r, i) { items.push({ r: r, head: i === 0 ? 'Anywhere' : null }); });
+    }
+
+    var rows = el('ol', { class: 'rows' });
+    var detail = el('section', { class: 'browse-detail' });
+    var wrap = el('div', { class: 'browse' });
+    var buttons = [];
+
+    function back() {
+      wrap.classList.remove('on-detail');
+      var cur = buttons[browsePick];
+      if (cur) cur.focus();
+    }
+
+    function pick(i, push) {
+      browsePick = i;
+      buttons.forEach(function (b, j) {
+        b.setAttribute('aria-current', j === i ? 'true' : 'false');
+      });
+      detail.innerHTML = '';
+      detail.appendChild(detailPane(items[i].r, p, back));
+      detail.scrollTop = 0;
+      // Under the breakpoint there is only room for one pane, so choosing a
+      // row is a navigation. Above it both are on screen and nothing moves.
+      if (push) {
+        wrap.classList.add('on-detail');
+        track('expand', items[i].r.org);
+        var h = detail.querySelector('h2');
+        if (h) { h.setAttribute('tabindex', '-1'); h.focus(); }
+      }
+    }
+
+    items.forEach(function (it, i) {
+      if (it.head) rows.appendChild(el('li', { class: 'rows-head', text: it.head }));
+      var b = el('button', {
+        class: 'row', type: 'button', 'aria-current': 'false',
+        onclick: function () { pick(i, true); }
+      }, [
+        el('span', { class: 'row-name', text: it.r.org.name }),
+        el('span', { class: 'row-sub', text: it.r.org.neighborhood || it.r.org.cityName || '' })
+      ]);
+      buttons.push(b);
+      rows.appendChild(el('li', {}, [b]));
+    });
+
+    var more = !I.done(session);
+    var listCol = el('aside', { class: 'browse-list' }, [
+      el('div', { class: 'browse-bar' }, [
+        el('h2', { text: where }),
+        el('button', { class: 'linkish', type: 'button', onclick: function () {
+          if (!more) newSession();
+          host.hidden = true;
+          paintIntake();
+        } }, [more ? 'Change answers' : 'Start over'])
+      ])
+    ]);
 
     // Say outright which interests this city has no hand-picked listing for.
     if (m.cityMatched && m.uncovered && m.uncovered.length) {
-      host.appendChild(el('div', { class: 'notice' }, [
-        'Nothing hand-picked for ' + joinList(labels(m.uncovered)) + ' in ' + where + ' yet.'
+      listCol.appendChild(el('div', { class: 'notice' }, [
+        'Nothing hand-picked for ' + joinList(labels(m.uncovered)) + ' here yet.'
       ]));
     }
-
     if (!m.cityMatched) {
-      host.appendChild(el('div', { class: 'notice' }, [
-        'No hand-picked list for ' + where + ' yet — these work anywhere.'
+      listCol.appendChild(el('div', { class: 'notice' }, [
+        'No hand-picked list for ' + where + ' yet \u2014 these work anywhere.'
       ]));
     }
 
-    primary.forEach(function (r, i) {
-      host.appendChild(orgCard(r, p, { starter: i === 0 }));
-    });
-
-    if (hasCurated && uni.length) {
-      host.appendChild(el('div', { class: 'results-head' }, [
-        el('h2', { text: 'Anywhere' }),
-        el('p', { text: uni.length + (uni.length === 1 ? ' route' : ' routes') })
-      ]));
-      uni.forEach(function (r) { host.appendChild(orgCard(r, p, {})); });
-    }
+    listCol.appendChild(rows);
 
     // With a backend, the other door: circles near here on the same interests,
     // where you talk to people before anyone suggests turning up somewhere.
     if (window.FYC_CIRCLES && window.FYC_CIRCLES.resultsStrip) {
-      window.FYC_CIRCLES.resultsStrip(host, p);
+      window.FYC_CIRCLES.resultsStrip(listCol, p);
     }
 
-    // The data is a snapshot. Said once, at the end, where it is about the
-    // listings rather than about the product.
-    host.appendChild(el('p', { class: 'list-foot', text: 'Details change — check before you go.' }));
+    wrap.appendChild(listCol);
+    wrap.appendChild(detail);
+    host.appendChild(wrap);
+
+    pick(browsePick < items.length ? browsePick : 0, false);
     host.hidden = false;
   }
 
@@ -780,6 +792,9 @@
       el('p', { class: 'hint', text: profile.count
         ? profile.count + (profile.count === 1 ? ' action' : ' actions') + ', kept on this device only.'
         : 'Nothing yet. Kept on this device only.' }),
+      // Where the rest of it lives. This used to be printed in the footer,
+      // under every screen in the app; it is a fact about you, so it is here.
+      el('p', { class: 'hint', text: window.FYC_STORAGE_NOTE || 'Nothing leaves this browser.' }),
       el('div', { class: 'actions' }, [
         el('button', {
           class: 'btn ghost sm', type: 'button',

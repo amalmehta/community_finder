@@ -22,6 +22,8 @@
   --radius-sm: 9px;
   --shadow: 0 1px 2px rgba(34, 31, 27, .05), 0 6px 20px -12px rgba(34, 31, 27, .25);
   --maxw: 880px;
+  /* Find is two panes, so it gets more room than a column of prose needs. */
+  --maxw-wide: 1120px;
 
   /* Type scale, 1.25 ratio. Named by role so the steps stay deliberate
      rather than drifting into a dozen arbitrary sizes. */
@@ -305,29 +307,6 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 }
 .notice b { color: var(--moss); }
 
-/* The first result should look like the answer, not like item one of eight. */
-.starter {
-  border-color: var(--accent); border-width: 1px;
-  padding: var(--s6) var(--s5);
-  box-shadow: 0 1px 2px rgba(34,31,27,.05), 0 18px 44px -28px rgba(177,80,42,.55);
-}
-.starter h3 { font-size: calc(var(--t-h3) * 1.26); letter-spacing: -.02em; }
-.starter .blurb { font-size: var(--t-lead); line-height: 1.55; }
-.starter-flag {
-  display: block; font-size: var(--t-micro); font-weight: 700; letter-spacing: .09em;
-  text-transform: uppercase; color: var(--accent-ink); margin-bottom: var(--s2);
-}
-
-.org { margin: var(--s3) 0; }
-.org-top { display: flex; gap: var(--s4); align-items: flex-start; }
-.org h3 { margin: 0 0 var(--s1); font-size: var(--t-h3); letter-spacing: -.015em; line-height: 1.25; }
-
-.org .where {
-  font-size: var(--t-small); color: var(--ink-faint); margin: 0 0 var(--s3);
-  letter-spacing: .01em;
-}
-.org .blurb { margin: 0 0 var(--s4); color: var(--ink-soft); font-size: var(--t-body); line-height: 1.55; }
-
 .badges { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s4); }
 .badge {
   font-size: var(--t-small); padding: 3px 10px; border-radius: 999px;
@@ -337,20 +316,6 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 .badge.ease3 { background: var(--moss-soft); color: var(--moss); border-color: transparent; font-weight: 600; }
 .badge.ease2 { background: var(--bg-sunk); color: var(--ink-soft); }
 .badge.ease1 { background: var(--accent-soft); color: var(--accent-ink); }
-
-.first-step {
-  background: var(--bg-sunk); border-radius: var(--radius-sm);
-  padding: var(--s4) var(--s5); margin-top: var(--s2);
-}
-.first-step h4 {
-  margin: 0 0 var(--s2); font-size: var(--t-micro); text-transform: uppercase;
-  letter-spacing: .1em; color: var(--ink-faint); font-weight: 700;
-}
-.first-step .do { margin: 0 0 var(--s1); font-size: var(--t-lead); font-weight: 600; letter-spacing: -.01em; }
-.first-step .when { margin: 0 0 var(--s4); font-size: var(--t-small); color: var(--ink-faint); }
-.expect { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 5px; }
-.expect li { font-size: 14px; color: var(--ink-soft); padding-left: 18px; position: relative; }
-.expect li::before { content: "·"; position: absolute; left: 4px; font-weight: 800; color: var(--ink-faint); }
 
 .script { margin-top: 14px; }
 .script label {
@@ -589,10 +554,6 @@ body { font-size: var(--t-body); }
 .results { padding-bottom: var(--s8); }
 .notice { margin: var(--s4) 0; padding: var(--s3) var(--s4); font-size: var(--t-meta); }
 
-/* What to expect: supporting detail, visibly subordinate to the step itself. */
-.expect { margin: var(--s4) 0 0; gap: var(--s2); }
-.expect li { font-size: var(--t-meta); line-height: 1.5; color: var(--ink-soft); }
-
 /* Intake: give the question room, and stop the summary line overflowing. */
 .question { padding: var(--s6) var(--s5); }
 .q-head { margin-bottom: var(--s5); }
@@ -607,7 +568,7 @@ body { font-size: var(--t-body); }
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: none; }
 }
-.results .org, .results .results-head, .results .notice {
+.results .browse-bar, .results .notice {
   animation: fyc-rise .32s cubic-bezier(.2, .7, .3, 1) both;
 }
 .results > *:nth-child(1) { animation-delay: 0ms; }
@@ -629,17 +590,13 @@ body { font-size: var(--t-body); }
 
 /* Cards lift slightly on hover, so the list feels handled rather than static.
    The transition has always named transform; now something actually moves. */
-.org, .plan-item, .card.circle.mine {
+.plan-item, .card.circle.mine {
   transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
 }
-.org:hover, .plan-item:hover, .card.circle.mine:hover {
+.plan-item:hover, .card.circle.mine:hover {
   border-color: var(--line-strong);
   transform: translateY(-2px);
   box-shadow: 0 2px 4px rgba(34, 31, 27, .05), 0 14px 32px -18px rgba(34, 31, 27, .35);
-}
-.starter:hover {
-  border-color: var(--accent);
-  box-shadow: 0 2px 4px rgba(34, 31, 27, .05), 0 22px 50px -26px rgba(177, 80, 42, .6);
 }
 /* A lift on something you cannot click is a lie about what it does. */
 .card.circle:not(.mine):hover { transform: none; }
@@ -653,16 +610,15 @@ body { font-size: var(--t-body); }
 .pill:active, .choice:active, .chip:active { transform: translateY(1px); }
 
 @media (prefers-reduced-motion: reduce) {
-  .results .org, .results .results-head, .results .notice, #intake .question { animation: none; }
+  .results .browse-bar, .results .notice, #intake .question { animation: none; }
   /* The global rule below kills transitions, so the animated height would
      stick at whatever it was told last. Let it be auto instead. */
   #intake { height: auto !important; }
-  .org:hover, .plan-item:hover, .card.circle.mine:hover { transform: none; }
+  .plan-item:hover, .card.circle.mine:hover { transform: none; }
 }
 
 @media (max-width: 560px) {
   .card { padding: var(--s4); }
-  .starter { padding: var(--s5) var(--s4); }
   .question { padding: var(--s5) var(--s4); }
   .results-head { margin: var(--s5) 0 var(--s3); }
 }
@@ -973,19 +929,6 @@ main:focus { outline: none; }
 }
 .linkish:hover { color: var(--accent-ink); text-decoration: underline; }
 
-/* What the results are built from, as chips rather than a sentence. */
-.recap {
-  display: flex; align-items: flex-start; gap: var(--s4);
-  margin: 0 0 var(--s2);
-}
-.recap-chips { display: flex; flex-wrap: wrap; gap: var(--s2); flex: 1 1 auto; min-width: 0; }
-.recap .linkish { flex: none; padding-top: 3px; }
-.rchip {
-  font-size: var(--t-small); color: var(--ink-soft);
-  background: var(--bg-sunk); border-radius: 999px; padding: 3px var(--s3);
-  white-space: nowrap;
-}
-
 /* One line, in the warning colour, for anything true of this listing that
    cuts against what you asked for. */
 .caveat-line {
@@ -994,24 +937,6 @@ main:focus { outline: none; }
 .list-foot {
   margin: var(--s6) 0 0; font-size: var(--t-small); color: var(--ink-faint);
 }
-
-/* ---------- a card you can tap ----------
-   The card is the control. The chevron says so without a label. */
-.tappable { cursor: pointer; position: relative; }
-.tappable .org-body { position: relative; }
-.tappable .chev {
-  position: absolute; right: 0; top: 2px;
-  font-size: 19px; line-height: 1; color: var(--ink-faint);
-  transition: transform .2s ease, color .2s ease;
-}
-.tappable:hover .chev { color: var(--accent-ink); }
-.tappable[aria-expanded="true"] .chev { transform: rotate(180deg); }
-.tappable h3, .tappable .blurb, .tappable .where { padding-right: var(--s5); }
-.tappable[aria-expanded="true"] { border-color: var(--line-strong); }
-/* Inside the opened panel the pointer is back to normal — those are controls
-   of their own, not more of the card. */
-.tappable .first-step { cursor: auto; }
-@media (prefers-reduced-motion: reduce) { .tappable .chev { transition: none; } }
 
 /* Content needs air under a translucent bar, and room above the bottom one. */
 main { padding: var(--s6) 0 var(--s7); }
@@ -1062,3 +987,152 @@ main { padding: var(--s6) 0 var(--s7); }
 /* The legal pages borrow the app bar and label themselves. */
 .brand { text-decoration: none; }
 .page-tag { color: var(--ink-faint); font-size: var(--t-small); }
+
+
+/* ============================================================
+   Browse — Find as a list and the thing you chose
+   ============================================================
+   Find used to be one column of cards that opened in place. On a 1180px
+   window that showed one and a half results at a time, each of them a
+   postcard of eyebrow, title, blurb, three chips, a tinted panel and a
+   three-bullet list; choosing one reflowed everything below the cursor.
+   It is now a list you can see all of and a detail pane that does not move. */
+
+#view-find > .wrap { max-width: var(--maxw-wide); }
+
+.browse-bar {
+  display: flex; align-items: baseline; gap: var(--s4);
+  margin: 0 0 var(--s2); padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--line);
+}
+.browse-bar h2 {
+  flex: 1 1 auto; margin: 0; font-family: var(--serif);
+  font-size: var(--t-h2); font-weight: 600; letter-spacing: -.02em; line-height: 1.1;
+}
+.browse-bar .linkish { flex: none; }
+
+.rows { list-style: none; margin: 0; padding: 0; }
+.rows-head {
+  margin: var(--s5) 0 var(--s1); padding: 0 var(--s3);
+  font-size: var(--t-micro); text-transform: uppercase; letter-spacing: .09em;
+  color: var(--ink-faint); font-weight: 700;
+}
+.row {
+  display: block; width: 100%; text-align: left;
+  border: 0; background: none; font: inherit; color: inherit;
+  padding: var(--s3); border-radius: var(--radius-sm); cursor: pointer;
+  transition: background-color .12s ease;
+}
+.row:hover { background: var(--bg-sunk); }
+.row-name { display: block; font-weight: 600; font-size: var(--t-meta); line-height: 1.35; }
+.row-sub {
+  display: block; margin-top: 1px; color: var(--ink-faint); font-size: var(--t-small);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.row[aria-current="true"] { background: var(--moss-soft); }
+.row[aria-current="true"] .row-name,
+.row[aria-current="true"] .row-sub { color: var(--moss); }
+
+.browse-detail { min-width: 0; }
+.detail { animation: fyc-fade .2s ease both; }
+.detail .blurb {
+  margin: 0 0 var(--s3); max-width: 62ch;
+  color: var(--ink-soft); font-size: var(--t-lead); line-height: 1.5;
+}
+/* Ease, cadence and cost, which used to be three chips in a row. */
+.facts { margin: 0 0 var(--s5); color: var(--ink-faint); font-size: var(--t-small); }
+.detail .caveat-line { margin: calc(-1 * var(--s4)) 0 var(--s5); }
+
+.step-box {
+  margin: 0 0 var(--s5); padding: var(--s5);
+  background: var(--moss-soft); border-radius: var(--radius);
+}
+.step-box h3 {
+  margin: 0 0 var(--s1); font-size: var(--t-lead); font-weight: 600;
+  letter-spacing: -.01em; line-height: 1.3;
+}
+.step-box .when { margin: 0 0 var(--s4); color: var(--ink-soft); font-size: var(--t-small); }
+.step-box .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+
+/* What the place is like. Three bullets under three chips read as a spec
+   sheet; these are sentences about a place, so they are set as sentences. */
+.expect { display: grid; gap: var(--s2); margin: 0 0 var(--s5); }
+.expect p { margin: 0; color: var(--ink-soft); font-size: var(--t-meta); line-height: 1.5; }
+
+.detail .list-foot { margin: 0; }
+
+/* Two panes, each scrolling on its own, together filling the frame below the
+   app bar. Nothing here is a magic number: it is the bar plus main's padding. */
+@media (min-width: 900px) {
+  .browse {
+    display: grid; gap: var(--s6);
+    grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+    height: calc(100dvh - 56px - var(--s6) - var(--s7));
+    min-height: 430px;
+  }
+  .browse-list, .browse-detail {
+    height: 100%; min-height: 0; overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* The rule between the panes, so the list reads as a column and not as
+     text that happens to be left of other text. */
+  .browse-list { border-right: 1px solid var(--line); padding-right: var(--s4); }
+  .browse-detail { padding-right: var(--s2); }
+  /* Left to the platform, the pane scrollbar draws a bright slab down the
+     middle of the dark theme, right where the rule between the panes is. */
+  .browse-list, .browse-detail { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+  .browse-list::-webkit-scrollbar, .browse-detail::-webkit-scrollbar { width: 8px; }
+  .browse-list::-webkit-scrollbar-track, .browse-detail::-webkit-scrollbar-track { background: transparent; }
+  .browse-list::-webkit-scrollbar-thumb, .browse-detail::-webkit-scrollbar-thumb {
+    background: var(--line-strong); border-radius: 4px;
+  }
+  .browse-list .browse-bar {
+    position: sticky; top: 0; z-index: 1; background: var(--bg);
+  }
+  /* Both panes are on screen, so there is nothing to go back to. */
+  .browse-detail .back-btn { display: none; }
+  .detail .detail-head { margin-bottom: var(--s3); }
+}
+
+/* Below that there is room for one pane, so choosing a row is a navigation:
+   the list goes, the detail arrives, and the back button earns its place. */
+@media (max-width: 899px) {
+  .browse-detail { display: none; }
+  .browse.on-detail .browse-list { display: none; }
+  .browse.on-detail .browse-detail { display: block; }
+  .row { padding: var(--s3) var(--s2); }
+  /* The feedback pill floats above the bottom bar, so the last line of the
+     detail has to clear it rather than run underneath. */
+  .browse.on-detail .browse-detail { padding-bottom: var(--s7); }
+}
+
+/* ---------- the question is the screen ----------
+   It used to be a card: a 430px box with a visible edge and a shadow,
+   centred in a 1180px window with a footer stranded below it. There is only
+   ever one question on screen, so the card was drawing a border around the
+   whole app. */
+.question {
+  max-width: 600px; margin: 0 auto;
+  padding: 0; border: 0; background: none; box-shadow: none;
+}
+/* The intake fills the frame rather than floating a box in the middle of it.
+   One consequence worth knowing: every question is now the same height, so
+   settleHeight finds from === to and the card stops animating between
+   questions. That jiggle only existed because the heights differed. */
+#intake .question {
+  min-height: calc(100dvh - 56px - var(--s6) - var(--s7));
+  display: flex; flex-direction: column; justify-content: center;
+}
+.question .choices { grid-template-columns: 1fr; gap: var(--s2); }
+.question .choice {
+  padding: var(--s4) var(--s5); border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+.question .choice b { font-size: var(--t-lead); }
+.question input[type="text"] { font-size: var(--t-lead); padding: var(--s3) var(--s4); }
+.q-outs { margin-top: var(--s4); }
+
+/* The footer is three links now. The sentence above them was about where
+   your data lives, which is a thing about you, and it moved to You. */
+footer.site-footer { margin-top: var(--s6); padding: var(--s4) 0 var(--s6); }
+footer.site-footer p { margin: 0; }

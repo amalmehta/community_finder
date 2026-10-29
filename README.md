@@ -341,7 +341,7 @@ npm test        # both suites
 node tests/run-tests.js
 ```
 
-8090+ assertions covering data integrity (every listing has a valid first step,
+8120+ assertions covering data integrity (every listing has a valid first step,
 a real URL, interests that exist in the taxonomy, ratings in range), city lookup
 and aliasing, the universal fallback engine, matcher behaviour (a nervous person
 gets gentle options first, budget is respected, the comfort dial actually
@@ -409,7 +409,7 @@ probes, that negative answers push things down, and that it terminates however
 it is answered.
 
 Manual check: open the app, type `Brooklyn`, pick a few interests, and confirm
-you get New York listings with a "Start here" card. Then type `Boise, Idaho` and
+you get New York listings in the list. Then type `Boise, Idaho` and
 confirm you get the national-routes view instead.
 
 ---
@@ -490,9 +490,26 @@ chat, scrolled to the latest message. The readiness count rides on the Plan
 tab's label and ticks over as you send, so the gate is visible without a copy
 of it sitting under the composer.
 
-A result card is itself the control: tap anywhere to open the first step. The
-name used to be a link to the same page as the button four lines below it,
-which made the card ambiguous about what a click would do.
+Find is a list and a detail pane. Every match is one row — name and place —
+in a column that scrolls on its own, with the one you chose open beside it in a
+pane that scrolls on its own. Under 900px there is room for one, so choosing a
+row is a navigation and the back button appears; above it both are on screen
+and nothing moves when you change your mind. It replaced a single column of
+cards that expanded in place, which gave a 1180px window to one and a half
+results and reflowed the page under the cursor on every tap.
+
+What a listing says about itself got shorter. Ease, cadence and cost were three
+chips in a row; they are one line of text. The two-to-four "what to expect"
+facts were a bulleted list under them; they are sentences. The eyebrows above
+each — START HERE, FIRST STEP — are gone, along with the wall of chips that
+read your own answers back to you before the first result and the count of them
+beside the city.
+
+A question is the screen rather than a card floating in the middle of one: no
+border, no shadow, filling the frame under the bar. Four questions carried a
+line explaining why they were worth asking ("this is the single biggest
+predictor"); those are deleted. The ones that say *how* to answer — "up to
+three", "anywhere works" — stay, because that is instruction, not argument.
 
 Nothing on screen explains why the product is built the way it is. The rule is
 **state and instruction, never justification**: a circle says "4 of 5" and
