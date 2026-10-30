@@ -341,7 +341,7 @@ npm test        # both suites
 node tests/run-tests.js
 ```
 
-8120+ assertions covering data integrity (every listing has a valid first step,
+8270+ assertions covering data integrity (every listing has a valid first step,
 a real URL, interests that exist in the taxonomy, ratings in range), city lookup
 and aliasing, the universal fallback engine, matcher behaviour (a nervous person
 gets gentle options first, budget is respected, the comfort dial actually
@@ -426,8 +426,11 @@ src/
   intake.js           the adaptive 20-question engine (pure functions, no DOM)
   preferences.js      on-device preference tracker (pure functions, injectable storage)
   social.js           accounts, people and messaging UI (inert without a backend)
+  circles.js          circles: vetting, group chat, quorum and meetups
+  art.js              every drawing in the app, built as inline SVG at runtime
   match.js            the scoring engine (pure functions, no DOM)
   app.js              DOM rendering, saved list, feedback
+sitemap.xml           the three public pages, for crawlers
 tests/run-tests.js    the test suite
 tools/check-links.js  the link checker
 tools/moderate.js     moderation console: reports, suspensions
@@ -565,6 +568,21 @@ you choose to click. Nothing is ever transmitted, and the You tab can erase the
 behavioural record completely.
 
 ---
+
+## Continuous integration
+
+`.github/workflows/check-links.yml` runs two jobs on two clocks, because they
+answer two different questions.
+
+`test` runs on every push and pull request, on Node 22 — the version
+`package.json` asks for, and the one `node:sqlite` needs. It runs both suites:
+the app's and the server's.
+
+`links` runs weekly and on demand only. It makes a few hundred outbound
+requests to check that every listing still resolves, which is not something to
+do on every commit, and the answer changes whether or not anyone commits. When
+something breaks it opens one issue and comments on it thereafter rather than
+filing a new one every Monday.
 
 ## Known limits
 

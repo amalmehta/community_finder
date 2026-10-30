@@ -5,16 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Terms — Community Finder</title>
 <meta name="description" content="The rules for using Community Finder, and the limits of what it promises.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🫂</text></svg>">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#fbf8f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
+<!-- The server sends this as a header; GitHub Pages cannot send headers, so
+     the static build carries its own. frame-ancestors is deliberately absent:
+     it is ignored in a meta element, and a directive that does nothing but
+     log an error on every load is worse than none. Framing is refused by the
+     server's header, which is the only place it can be. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <link rel="stylesheet" href="assets/styles.css">
+<script>
+  // The same four lines the app runs, so arriving here from a dark app does
+  // not flash a cream page. These pages carry no toggle of their own: the
+  // choice is the app's, and this honours it.
+  try {
+    var t = localStorage.getItem('fyc.theme.v1');
+    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+</script>
 </head>
 <body>
+
+<a class="skip" href="#main">Skip to content</a>
 <header class="appbar"><div class="appbar-in">
   <a class="brand" href="/">Community Finder</a>
   <span class="page-tag">terms</span>
 </div></header>
 
-<main><div class="wrap legal">
+<main id="main" tabindex="-1"><div class="wrap legal">
   <h1>Terms</h1>
   <p class="lede">Short, because the service is small.</p>
 

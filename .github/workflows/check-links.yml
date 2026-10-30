@@ -1,10 +1,12 @@
-# The dataset is a point-in-time snapshot: groups fold, rename and move.
-# This runs the test suite and the link checker weekly and opens an issue when
-# a listing's link actually breaks, so dead entries surface without anyone
-# remembering to look.
-name: Check listing links
+# Two jobs with two different clocks. The tests answer "did this change
+# break anything", so they run on every push and pull request. The link
+# check answers "has the world moved on", which it does whether or not
+# anyone commits, so it stays on the weekly schedule and opens an issue.
+name: Tests and listing links
 
 on:
+  push:
+  pull_request:
   schedule:
     # Mondays, 14:00 UTC.
     - cron: '0 14 * * 1'
@@ -15,17 +17,35 @@ permissions:
   issues: write
 
 jobs:
-  check:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 22, matching package.json's engines field. The server half of the
+      # suite uses node:sqlite, which does not exist before 22, so on 20 it
+      # could only ever have been skipped.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run the app suite
+        run: node tests/run-tests.js
+
+      - name: Run the server suite
+        run: node tests/run-server-tests.js
+
+  links:
+    # Only on the schedule and by hand: it makes a few hundred outbound
+    # requests, which is not something to do on every push.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Run the test suite
-        run: node tests/run-tests.js
+          node-version: '22'
 
       - name: Check every listing link
         id: links

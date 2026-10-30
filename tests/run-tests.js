@@ -1330,6 +1330,63 @@ group('the pass over the whole thing: using it', function () {
   ok(app.indexOf('will not let the app store anything') !== -1, 'in a sentence, once');
   ok(css.indexOf('.storage-warn') !== -1, 'and it is styled');
 });
+group('the pass over the whole thing: around it', function () {
+  var fs = require('fs');
+  var ci = fs.readFileSync(path.join(root, '.github/workflows/check-links.yml'), 'utf8');
+  var manifest = JSON.parse(fs.readFileSync(path.join(root, 'site.webmanifest'), 'utf8'));
+  var robots = fs.readFileSync(path.join(root, 'robots.txt'), 'utf8');
+  var sitemap = fs.readFileSync(path.join(root, 'sitemap.xml'), 'utf8');
+  var privacy = fs.readFileSync(path.join(root, 'privacy.html'), 'utf8');
+  var terms = fs.readFileSync(path.join(root, 'terms.html'), 'utf8');
+  var server = fs.readFileSync(path.join(root, 'server/app.js'), 'utf8');
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+
+  // 31. The suite ran weekly. A test that only runs on Mondays tells you
+  //     which of the week's commits broke it, eventually.
+  ok(/\non:\n\s+push:/.test(ci), 'the tests run on push');
+  ok(ci.indexOf('pull_request:') !== -1, 'and on pull requests');
+  ok(ci.indexOf("github.event_name == 'schedule'") !== -1,
+     'while the few hundred outbound requests stay on the schedule');
+
+  // 32. package.json asks for Node >= 22 and the server uses node:sqlite,
+  //     which does not exist before 22.
+  ok(ci.indexOf("node-version: '20'") === -1, 'CI is off Node 20');
+  eq((ci.match(/node-version: '22'/g) || []).length, 2, 'both jobs are on 22');
+
+  // 33. Half the suite was never run anywhere but a laptop.
+  ok(ci.indexOf('node tests/run-server-tests.js') !== -1, 'the server suite runs in CI');
+
+  // 34 + 35. The legal pages are reached from inside the app and rendered as
+  //     plain documents: no skip link, and a cream flash on a dark app.
+  [['privacy', privacy], ['terms', terms]].forEach(function (pair) {
+    ok(pair[1].indexOf('class="skip"') !== -1, pair[0] + ' has a skip link');
+    ok(pair[1].indexOf('id="main"') !== -1, pair[0] + ': pointing at something');
+    ok(pair[1].indexOf("localStorage.getItem('fyc.theme.v1')") !== -1, pair[0] + ': honours the theme');
+    ok(pair[1].indexOf('name="theme-color"') !== -1, pair[0] + ': and the browser chrome with it');
+    ok(pair[1].indexOf('href="assets/icon.svg"') !== -1, pair[0] + ': shows the drawn mark');
+    var pol = (pair[1].match(/Content-Security-Policy" content="([^"]+)"/) || [])[1] || '';
+    ok(pol.indexOf("connect-src 'none'") !== -1, pair[0] + ': and asks for nothing over the network');
+    ok(pol.indexOf('frame-ancestors') === -1, pair[0] + ': without the directive meta ignores');
+  });
+
+  // 36. The manifest described the app but not where it fits or how to get
+  //     into one part of it.
+  eq(manifest.lang, 'en', 'the manifest declares a language');
+  ok(Array.isArray(manifest.categories) && manifest.categories.length >= 2, 'and some categories');
+  eq(manifest.shortcuts.length, 2, 'two shortcuts into the app');
+  manifest.shortcuts.forEach(function (sc) {
+    var want = (sc.url.split('tab=')[1] || '');
+    ok(app.indexOf("get('tab')") !== -1, 'the app reads ?tab=');
+    ok(['plan', 'you'].indexOf(want) !== -1, 'the shortcut points at a real tab: ' + want);
+  });
+
+  // 37. Three public pages, and nothing pointing a crawler at them.
+  ok(robots.indexOf('Sitemap: https://') !== -1, 'robots.txt names a sitemap');
+  ok(sitemap.indexOf('<urlset') !== -1, 'which exists');
+  eq((sitemap.match(/<loc>/g) || []).length, 3, 'with the three public pages in it');
+  ok(server.indexOf("'sitemap.xml'") !== -1, 'and the server will actually serve it');
+  ok(server.indexOf("'.xml': 'application/xml") !== -1, 'with a type on it');
+});
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail) {

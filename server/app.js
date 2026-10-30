@@ -251,7 +251,8 @@ const MIME = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon',
-  '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json'
+  '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json',
+  '.xml': 'application/xml; charset=utf-8'
 };
 
 // The app loads no third-party scripts, styles, fonts or images, so the policy
@@ -1437,7 +1438,8 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
   // Only what the browser actually needs. An allowlist rather than a denylist,
   // so adding a file to the repo can never accidentally publish it.
   const SERVE_EXACT = new Set([
-    'index.html', 'privacy.html', 'terms.html', 'robots.txt', 'site.webmanifest'
+    'index.html', 'privacy.html', 'terms.html', 'robots.txt', 'site.webmanifest',
+    'sitemap.xml'
   ]);
   const SERVE_DIRS = ['assets/', 'src/'];
 
