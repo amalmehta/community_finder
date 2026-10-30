@@ -1439,7 +1439,7 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
   // so adding a file to the repo can never accidentally publish it.
   const SERVE_EXACT = new Set([
     'index.html', 'privacy.html', 'terms.html', 'robots.txt', 'site.webmanifest',
-    'sitemap.xml'
+    'sitemap.xml', 'sw.js'
   ]);
   const SERVE_DIRS = ['assets/', 'src/'];
 
@@ -1467,7 +1467,11 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
       // revalidate against, so a changed script stayed invisible for the full
       // five minutes — and because the page itself does revalidate, a deploy
       // handed people new HTML driving old JavaScript.
-      const isPage = rel.endsWith('.html');
+      //
+      // The worker is in with the pages: it decides what every other file
+      // gets served from, so a stale copy of it outlives a deploy by
+      // whatever it cached. It is the one file that must never be held.
+      const isPage = rel.endsWith('.html') || rel === 'sw.js';
       const tag = '"' + crypto.createHash('sha1').update(data).digest('base64url').slice(0, 22) + '"';
       if (req.headers['if-none-match'] === tag) {
         res.writeHead(304, { 'ETag': tag, 'Cache-Control': isPage ? 'no-cache' : 'public, max-age=300, must-revalidate' });

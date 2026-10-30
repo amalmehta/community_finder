@@ -1159,10 +1159,45 @@
     });
   }
 
+  // ---------- the network going away ----------
+  /**
+   * With the worker installed the app itself keeps working offline — the
+   * listings are in the bundle and what you saved is on the device. What
+   * stops working is every link out of it, which is most of the point of a
+   * first step. So this says that, rather than a bare "you are offline" over
+   * an app that is plainly still running.
+   *
+   * It informs and never blocks. navigator.onLine is false behind some
+   * captive portals and true on others, so a disabled "Open the page" button
+   * would be wrong about as often as it was right — and a tap costs the
+   * person nothing when signal has come back a second before.
+   */
+  function wireOffline() {
+    function paint() {
+      var off = navigator.onLine === false;
+      document.documentElement.classList.toggle('is-offline', off);
+      var bar = $('#offline-warn');
+      if (!off) {
+        if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+        return;
+      }
+      if (bar) return;
+      var m = $('#main');
+      if (!m) return;
+      bar = el('p', { id: 'offline-warn', class: 'storage-warn offline-warn', role: 'status',
+        text: 'You are offline. Everything here still works — but the links out to each group will not until you are back.' });
+      m.insertBefore(bar, m.firstChild);
+    }
+    window.addEventListener('online', paint);
+    window.addEventListener('offline', paint);
+    paint();
+  }
+
   // ---------- boot ----------
   function init() {
     wireTheme();
     wireFeedback();
+    wireOffline();
     paintPlanCount();
 
     $('#tab-find').addEventListener('click', function () { showTab('find'); });

@@ -1388,6 +1388,186 @@ group('the pass over the whole thing: around it', function () {
   ok(server.indexOf("'.xml': 'application/xml") !== -1, 'with a type on it');
 });
 
+// --------------------------------------------- it has to work on the bus
+group('offline: the app when the network is not there', function () {
+  var fs = require('fs');
+  var vm = require('vm');
+  var swSrc = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+  var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+  var server = fs.readFileSync(path.join(root, 'server/app.js'), 'utf8');
+  var docker = fs.readFileSync(path.join(root, 'Dockerfile'), 'utf8');
+  var swift = fs.readFileSync(path.join(root, 'mac/Sources/StaticServer.swift'), 'utf8');
+
+  // --- run the worker for real, on a subpath -------------------------------
+  // Served from a directory on Pages and from the root by the Node server, so
+  // everything it decides has to be relative to itself. Loading it under a
+  // subpath is the only way to catch an absolute '/index.html'.
+  var handlers = {};
+  var precached = null;
+  var sandbox = {
+    URL: URL, Request: Request, Response: Response, Promise: Promise, console: console,
+    setTimeout: setTimeout, clearTimeout: clearTimeout,
+    fetch: function () { return Promise.resolve({ ok: true, clone: function () { return {}; } }); },
+    caches: {
+      // Resolves on the spot rather than on a microtask, so the install can
+      // be fired and read back inside this synchronous suite.
+      open: function () {
+        var box = {
+          addAll: function (list) { precached = list; return box; },
+          put: function () {},
+          then: function (f) { return f ? (f(box) || box) : box; },
+          'catch': function () { return box; }
+        };
+        return box;
+      },
+      keys: function () { return Promise.resolve([]); },
+      match: function () { return Promise.resolve(null); },
+      'delete': function () { return Promise.resolve(true); }
+    },
+    self: {
+      location: new URL('https://amalmehta.github.io/community_finder/sw.js'),
+      addEventListener: function (type, fn) { handlers[type] = fn; },
+      skipWaiting: function () { return Promise.resolve(); },
+      clients: { claim: function () { return Promise.resolve(); } }
+    }
+  };
+  sandbox.self.registration = {};
+  vm.createContext(sandbox);
+  vm.runInContext(swSrc, sandbox, { filename: 'sw.js' });
+
+  ok(!!handlers.install && !!handlers.activate && !!handlers.fetch,
+     'the worker installs, activates and answers fetches');
+
+  // Fire install and read back what it actually asked to cache.
+  var waited = [];
+  handlers.install({ waitUntil: function (p) { waited.push(p); } });
+
+  /** Drive the fetch handler and report whether it took the request. */
+  function answers(url, init) {
+    var took = false;
+    handlers.fetch({
+      request: new Request(url, init || {}),
+      respondWith: function () { took = true; }
+    });
+    return took;
+  }
+  var B = 'https://amalmehta.github.io/community_finder/';
+
+  ok(answers(B + 'src/app.js'), 'it answers for the app it cached');
+  ok(answers(B, { headers: {} }), 'and for the page itself');
+  // Accounts, circles and messages are shared state. A cached answer about
+  // who is in a circle is a lie with a timestamp on it.
+  ok(!answers(B + 'api/me'), 'it leaves the API alone');
+  ok(!answers(B + 'api/circles/3'), 'all of it');
+  // Nothing third-party is loaded, so nothing third-party should be stored.
+  ok(!answers('https://www.cmc.org/'), 'and every other site on the internet');
+  // The bug this catches: a worker written as if it lived at the root would
+  // claim everything on github.io, not just this app.
+  ok(!answers('https://amalmehta.github.io/some-other-project/app.js'),
+     'and the neighbours on the same host');
+  ok(!answers(B + 'src/app.js', { method: 'POST' }), 'it only answers GETs');
+
+  // --- the shell list is the whole app ------------------------------------
+  // addAll is all or nothing, so one typo means no offline at all. That is
+  // the right failure — silence is worse — but only if it cannot ship.
+  var shell = (swSrc.match(/var SHELL = \[([\s\S]*?)\];/) || [])[1] || '';
+  var listed = shell.match(/'([^']+)'/g).map(function (q) { return q.slice(1, -1); });
+  ok(listed.length > 25, 'the shell lists the app (' + listed.length + ' entries)');
+  eq(listed.length, Object.keys(listed.reduce(function (a, x) { a[x] = 1; return a; }, {})).length,
+     'with nothing listed twice');
+  listed.forEach(function (rel) {
+    if (rel === './') return;
+    ok(fs.existsSync(path.join(root, rel)), 'cached file exists: ' + rel);
+  });
+  eq(precached.length, listed.length, 'and the install asks for all of them');
+
+  // The list cannot be allowed to drift behind index.html: a city file added
+  // to the page and not to the shell is a city that vanishes offline.
+  var scripts = (html.match(/<script src="([^"]+)"/g) || []).map(function (t) {
+    return t.replace(/<script src="/, '').replace(/"$/, '');
+  });
+  ok(scripts.length >= 22, 'the page loads every city and module');
+  scripts.forEach(function (src) {
+    ok(listed.indexOf(src) !== -1, 'the shell covers ' + src);
+  });
+  ok(listed.indexOf('assets/styles.css') !== -1, 'and the stylesheet');
+  ok(listed.indexOf('site.webmanifest') !== -1, 'and the manifest');
+  ok(listed.indexOf('assets/icon.svg') !== -1, 'and the icon');
+
+  // --- how it keeps itself honest -----------------------------------------
+  ok(/fyc-shell-' \+ VERSION/.test(swSrc), 'the cache name carries a version');
+  ok(swSrc.indexOf('caches.keys()') !== -1 && swSrc.indexOf('caches.delete') !== -1,
+     'and old versions are deleted rather than left on the device');
+  ok(swSrc.indexOf("new URL('./', self.location)") !== -1,
+     'the scope is read off the worker, not assumed to be the root');
+  ok(swSrc.indexOf("cache: 'reload'") !== -1,
+     'the install reads from the network, not the HTTP cache it is replacing');
+  ok(swSrc.indexOf("req.mode === 'navigate'") !== -1 && swSrc.indexOf('index.html') !== -1,
+     'a page with nothing to reach falls back to the cached app');
+  ok(/if \(!res \|\| !res\.ok/.test(swSrc), 'a 404 is never cached');
+
+  // Cache-first would answer a live page's scripts from the cache, which is
+  // the "new HTML driving old JavaScript" deploy the ETag in server/app.js
+  // exists to prevent. The live copy wins whenever there is one.
+  ok(swSrc.indexOf('raceNetwork') !== -1, 'the network is asked first');
+  ok(swSrc.indexOf('caches.match(req)') !== -1 && /raceNetwork\(req\)\.catch/.test(swSrc),
+     'and the cache is what answers when it cannot');
+  // Plain network-first makes a bad connection worse than no worker at all:
+  // a request that will fail in thirty seconds blocks a file already on the
+  // device, on exactly the bus this is for.
+  ok(/NET_WAIT = \d+/.test(swSrc), 'the network does not get forever to answer');
+  var wait = Number((swSrc.match(/NET_WAIT = (\d+)/) || [])[1]);
+  ok(wait > 0 && wait <= 5000, 'and the wait is short enough to be worth having (' + wait + 'ms)');
+  // A fetch that loses the race has still been made; throwing the answer
+  // away would mean the cache never updated on a slow connection.
+  ok(/putCopy\(req, res\);\n      if \(settled\) return;/.test(swSrc),
+     'a slow answer still refreshes the cache');
+
+  // --- registering it ------------------------------------------------------
+  ok(html.indexOf("navigator.serviceWorker.register('sw.js')") !== -1,
+     'the page registers it, by a relative path');
+  ok(html.indexOf("register('/sw.js')") === -1, 'never an absolute one');
+  ok(/location\.protocol === 'https:'/.test(html) && html.indexOf("'localhost'") !== -1,
+     'only where a worker can be registered at all');
+  ok(/addEventListener\('load'/.test(html), 'and after the page has painted');
+  ok(/register\('sw\.js'\)\.catch/.test(html), 'a refusal does not break the boot');
+
+  // --- the server half -----------------------------------------------------
+  ok(server.indexOf("'sw.js'") !== -1, 'the server serves the worker');
+  ok(/rel === 'sw\.js'/.test(server), 'and never lets it be cached');
+  ok(/COPY sitemap\.xml sw\.js/.test(docker), 'the image ships both files');
+  // Shipped broken in the commit that added the sitemap: robots.txt pointed
+  // at a URL the image answered with a 404.
+  ok(docker.indexOf('sitemap.xml') !== -1, 'including the sitemap robots.txt advertises');
+  // Served as octet-stream the manifest is ignored, so the Mac build could
+  // never offer to install the app either.
+  ok(swift.indexOf('application/manifest+json') !== -1,
+     'the Mac server gives the manifest a type a browser accepts');
+
+  // --- saying so, and printing it -----------------------------------------
+  ok(app.indexOf('wireOffline') !== -1, 'the app notices the network going away');
+  ok(/addEventListener\('offline'/.test(app) && /addEventListener\('online'/.test(app),
+     'both directions');
+  ok(app.indexOf('links out to each group will not') !== -1,
+     'and says the true thing: the app works, the links out do not');
+  // navigator.onLine is false behind some captive portals and true on others.
+  ok(app.indexOf('disabled = true') === -1 || app.indexOf('offline-warn') !== -1,
+     'it informs rather than blocking a tap that might work');
+  ok(css.indexOf('.offline-warn') !== -1, 'with a tone of its own, not the warning one');
+
+  var print = (css.match(/@media print \{([\s\S]*)$/) || [])[1] || '';
+  ok(print.length > 200, 'the saved list can be printed');
+  ['.appbar', '.fb-tab', '.theme-btn'].forEach(function (sel) {
+    ok(print.indexOf(sel) !== -1, 'print drops ' + sel + ', which needs tapping');
+  });
+  ok(/\.progress \{ display: none/.test(print), 'and the bar that means nothing without colour');
+  ok(print.indexOf('attr(href)') !== -1, 'a link becomes its address on paper');
+  ok(print.indexOf('print-color-adjust: exact') !== -1, 'and the ticks survive the printer');
+  ok(/--ink: #000/.test(print), 'dark mode does not follow the page onto paper');
+});
+
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail) {
   failures.slice(0, 25).forEach(function (f) { console.log('   ✗ ' + f); });

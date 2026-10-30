@@ -341,7 +341,7 @@ npm test        # both suites
 node tests/run-tests.js
 ```
 
-8270+ assertions covering data integrity (every listing has a valid first step,
+8370+ assertions covering data integrity (every listing has a valid first step,
 a real URL, interests that exist in the taxonomy, ratings in range), city lookup
 and aliasing, the universal fallback engine, matcher behaviour (a nervous person
 gets gentle options first, budget is respected, the comfort dial actually
@@ -430,6 +430,7 @@ src/
   art.js              every drawing in the app, built as inline SVG at runtime
   match.js            the scoring engine (pure functions, no DOM)
   app.js              DOM rendering, saved list, feedback
+sw.js                 service worker: caches the app so it opens offline
 sitemap.xml           the three public pages, for crawlers
 tests/run-tests.js    the test suite
 tools/check-links.js  the link checker
@@ -583,6 +584,48 @@ requests to check that every listing still resolves, which is not something to
 do on every commit, and the answer changes whether or not anyone commits. When
 something breaks it opens one issue and comments on it thereafter rather than
 filing a new one every Monday.
+
+## Offline, and on paper
+
+Everything the finder needs is already in the bundle — the listings are
+JavaScript files, the matching runs in the browser, and the saved list is in
+`localStorage`. The only thing it ever needed the network for was fetching its
+own files, which meant it failed at exactly the moment it was most useful:
+standing outside the place, no signal, wanting the first step it told you
+about.
+
+`sw.js` caches the whole app on the first visit. Afterwards:
+
+- **The network is asked first, with a stopwatch on it.** Cache-first would
+  answer a live page's scripts out of the cache, which is the "new HTML
+  driving old JavaScript" deploy the ETag in `server/app.js` exists to
+  prevent. So the live copy wins whenever there is one. But plain
+  network-first makes a bad connection *worse* than no worker at all — a
+  request that will fail in thirty seconds blocks a file already sitting on
+  the device, on exactly the bus this is for. After 2.5 seconds the cached
+  copy answers instead. The slow fetch still finishes and still updates the
+  cache; it just stops being what the page waits on.
+- **Any URL under the app opens the app**, so the installed `?tab=plan`
+  shortcut works with the radio off.
+- **The API is never cached.** Accounts, circles and messages are shared state,
+  and a cached answer about who is in a circle is a lie with a timestamp on it.
+- **Scope is read off the worker**, not assumed to be the root, because the app
+  is served from a subdirectory on Pages and from `/` by the Node server.
+- The precache is all-or-nothing, which is the right failure — a half-cached
+  app that boots and then dies on a missing city is worse. What makes that safe
+  is a test asserting every file in the list exists *and* that nothing
+  `index.html` loads is missing from it, so the list cannot drift.
+
+Being offline is not a problem with the app, so it does not get the warning
+tint. The banner says the true thing: everything here still works, but the
+links out to each group will not. It never disables those links —
+`navigator.onLine` is false behind some captive portals and true on others, so
+a blocked tap would be wrong about as often as it was right.
+
+The saved list also prints. `@media print` drops everything that only works by
+being tapped, drops the colour, and prints each first step's address after it,
+so the sheet is still usable away from the screen.
+
 
 ## Known limits
 

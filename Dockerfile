@@ -11,6 +11,10 @@ COPY server ./server
 COPY src ./src
 COPY assets ./assets
 COPY index.html privacy.html terms.html robots.txt site.webmanifest ./
+# sitemap.xml is the URL robots.txt advertises, and sw.js is what makes the
+# app open offline. Left out of the image, the first 404s and the second
+# quietly turns the install into an ordinary bookmark.
+COPY sitemap.xml sw.js ./
 
 # The database lives on a volume, not in the image.
 RUN mkdir -p /app/server/data && chown -R node:node /app

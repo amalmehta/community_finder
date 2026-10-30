@@ -1249,3 +1249,61 @@ main { padding: var(--s6) 0 var(--s7); }
   .row-pic { color: var(--ink-soft); }
   .badge { border-color: var(--line-strong); }
 }
+
+/* Offline is not a problem with the app, so it does not get the warning
+   tint — the listings are in the bundle and the saved list is on the device.
+   It reads as a fact about the network, quietly. */
+.offline-warn { background: var(--bg-sunk); color: var(--ink-soft); }
+
+/* Printing. The saved list is a handful of places and the one concrete step
+   into each, which is exactly the thing somebody wants on paper or as a PDF
+   to take with them. Everything that only works by being tapped comes off,
+   the colour comes off, and the links print their addresses so the sheet is
+   still usable away from the screen. */
+@media print {
+  /* Dark mode must not follow the page onto paper. */
+  :root, :root[data-theme="dark"] {
+    --bg: #fff; --bg-raised: #fff; --bg-sunk: #fff;
+    --ink: #000; --ink-soft: #333; --ink-faint: #555;
+    --line: #bbb; --line-strong: #999;
+    --accent-soft: #fff; --moss-soft: #fff;
+    --shadow: none;
+  }
+  body { background: #fff; color: #000; }
+
+  /* Chrome you cannot use on paper. */
+  .appbar, .tabs, .theme-btn, .skip, .fb-tab, .fb-panel,
+  #auth-gate, .storage-warn, .screen-head .actions { display: none !important; }
+
+  /* The drawings are there to make a screen feel inviting; on paper they are
+     a page of toner. */
+  .sc, .guide, .empty svg, .plan-done { display: none !important; }
+
+  main, .wrap { max-width: none; padding: 0; margin: 0; }
+
+  .card, .plan-item {
+    border: 1px solid #999; box-shadow: none; background: #fff;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+
+  /* Four ticks say how far along you are. A part-filled bar says it in a
+     grey block that means nothing once the colour has gone. */
+  .progress { display: none !important; }
+
+  /* Checked steps have to survive the printer's habit of dropping
+     backgrounds, or the sheet arrives with every box empty. */
+  .steps input[type="checkbox"] { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* A link is an address on paper, not a button: nothing here can be
+     tapped, so the pill comes off and it reads as the line of text it is.
+     Only the ones worth walking away with — the first step into each
+     place, not the app's own pages. */
+  .plan-item .actions a[href^="http"] {
+    border: 0; padding: 0; background: none; border-radius: 0;
+    text-decoration: underline; font-weight: 600;
+  }
+  .plan-item .actions a[href^="http"]::after {
+    content: " — " attr(href); font-size: var(--t-small); color: #333; word-break: break-all;
+  }
+  .plan-item .actions button { display: none !important; }
+}

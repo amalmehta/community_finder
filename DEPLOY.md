@@ -9,7 +9,14 @@ No server, no accounts, nothing transmitted. This is what is published today at
 
 Any static host works — push to `main` and GitHub Pages rebuilds, or copy
 `index.html`, `privacy.html`, `terms.html`, `robots.txt`, `site.webmanifest`,
-`assets/` and `src/` anywhere. There is no build step.
+`sitemap.xml`, `sw.js`, `assets/` and `src/` anywhere. There is no build step.
+
+Two things about `sw.js`, which is what makes the app open offline: it has to
+sit beside `index.html` rather than on a CDN, because a worker can only take
+charge of its own directory and below; and it must be served with
+`Cache-Control: no-cache`. It decides where every other file comes from, so a
+held copy of it outlives a deploy by whatever it had cached. GitHub Pages does
+the right thing here on its own; the Node server is told to in `server/app.js`.
 
 ## 2. The full app, with accounts and messaging
 

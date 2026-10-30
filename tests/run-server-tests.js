@@ -1044,11 +1044,20 @@ async function verifyEmail(call, email) {
     eq((await fetch(base + '/api/me')).headers.get('cache-control'), 'no-store', 'API responses are never cached');
 
     // The public, non-app files a deployment needs.
-    for (const p of ['/privacy.html', '/terms.html', '/robots.txt', '/site.webmanifest']) {
+    for (const p of ['/privacy.html', '/terms.html', '/robots.txt', '/site.webmanifest',
+                     '/sitemap.xml', '/sw.js']) {
       eq((await fetch(base + p)).status, 200, `serves ${p}`);
     }
     ok((await (await fetch(base + '/robots.txt')).text()).includes('Disallow: /api/'),
        'robots keeps crawlers out of the API');
+
+    // The worker decides where every other file comes from, so a stale copy
+    // of it outlives a deploy by whatever it had cached. It is the one asset
+    // that must be revalidated every time, like the page itself.
+    const sw = await fetch(base + '/sw.js');
+    eq(sw.headers.get('cache-control'), 'no-cache', 'the worker is never held');
+    ok(sw.headers.get('content-type').includes('javascript'), 'and is served as a script');
+    ok((await sw.text()).includes('fyc-shell-'), 'and is the worker, not a stray file');
 
     // Suspension has to end access, not just hide the profile.
     const victim = client();
