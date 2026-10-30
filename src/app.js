@@ -48,6 +48,19 @@
     return id ? A.pictogram(id, cls) : null;
   }
 
+  /**
+   * Which tint the subject badge takes. The taxonomy already sorts every
+   * interest into one of six groups, so the colour says something true about
+   * the listing rather than decorating it: moving and making are warm, the
+   * rest are the moss the app already uses for "this is the thing".
+   */
+  var TINT = { move: 'warm', make: 'warm', think: 'cool', grow: 'leaf', give: 'leaf', belong: 'cool' };
+  function tintFor(org) {
+    var id = (org.interests || [])[0];
+    var grp = id && FYC.INTERESTS[id] ? FYC.INTERESTS[id].group : null;
+    return TINT[grp] || 'leaf';
+  }
+
   /** A drawing for a screen with nothing on it yet. */
   function sceneFor(name) {
     var A = art();
@@ -62,28 +75,36 @@
   function $$(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
 
   // ---------- storage ----------
-  var KEY = { plan: 'fyc.plan.v1', profile: 'fyc.profile.v1', feedback: 'fyc.feedback.v1', intake: 'fyc.intake.v1' };
+  var KEY = {
+    plan: 'fyc.plan.v1', profile: 'fyc.profile.v1', feedback: 'fyc.feedback.v1',
+    intake: 'fyc.intake.v1', tab: 'fyc.tab.v1'
+  };
   function load(key, fallback) {
     try {
       var raw = localStorage.getItem(key);
       return raw ? JSON.parse(raw) : fallback;
     } catch (e) { return fallback; }
   }
+  var storageWarned = false;
   function save(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* private mode */ }
+    try {
+      localStorage.setItem(key, JSON.stringify(val));
+    } catch (e) {
+      // Private mode, or a full quota. Silently dropping every save meant the
+      // plan looked saved and was gone on the next load, with nothing said.
+      if (storageWarned) return;
+      storageWarned = true;
+      var bar = el('p', { class: 'storage-warn', role: 'status',
+        text: 'This browser will not let the app store anything, so nothing here will survive a reload.' });
+      var m = $('#main');
+      if (m) m.insertBefore(bar, m.firstChild);
+    }
   }
 
-  // ---------- selection state ----------
-  var state = {
-    interests: [],           // ordered
-    comfort: 1,
-    when: [],
-    goals: [],
-    commitment: null,
-    budget: null
-  };
-  var MAX_INTERESTS = 6;
-  var browsePick = 0;   // which listing the detail pane is showing
+  // Which listing the detail pane is showing, held by id rather than by
+  // position: the list is re-ranked whenever the answers change, and an index
+  // kept across that lands on whatever happens to be sitting in that slot.
+  var browsePick = null;
   var plan = load(KEY.plan, []);
 
   // ---------- the adaptive intake ----------
@@ -195,7 +216,10 @@
     // of the row is quiet: skipping and leaving early are ways out, not offers.
     if (q.kind !== 'one') {
       box.appendChild(el('div', { class: 'actions' }, [
-        el('button', { class: 'btn', type: 'button', onclick: function () { submit(answer()); } }, ['Continue'])
+        el('button', {
+          class: 'btn', type: 'button', 'data-continue': true,
+          onclick: function () { submit(answer()); }
+        }, ['Continue'])
       ]));
     }
     box.appendChild(el('div', { class: 'q-outs' }, [
@@ -244,8 +268,11 @@
       return;
     }
     if (e.key === 'Enter') {
-      var next = Array.prototype.slice.call($('#intake').querySelectorAll('button'))
-        .filter(function (b) { return b.textContent === 'Next'; })[0];
+      // The button is marked, not matched on its text. It used to be found by
+      // reading every button's label and comparing it to 'Next', which is not
+      // what it has said for a long time — so Enter did nothing on every
+      // multi-select question in the form.
+      var next = $('#intake').querySelector('[data-continue]');
       if (next) { e.preventDefault(); next.click(); }
     }
   }
@@ -272,7 +299,9 @@
    * size on the same frame the new question fades in, and twenty questions
    * read as twenty cards rather than one form being filled in.
    */
+  var settleTimer = null;
   function settleHeight(host, from) {
+    if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
     host.style.height = '';
     host.classList.remove('settling');
     var to = host.scrollHeight;
@@ -290,7 +319,7 @@
     host.addEventListener('transitionend', done);
     // A transition that never fires — reduced motion, a hidden tab — must not
     // leave the card pinned to a stale height.
-    setTimeout(done, 400);
+    settleTimer = setTimeout(done, 400);
   }
 
   function paintIntake() {
@@ -356,19 +385,6 @@
   }
 
   // ---------- results ----------
-  function profile() {
-    return {
-      location: $('#location').value.trim(),
-      name: $('#firstname').value.trim(),
-      interests: state.interests.slice(),
-      comfort: state.comfort,
-      when: state.when.slice(),
-      goals: state.goals.slice(),
-      commitment: state.commitment,
-      budget: state.budget
-    };
-  }
-
   /** What gets sent: the name, where, the first step, and the link. */
   function shareText(org) {
     var where = [org.neighborhood, org.cityName].filter(Boolean).join(', ');
@@ -437,7 +453,7 @@
     ].filter(Boolean).join('  \u00b7  ');
   }
 
-  function detailPane(r, p, onBack) {
+  function detailPane(r, p, onBack, onSaveChange) {
     var org = r.org;
     var pane = el('div', { class: 'detail' });
 
@@ -445,7 +461,7 @@
       el('button', {
         class: 'back-btn', type: 'button', 'aria-label': 'Back to the list', onclick: onBack
       }, ['\u2190']),
-      el('span', { class: 'pic-badge' }, [orgPic(org)]),
+      el('span', { class: 'pic-badge ' + tintFor(org) }, [orgPic(org)]),
       el('div', { class: 'detail-title' }, [
         el('h2', { text: org.name }),
         el('p', { class: 'where', text: [org.neighborhood, org.cityName].filter(Boolean).join(' \u00b7 ') })
@@ -460,20 +476,35 @@
       pane.appendChild(el('p', { class: 'caveat-line', text: r.caveats.join(' \u00b7 ') }));
     }
 
-    var note = el('span', { class: 'copied', hidden: true });
+    var note = el('span', { class: 'copied', role: 'status', hidden: true });
+    // Saving is a toggle. It used to set the button to "Saved ✓" and disable
+    // it, so the only way to undo a mis-tap was to find the Saved tab.
+    var saveBtn = el('button', {
+      class: 'btn ghost', type: 'button',
+      'aria-pressed': inPlan(org.id) ? 'true' : 'false',
+      onclick: function () {
+        var now = togglePlan(org);
+        saveBtn.setAttribute('aria-pressed', now ? 'true' : 'false');
+        saveBtn.textContent = now ? 'Saved \u2713' : 'Save';
+        if (onSaveChange) onSaveChange();
+      }
+    }, [inPlan(org.id) ? 'Saved \u2713' : 'Save']);
+
     pane.appendChild(el('div', { class: 'step-box' }, [
-      el('h3', { text: org.firstStep.label }),
-      org.firstStep.when ? el('p', { class: 'when', text: org.firstStep.when }) : null,
+      el('div', { class: 'step-head' }, [
+        el('span', { class: 'pic-badge ' + tintFor(org) }, [orgPic(org)]),
+        el('div', {}, [
+          el('h3', { text: org.firstStep.label }),
+          org.firstStep.when ? el('p', { class: 'when', text: org.firstStep.when }) : null
+        ])
+      ]),
       el('div', { class: 'actions' }, [
         el('a', {
           class: 'btn', href: org.firstStep.url || org.url,
           target: '_blank', rel: 'noopener noreferrer',
           onclick: function () { track('open', org); }
         }, [org.universal ? 'Open the directory \u2192' : 'Open the page \u2192']),
-        el('button', {
-          class: 'btn ghost', type: 'button',
-          onclick: function (e) { addToPlan(org, e.currentTarget); }
-        }, ['Save']),
+        saveBtn,
         el('span', { class: 'share-wrap' }, [
           el('button', { class: 'btn ghost', type: 'button', onclick: function () {
             shareOrg(org).then(function (how) {
@@ -500,6 +531,12 @@
     // you rather than about the product.
     pane.appendChild(el('p', { class: 'list-foot', text: 'Details change \u2014 check before you go.' }));
     return pane;
+  }
+
+  /** Say one short thing to a screen reader. The panes themselves are quiet. */
+  function announce(text) {
+    var s = $('#results-status');
+    if (s) s.textContent = text;
   }
 
   function render(m, p) {
@@ -547,42 +584,75 @@
     var detail = el('section', { class: 'browse-detail' });
     var wrap = el('div', { class: 'browse' });
     var buttons = [];
+    var at = 0;                       // which row is open, as a position
 
     function back() {
       wrap.classList.remove('on-detail');
-      var cur = buttons[browsePick];
+      var cur = buttons[at];
       if (cur) cur.focus();
     }
 
     function pick(i, push) {
-      browsePick = i;
+      at = i;
+      // Held by id, so re-ranking after a changed answer reopens the listing
+      // you were reading rather than whatever now sits in that slot.
+      browsePick = items[i].r.org.id;
       buttons.forEach(function (b, j) {
         b.setAttribute('aria-current', j === i ? 'true' : 'false');
       });
       detail.innerHTML = '';
-      detail.appendChild(detailPane(items[i].r, p, back));
+      detail.appendChild(detailPane(items[i].r, p, back, repaintRows));
       detail.scrollTop = 0;
       // Under the breakpoint there is only room for one pane, so choosing a
       // row is a navigation. Above it both are on screen and nothing moves.
       if (push) {
         wrap.classList.add('on-detail');
         track('expand', items[i].r.org);
+        announce(items[i].r.org.name + '. ' + factLine(items[i].r) + '.');
         var h = detail.querySelector('h2');
         if (h) { h.setAttribute('tabindex', '-1'); h.focus(); }
       }
     }
 
+    /** Re-tick the saved markers after something is saved or unsaved. */
+    function repaintRows() {
+      buttons.forEach(function (b, j) {
+        b.classList.toggle('is-saved', inPlan(items[j].r.org.id));
+      });
+      paintPlanCount();
+    }
+
+    /**
+     * Up and down walk the list the way a mail client does: one roving stop
+     * for the whole column, rather than twelve tab stops to get past it.
+     */
+    function rowKeys(e) {
+      var d = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1
+        : e.key === 'Home' ? -items.length : e.key === 'End' ? items.length : 0;
+      if (!d) return;
+      e.preventDefault();
+      var to = Math.max(0, Math.min(items.length - 1, at + d));
+      if (to === at) return;
+      pick(to, false);
+      buttons[to].focus();
+    }
+
     items.forEach(function (it, i) {
       if (it.head) rows.appendChild(el('li', { class: 'rows-head', text: it.head }));
       var b = el('button', {
-        class: 'row', type: 'button', 'aria-current': 'false',
-        onclick: function () { pick(i, true); }
+        class: 'row' + (inPlan(it.r.org.id) ? ' is-saved' : ''),
+        type: 'button', 'aria-current': 'false',
+        onclick: function () { pick(i, true); },
+        onkeydown: rowKeys
       }, [
         orgPic(it.r.org, 'row-pic'),
         el('span', { class: 'row-text' }, [
           el('span', { class: 'row-name', text: it.r.org.name }),
           el('span', { class: 'row-sub', text: it.r.org.neighborhood || it.r.org.cityName || '' })
-        ])
+        ]),
+        // A tick, not a word: the row is a name and a place, and a second
+        // label on it would compete with both.
+        el('span', { class: 'row-saved', 'aria-hidden': 'true', text: '\u2713' })
       ]);
       buttons.push(b);
       rows.appendChild(el('li', {}, [b]));
@@ -592,6 +662,7 @@
     var listCol = el('aside', { class: 'browse-list' }, [
       el('div', { class: 'browse-bar' }, [
         el('h2', { text: where }),
+        el('span', { class: 'browse-n', text: String(items.length) }),
         el('button', { class: 'linkish', type: 'button', onclick: function () {
           if (!more) newSession();
           host.hidden = true;
@@ -624,7 +695,10 @@
     wrap.appendChild(detail);
     host.appendChild(wrap);
 
-    pick(browsePick < items.length ? browsePick : 0, false);
+    var was = 0;
+    items.forEach(function (it, i) { if (it.r.org.id === browsePick) was = i; });
+    pick(was, false);
+    announce(items.length + (items.length === 1 ? ' place' : ' places') + ' in ' + where + '.');
     host.hidden = false;
   }
 
@@ -636,11 +710,28 @@
     'Go again'
   ];
 
-  function addToPlan(org, btn) {
-    if (plan.some(function (x) { return x.id === org.id; })) {
-      if (btn) btn.textContent = 'Saved';
-      return;
+  function inPlan(id) {
+    return plan.some(function (x) { return x.id === id; });
+  }
+
+  /** Save or unsave. Returns whether it is saved afterwards. */
+  function togglePlan(org) {
+    var at = -1;
+    plan.forEach(function (x, i) { if (x.id === org.id) at = i; });
+    if (at !== -1) {
+      if (plan[at].attrs) track('unplan', plan[at].attrs);
+      plan.splice(at, 1);
+      save(KEY.plan, plan);
+      paintPlanCount();
+      renderPlan();
+      return false;
     }
+    addToPlan(org);
+    return true;
+  }
+
+  function addToPlan(org) {
+    if (inPlan(org.id)) return;
     track('plan', org);
     plan.push({
       id: org.id,
@@ -662,7 +753,6 @@
     save(KEY.plan, plan);
     paintPlanCount();
     renderPlan();
-    if (btn) { btn.textContent = 'Saved \u2713'; btn.disabled = true; }
   }
 
   function paintPlanCount() {
@@ -673,13 +763,17 @@
 
   function renderPlan() {
     var host = $('#plan-body');
+    if (!host) return;
     host.innerHTML = '';
     if (!plan.length) {
       host.appendChild(el('div', { class: 'screen-head' }, [el('h2', { text: 'Saved' })]));
-      host.appendChild(el('div', { class: 'card empty' }, [
+      host.appendChild(el('div', { class: 'empty' }, [
         sceneFor('saved'),
         el('h2', { text: 'Nothing saved yet.' }),
-        el('p', { text: 'Add something from Find.' })
+        el('p', { text: 'Anything you like the look of lands here, with its first step.' }),
+        el('div', { class: 'actions' }, [
+          el('button', { class: 'btn', type: 'button', onclick: function () { showTab('find'); } }, ['Find something'])
+        ])
       ]));
       return;
     }
@@ -689,6 +783,7 @@
     plan.forEach(function (item, idx) {
       var steps = PLAN_STEPS.map(function (s, i) { return i === 1 ? item.stepLabel : s; });
       var doneCount = item.done.filter(Boolean).length;
+      var finished = doneCount === item.done.length;
       var bar = el('i');
       bar.style.width = (doneCount / 4 * 100) + '%';
 
@@ -706,9 +801,18 @@
         return el('li', {}, [cb, el('label', { for: cbId }, [span])]);
       }));
 
-      host.appendChild(el('article', { class: 'card plan-item' }, [
-        el('h3', { text: item.name }),
-        el('p', { class: 'where', text: [item.cityName, item.when].filter(Boolean).join(' · ') }),
+      host.appendChild(el('article', { class: 'card plan-item' + (finished ? ' done' : '') }, [
+        el('div', { class: 'plan-top' }, [
+          el('div', { class: 'plan-title' }, [
+            el('h3', { text: item.name }),
+            el('p', { class: 'where', text: [item.cityName, item.when].filter(Boolean).join(' · ') })
+          ]),
+          // Four ticks is the whole point of the list, so finishing it gets
+          // a drawing rather than a bar that has quietly reached the end.
+          finished ? el('span', { class: 'plan-done', title: 'You went.' }, [
+            art() ? art().guide('cheer') : null
+          ]) : null
+        ]),
         el('div', { class: 'progress' }, [bar]),
         list,
         el('div', { class: 'actions' }, [
@@ -889,10 +993,25 @@
     }
   }
   window.FYC_TAB_IN_VIEW = onTabShown;
+  var TABS = ['find', 'plan', 'you', 'circles', 'messages'];
+  /**
+   * Where to open: whatever ?tab= asks for, else where you were when you
+   * closed it, else Find. The query form is what the installed app's
+   * shortcuts point at, so "Saved" from the dock opens Saved.
+   */
+  function openAt() {
+    var want = null;
+    try { want = new URLSearchParams(location.search).get('tab'); } catch (e) { want = null; }
+    if (want && TABS.indexOf(want) !== -1) return want;
+    var last = load(KEY.tab, 'find');
+    return TABS.indexOf(last) !== -1 ? last : 'find';
+  }
+  window.FYC_LAST_TAB = openAt;
 
   function showTab(which) {
     // With a backend there are more tabs than these three; social.js owns the
     // switching in that case so every view is hidden correctly.
+    save(KEY.tab, which);
     keepTabInView(which);
     if (window.FYC_SHOW) return window.FYC_SHOW(which);
     ['find', 'plan', 'you'].forEach(function (name) {
@@ -924,9 +1043,28 @@
     return THEMES.indexOf(t) !== -1 ? t : 'auto';
   }
 
+  /* The two <meta name="theme-color"> tags in the head are scoped by
+     prefers-color-scheme, which is right up to the moment someone overrides
+     the system. From then on the page is dark and the browser's own chrome
+     around it is not, which is the one place the choice visibly fails to
+     take. A third, unscoped tag wins over both and is removed on auto. */
+  var BAR = { light: '#fbf8f4', dark: '#171512' };
+  function paintBrowserChrome(t) {
+    var tag = document.getElementById('theme-color-pick');
+    if (t === 'auto') { if (tag) tag.remove(); return; }
+    if (!tag) {
+      tag = document.createElement('meta');
+      tag.id = 'theme-color-pick';
+      tag.setAttribute('name', 'theme-color');
+      document.head.appendChild(tag);
+    }
+    tag.setAttribute('content', BAR[t]);
+  }
+
   function applyTheme(t) {
     if (t === 'auto') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.setAttribute('data-theme', t);
+    paintBrowserChrome(t);
     try {
       if (t === 'auto') localStorage.removeItem('fyc.theme.v1');
       else localStorage.setItem('fyc.theme.v1', t);
@@ -957,6 +1095,7 @@
       applyTheme(next);
     });
     paintTheme();
+    paintBrowserChrome(currentTheme());
   }
 
   // ---------- feedback ----------
@@ -971,6 +1110,14 @@
     });
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && !panel.hidden) { panel.hidden = true; tab.setAttribute('aria-expanded', 'false'); tab.focus(); }
+    });
+    // A panel floating over the page should close when you go back to the
+    // page. Escape already did; a click anywhere else did nothing.
+    document.addEventListener('pointerdown', function (e) {
+      if (panel.hidden) return;
+      if (panel.contains(e.target) || tab.contains(e.target)) return;
+      panel.hidden = true;
+      tab.setAttribute('aria-expanded', 'false');
     });
     $$('#fb-stars button').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -1012,20 +1159,6 @@
     });
   }
 
-  // ---------- surprise me ----------
-  function surprise() {
-    var city = FYC.cities[Math.floor(Math.random() * FYC.cities.length)];
-    $('#location').value = city.name;
-    var ids = Object.keys(FYC.INTERESTS);
-    state.interests = [];
-    while (state.interests.length < 3) {
-      var pick = ids[Math.floor(Math.random() * ids.length)];
-      if (state.interests.indexOf(pick) === -1) state.interests.push(pick);
-    }
-    paintInterests();
-    $('#finder').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-  }
-
   // ---------- boot ----------
   function init() {
     wireTheme();
@@ -1040,9 +1173,29 @@
 
     document.addEventListener('keydown', intakeKeys);
 
+    // Under the breakpoint the detail pane is a whole screen, reached by
+    // choosing a row. Escape is how you leave a screen like that; the back
+    // arrow was the only way out.
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      var open = document.querySelector('.browse.on-detail');
+      if (!open) return;
+      var back = open.querySelector('.back-btn');
+      if (back) { e.preventDefault(); back.click(); }
+    });
+
     resumeSession();
     if (I.done(session) && session.city) finish(false);
     else paintIntake();
+
+    // Gated on the button being available rather than on there being no
+    // backend: social.js assigns FYC_SHOW when it parses, before it has
+    // asked anyone whether they are signed in, so "is there a backend" is
+    // not a question this can answer yet. Circles and Inbox stay hidden
+    // until an account exists, and social.js reopens those itself.
+    var last = openAt();
+    var btn = $('#tab-' + last);
+    if (last !== 'find' && btn && !btn.hidden) showTab(last);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

@@ -3,9 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- The server sends this as a header; GitHub Pages cannot send headers, so
+     the static build carries its own. frame-ancestors is deliberately absent:
+     it is ignored in a meta element, and a directive that does nothing but
+     log an error on every load is worse than none. Framing is refused by the
+     server's header, which is the only place it can be. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'none'; base-uri 'none'">
 <title>Community Finder</title>
 <meta name="description" content="Real local communities by city and interest, with the concrete first step, the cost and the commitment for each.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🫂</text></svg>">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon.svg">
 <link rel="canonical" href="https://amalmehta.github.io/community_finder/">
 <meta name="theme-color" content="#fbf8f4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
@@ -33,7 +40,14 @@
      narrow one; they are the same buttons either way. -->
 <header class="appbar">
   <div class="appbar-in">
-    <span class="brand">Community Finder</span>
+    <span class="brand">
+      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="8.5" cy="8.5" r="3.4"/><circle cx="15.5" cy="8.5" r="3.4"/>
+        <path d="M3 19c0-3.1 2.5-5 5.5-5s5.5 1.9 5.5 5"/>
+        <path d="M10 19c0-3.1 2.5-5 5.5-5s5.5 1.9 5.5 5"/>
+      </svg>
+      <span>Community Finder</span>
+    </span>
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button class="tab" id="tab-find" role="tab" aria-selected="true" aria-controls="view-find">
         <svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
@@ -65,8 +79,17 @@
 <main id="main" tabindex="-1">
   <section id="view-find" role="tabpanel" aria-labelledby="tab-find">
     <div class="wrap">
+      <noscript>
+        <div class="notice">
+          <b>This one needs JavaScript.</b> The whole app runs in your browser —
+          there is no server doing the work — so with scripting off there is
+          nothing to show. Nothing is sent anywhere either way:
+          <a href="privacy.html">what it stores</a>.
+        </div>
+      </noscript>
       <div id="intake"></div>
-      <div class="results" id="results" role="region" aria-live="polite" aria-label="Results" hidden></div>
+      <p class="sr-only" id="results-status" role="status" aria-live="polite"></p>
+      <div class="results" id="results" role="region" aria-label="Results" hidden></div>
     </div>
   </section>
 

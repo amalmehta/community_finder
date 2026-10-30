@@ -175,12 +175,25 @@
 
   function hasPictogram(id) { return Object.prototype.hasOwnProperty.call(PICTO, id); }
 
+  /* Each pictogram is built once and cloned after that. A results page is
+     twelve rows plus the detail badge, the interest chooser is thirty-two
+     pills and a circle's badges run per card — building five path elements
+     and setting five attributes on each, every time, for a drawing that is
+     identical whenever the id is. cloneNode copies the subtree in one go. */
+  var PICTO_CACHE = {};
+
   /** One interest, drawn. Falls back to null so callers can keep the emoji. */
   function pictogram(id, cls) {
     var paths = PICTO[id];
     if (!paths) return null;
-    var svg = frame('0 0 24 24', 'pic' + (cls ? ' ' + cls : ''));
-    paths.forEach(function (d) { svg.appendChild(s('path', { d: d })); });
+    var master = PICTO_CACHE[id];
+    if (!master) {
+      master = frame('0 0 24 24', 'pic');
+      paths.forEach(function (d) { master.appendChild(s('path', { d: d })); });
+      PICTO_CACHE[id] = master;
+    }
+    var svg = master.cloneNode(true);
+    if (cls) svg.setAttribute('class', 'pic ' + cls);
     return svg;
   }
 
@@ -299,9 +312,16 @@
     }
   };
 
+  /* Scenes are the same drawing every time and the largest of the four, so
+     they are cached the same way. Only one is ever on screen at once, but an
+     empty state that re-renders on every poll was rebuilding thirty nodes. */
+  var SCENE_CACHE = {};
+
   function scene(name) {
     var fn = SCENES[name];
-    return fn ? fn() : null;
+    if (!fn) return null;
+    if (!SCENE_CACHE[name]) SCENE_CACHE[name] = fn();
+    return SCENE_CACHE[name].cloneNode(true);
   }
 
   g.FYC_ART = {

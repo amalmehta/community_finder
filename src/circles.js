@@ -633,12 +633,19 @@
     if (d.wants) S.wantsRule = d.wants;
     var c = d.circle;
 
+    var faces = null;
+    if (art() && d.members && d.members.length) {
+      faces = art().avatarStack(d.members.map(function (m) { return 'person-' + m.id; }));
+    }
     host.appendChild(el('div', { class: 'detail-head' }, [
       el('button', { class: 'back-btn', type: 'button', 'aria-label': 'All circles',
         onclick: function () { renderList(); } }, ['\u2190']),
       el('div', { class: 'detail-title' }, [
         el('h2', { text: c.name }),
-        el('p', { text: c.city + ' · ' + liveLine(c) + (c.status === 'closed' ? ' · closed' : '') })
+        el('p', { text: c.city + ' · ' + liveLine(c) + (c.status === 'closed' ? ' · closed' : '') }),
+        // The people, not a count of them. Only ever the real member list —
+        // a card with no members behind it gets nothing rather than extras.
+        faces
       ])
     ]));
 

@@ -930,9 +930,11 @@ group('the shell: one frame, and nothing explaining itself', function () {
   ok(circles.indexOf('} else if (c.readiness.ready && (!meetups') !== -1,
      '"anyone can propose something" only where proposing is open');
 
-  // 13. One word for one thing. The tab is Saved, so the button is Save.
+  // 13. One word for one thing. The tab is Saved, so the button is Save —
+  //     and now that saving is a toggle, the other face of it is Saved.
   ok(app.indexOf("'Add to my plan'") === -1, 'the save button does not name a tab that is gone');
-  ok(app.indexOf("}, ['Save']),") !== -1, 'it says Save, like the tab it fills');
+  ok(app.indexOf("[inPlan(org.id) ? 'Saved \\u2713' : 'Save']") !== -1,
+     'it says Save, like the tab it fills, and Saved once it is');
 
   // 14. The dark accent is a light orange; white on it measured 2.82:1, on
   //     the first thing a keyboard user reaches.
@@ -1040,6 +1042,17 @@ group('the drawn half: faces, pictograms, scenes and the guide', function () {
   }
   Node.prototype.setAttribute = function (k, v) { this.attrs[k] = String(v); };
   Node.prototype.appendChild = function (c) { this.kids.push(c); return c; };
+  // art.js builds each pictogram and scene once and clones it thereafter, so
+  // the stub has to be able to copy itself the way a real node can — deeply,
+  // and with the copy independent of the original.
+  Node.prototype.cloneNode = function () {
+    var n = new Node(this.tag);
+    n.ns = this.ns;
+    Object.keys(this.attrs).forEach(function (k) { n.attrs[k] = this.attrs[k]; }, this);
+    n.kids = this.kids.map(function (k) { return k.cloneNode(true); });
+    if (this.text != null) n.text = this.text;
+    return n;
+  };
   Object.defineProperty(Node.prototype, 'className', {
     set: function (v) { this.attrs['class'] = v; }, get: function () { return this.attrs['class'] || ''; }
   });
@@ -1130,6 +1143,192 @@ group('the footer came off every screen', function () {
   ok(appjs.indexOf("href: 'privacy.html'") !== -1, 'Privacy is reachable from You');
   ok(appjs.indexOf("href: 'terms.html'") !== -1, 'and so is Terms');
   ok(css.indexOf('.you-legal') !== -1, 'the row they moved to is styled');
+});
+
+// -------------------------------------------- forty changes, in four parts
+group('the pass over the whole thing: technical', function () {
+  var fs = require('fs');
+  var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+  var art = fs.readFileSync(path.join(root, 'src/art.js'), 'utf8');
+
+  // 1. Enter advanced nothing on a multi-select question: the handler matched
+  //    a button labelled 'Next', and the button has said Continue for a long
+  //    time. It is marked now, so the label is free to change again.
+  ok(app.indexOf("b.textContent === 'Next'") === -1, 'Enter no longer hunts for a label that is gone');
+  ok(app.indexOf("querySelector('[data-continue]')") !== -1, 'it finds the button by its mark');
+  ok(app.indexOf("'data-continue': true") !== -1, 'and the button carries it');
+
+  // 2. Dead code from before the intake replaced the one-page form. All of it
+  //    reached ids that no longer exist, and surprise() called a function that
+  //    is not defined anywhere in the repo.
+  ['#location', '#firstname', '#finder', 'paintInterests', 'MAX_INTERESTS'].forEach(function (gone) {
+    ok(app.indexOf(gone) === -1, 'app.js no longer mentions ' + gone);
+  });
+  ok(app.indexOf('function surprise()') === -1, 'surprise() is gone');
+  ok(app.indexOf('function profile()') === -1, 'and so is the profile() that read those fields');
+
+  // 3. The CSS that dressed them.
+  ['.submit-bar', '.quick {', '.chip {', '.pill .rank', '.script {', '.badge.ease1',
+   '.conf-bar', '.picked {', 'details.more'].forEach(function (gone) {
+    ok(css.indexOf(gone) === -1, 'no rules left for ' + gone);
+  });
+
+  // 4. Choosing dark inside a light system left the browser's own chrome
+  //    light: both theme-color tags are scoped by prefers-color-scheme.
+  ok(html.indexOf('name="theme-color" content="#fbf8f4" media=') !== -1, 'the scoped pair is still there');
+  ok(app.indexOf('theme-color-pick') !== -1, 'and a third, unscoped tag follows the choice');
+  ok(app.indexOf('paintBrowserChrome(currentTheme())') !== -1, 'set on load as well as on click');
+
+  // 5. One mark everywhere. The tab was the last place showing an emoji,
+  //    which is a different picture on every platform.
+  ok(html.indexOf('href="assets/icon.svg"') !== -1, 'the tab icon is the drawn mark');
+  ok(html.indexOf('<text y=') === -1, 'and not an emoji in a data URI');
+  ok(html.indexOf('rel="apple-touch-icon"') !== -1, 'and the home screen gets it too');
+
+  // 6. With scripting off the whole frame is blank, because there is no
+  //    server rendering any of it.
+  ok(html.indexOf('<noscript>') !== -1, 'there is a noscript block');
+  ok(html.indexOf('This one needs JavaScript') !== -1, 'that says so plainly');
+
+  // 7. The server sends a CSP; Pages cannot, so index.html carries its own.
+  //    The legal pages get the same, in the commit that is about them.
+  var policy = (html.match(/Content-Security-Policy" content="([^"]+)"/) || [])[1] || '';
+  ok(policy.length > 40, 'index.html carries a policy');
+  // Deliberately not frame-ancestors: a meta element ignores it, and logs an
+  // error saying so on every single page load.
+  ok(policy.indexOf('frame-ancestors') === -1, 'without the directive meta ignores');
+  ok(policy.indexOf("base-uri 'none'") !== -1, 'and pinning the base URI');
+  ok(policy.indexOf('unsafe-eval') === -1, 'with no eval');
+
+  // 8. The list is re-ranked whenever an answer changes, so an index kept
+  //    across that opens whatever now sits in the slot.
+  ok(app.indexOf('browsePick = items[i].r.org.id') !== -1, 'the open listing is held by id');
+  ok(app.indexOf('it.r.org.id === browsePick') !== -1, 'and found again by id');
+
+  // 9. A results page is a dozen rows plus a badge, and the chooser is
+  //    thirty-two pills: the same drawings, rebuilt path by path each time.
+  ok(art.indexOf('PICTO_CACHE') !== -1, 'pictograms are built once');
+  ok(art.indexOf('SCENE_CACHE') !== -1, 'scenes too');
+  ok(art.indexOf('cloneNode(true)') !== -1, 'and cloned after that');
+
+  // 10. The 400ms fallback was never cleared, so three quick answers left
+  //     three timers, each firing on a host that had moved on.
+  ok(app.indexOf('settleTimer = setTimeout(done, 400)') !== -1, 'the fallback timer is held');
+  ok(app.indexOf('if (settleTimer) { clearTimeout(settleTimer)') !== -1, 'and cleared on the next question');
+});
+
+group('the pass over the whole thing: the interface', function () {
+  var fs = require('fs');
+  var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+  var social = fs.readFileSync(path.join(root, 'src/social.js'), 'utf8');
+  var circles = fs.readFileSync(path.join(root, 'src/circles.js'), 'utf8');
+
+  // 11. Interests were drawings in the chooser and bare text on the card
+  //     below it — two answers to one question on the same screen.
+  ok(social.indexOf('A ? A.pictogram(i) : null, el(\'span\', { text: label(i) })') !== -1,
+     'a person’s interests are drawn, as they are everywhere else');
+
+  // 12. The subject badge was always moss, so a page of listings was a page
+  //     of identical green squares. Six groups, three tints.
+  ok(app.indexOf('function tintFor(org)') !== -1, 'the badge takes a tint from the interest group');
+  ['.pic-badge.leaf', '.pic-badge.warm', '.pic-badge.cool'].forEach(function (c) {
+    ok(css.indexOf(c) !== -1, c + ' exists');
+  });
+  ok(app.indexOf("'pic-badge ' + tintFor(org)") !== -1, 'and the pane uses it');
+
+  // 13. The app bar was the one surface with no drawing on it.
+  ok(html.indexOf('class="mark"') !== -1, 'the brand has a mark');
+  ok(css.indexOf('.brand .mark') !== -1, 'which is styled');
+
+  // 14. Everyone on People has a face; the card where you set yours up was
+  //     the only one without one.
+  ok(social.indexOf("art().avatar('person-' + u.id)") !== -1, 'your own profile card carries your face');
+  ok(css.indexOf('.who-head') !== -1, 'and the row it sits in is styled');
+
+  // 15. The selected row tinted, which reads as a highlighted word rather
+  //     than a position in a column.
+  ok(css.indexOf('.row[aria-current="true"]::before') !== -1, 'the open row has an edge');
+
+  // 16. Four ticks is the whole point of a saved item.
+  ok(app.indexOf("art().guide('cheer')") !== -1, 'finishing one is drawn, not just a full bar');
+  ok(css.indexOf('.plan-item.done') !== -1, 'and the card says so');
+
+  // 17. The step box is the thing you actually do; it leads with the subject.
+  ok(app.indexOf("class: 'step-head'") !== -1, 'the step box leads with the drawing');
+  ok(css.indexOf('.step-head') !== -1, 'styled as a row');
+
+  // 18. Where the system asks for more contrast, the line work is the first
+  //     thing to disappear: --line-strong is a mid grey by design.
+  ok(css.indexOf('@media (prefers-contrast: more)') !== -1, 'the drawings answer prefers-contrast');
+  ok(/prefers-contrast: more\)[^}]*\{[\s\S]{0,400}sc-line/.test(css), 'and it reaches the scenes');
+
+  // 19. A circle is a particular set of people. The header named it and
+  //     showed none of them — and only the real member list is ever drawn.
+  ok(circles.indexOf('art().avatarStack(d.members.map') !== -1, 'the circle header shows its members');
+  ok(circles.indexOf('if (art() && d.members && d.members.length)') !== -1,
+     'and nothing at all where there is no member list');
+
+  // 20. Saved rows say so in the list, not only in the pane.
+  ok(app.indexOf("class: 'row-saved'") !== -1, 'a saved row carries a tick');
+  ok(css.indexOf('.row.is-saved .row-saved') !== -1, 'shown only when it is saved');
+});
+
+group('the pass over the whole thing: using it', function () {
+  var fs = require('fs');
+  var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+  var social = fs.readFileSync(path.join(root, 'src/social.js'), 'utf8');
+
+  // 21. The one number worth printing here: whether this is a list you can
+  //     get through.
+  ok(app.indexOf("class: 'browse-n'") !== -1, 'the bar says how many places there are');
+  ok(css.indexOf('.browse-n') !== -1, 'and it is styled quietly');
+
+  // 22. Twelve rows meant twelve tab stops to get past the column.
+  ok(app.indexOf('function rowKeys(e)') !== -1, 'the rows answer the arrow keys');
+  ok(app.indexOf("e.key === 'Home'") !== -1, 'Home and End too');
+
+  // 23. Reloading always landed on Find, whatever you had open.
+  ok(app.indexOf('tab: \'fyc.tab.v1\'') !== -1, 'the tab is remembered');
+  ok(app.indexOf('function openAt()') !== -1, 'and reopened');
+  ok(social.indexOf('window.FYC_LAST_TAB ? window.FYC_LAST_TAB()') !== -1,
+     'including when accounts own the switching');
+
+  // 24. An empty screen that only says it is empty leaves you to find the
+  //     way out yourself.
+  ok(app.indexOf("}, ['Find something'])") !== -1, 'the empty Saved screen carries the door');
+  ok(css.indexOf('.empty .actions') !== -1, 'and the row is styled');
+
+  // 25. Under the breakpoint the detail pane is a whole screen; Escape is
+  //     how you leave one.
+  ok(app.indexOf(".browse.on-detail'") !== -1, 'Escape closes the detail pane');
+
+  // 26. It used to set itself to "Saved ✓" and disable, so the only way to
+  //     undo a mis-tap was to go and find the Saved tab.
+  ok(app.indexOf('function togglePlan(org)') !== -1, 'saving is a toggle');
+  ok(app.indexOf('btn.disabled = true') === -1, 'and nothing is disabled on save');
+  ok(app.indexOf("'aria-pressed': inPlan(org.id)") !== -1, 'the button says which way it is');
+
+  // 27 + 28. The whole two-pane browser was one live region, so every tap on
+  //     a row re-announced the list, the notices and the pane together.
+  ok(html.indexOf('id="results-status"') !== -1, 'there is a one-line status');
+  ok(/id="results"[^>]*aria-live/.test(html) === false, 'and the panes are no longer live');
+  ok(app.indexOf('function announce(text)') !== -1, 'something writes to it');
+  ok(app.indexOf("role: 'status'") !== -1, 'and the share result is announced');
+
+  // 29. Escape closed the feedback panel; clicking back at the page did not.
+  ok(app.indexOf("document.addEventListener('pointerdown'") !== -1, 'clicking away closes it');
+
+  // 30. Every save was wrapped in a try that swallowed the failure, so a
+  //     full or blocked store looked exactly like a working one.
+  ok(app.indexOf('storageWarned') !== -1, 'a blocked store is reported');
+  ok(app.indexOf('will not let the app store anything') !== -1, 'in a sentence, once');
+  ok(css.indexOf('.storage-warn') !== -1, 'and it is styled');
 });
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');

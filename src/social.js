@@ -392,7 +392,10 @@
         el('p', { class: 'where', text: [p.city, 'active ' + ago(p.lastSeen)].filter(Boolean).join(' · ') }),
         p.bio ? el('p', { class: 'blurb', text: p.bio }) : null,
         el('div', { class: 'badges' }, p.interests.slice(0, 6).map(function (i) {
-          return el('span', { class: 'badge', text: label(i) });
+          var A = art();
+          return el('span', { class: 'badge' }, [
+            A ? A.pictogram(i) : null, el('span', { text: label(i) })
+          ]);
         })),
         statusText ? el('p', { class: 'hint', text: statusText }) : null,
         intro, err,
@@ -622,6 +625,10 @@
   function profileCard() {
     if (!S.user) return null;
     var u = S.user;
+    // Everyone else on People has a face; the card where you set yours up
+    // was the only one without one.
+    var me = art() ? art().avatar('person-' + u.id) : null;
+    if (me) me.classList.add('lg');
     var city = el('input', { type: 'text', value: u.city || '', placeholder: 'Your city' });
     var bio = el('textarea', { maxlength: '280', rows: '2', placeholder: 'A sentence about what you are looking for (optional)' });
     bio.value = u.bio || '';
@@ -673,8 +680,13 @@
     ]);
 
     var profile = el('article', { class: 'card' }, [
-      el('h3', { text: 'Your profile' }),
-      el('p', { class: 'hint', text: 'Signed in as ' + u.display + ' (@' + u.username + ').' }),
+      el('div', { class: 'who who-head' }, [
+        me,
+        el('div', {}, [
+          el('h3', { text: 'Your profile' }),
+          el('p', { class: 'hint', text: 'Signed in as ' + u.display + ' (@' + u.username + ').' })
+        ])
+      ]),
       el('label', { class: 'field' }, [el('span', { text: 'City' }), city]),
       el('label', { class: 'field' }, [el('span', { text: 'About you' }), bio]),
       el('label', { class: 'check' }, [disc, el('span', { text: 'Let people with shared interests find me' })]),
@@ -754,7 +766,13 @@
     document.getElementById('tab-messages').addEventListener('click', function () { show('messages'); });
 
     if (!S.user) renderGate('signup');
-    else closeGate();
+    else {
+      closeGate();
+      // Signed in, so every tab exists and the one you were last on is worth
+      // reopening. app.js remembers it; show() is this file's with accounts.
+      var last = window.FYC_LAST_TAB ? window.FYC_LAST_TAB() : 'find';
+      if (last !== 'find' && document.getElementById('tab-' + last)) show(last);
+    }
 
     if (verifyNote) {
       var banner = el('div', { class: 'notice' + (verifyNote.ok ? '' : ' bad') }, [
