@@ -19,6 +19,15 @@ const SESSION_TTL = 30 * 24 * 3600 * 1000;   // 30 days
 const VERIFY_TTL = 24 * 3600 * 1000;         // 24 hours
 const DAY = 86400000, HOUR = 3600000;
 
+// How long one message may be. Every other field the server stores is cut to
+// a length — a display name to 30, a city to 60, a bio to 280 — and the two
+// message bodies were the exception, taking whatever fitted inside the 64KB
+// body limit. That is not a way in to anything, but a 60,000-character
+// message is still a message nobody in the circle can scroll past, kept
+// forever, and the composer gave no hint it would be accepted. The textareas
+// now stop at the same number.
+const MAX_MESSAGE = 2000;
+
 // "Enough things align" to skip the request step. Deliberately strict: the
 // recipient can still turn it off, block, and report, and rate limits apply.
 const DIRECT_RULE = {
@@ -701,6 +710,7 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     const body = await readJson(req);
     const text = String(body.body || '').trim();
     if (!text) return fail(res, 400, 'Empty message.');
+    if (text.length > MAX_MESSAGE) return fail(res, 400, 'That message is too long.');
     const id = store.addMessage(conn.id, u.id, text);
     store.note('u:' + u.id, 'message');
     send(res, 201, { id });
@@ -1194,6 +1204,7 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     const body = await readJson(req);
     const text = String(body.body || '').trim();
     if (!text) return fail(res, 400, 'Empty message.');
+    if (text.length > MAX_MESSAGE) return fail(res, 400, 'That message is too long.');
     const id = store.addCircleMessage(got.c.id, got.u.id, text, 'chat');
     store.note('u:' + got.u.id, 'cmessage');
     store.markCircleRead(got.c.id, got.u.id, id);

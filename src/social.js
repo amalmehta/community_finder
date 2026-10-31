@@ -10,58 +10,11 @@
   var S = { user: null, online: false, people: [], threads: [], openThread: null, poll: null };
 
   // ---------- small helpers ----------
-  function el(tag, props, kids) {
-    var n = document.createElement(tag);
-    Object.keys(props || {}).forEach(function (k) {
-      if (k === 'class') n.className = props[k];
-      else if (k === 'text') n.textContent = props[k];
-      else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2), props[k]);
-      else if (props[k] === true) n.setAttribute(k, '');
-      else if (props[k] !== false && props[k] != null) n.setAttribute(k, props[k]);
-    });
-    (kids || []).forEach(function (c) {
-      if (c == null || c === false) return;
-      n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
-    });
-    return n;
-  }
-  /** Namespaced element builder for the graph. (app.js has its own copy; these
-   *  two files are separate scopes on purpose, so neither depends on the other.) */
-  function svg(tag, props, kids) {
-    var n = document.createElementNS('http://www.w3.org/2000/svg', tag);
-    Object.keys(props || {}).forEach(function (k) {
-      if (props[k] == null) return;
-      if (k === 'text') n.textContent = props[k];
-      else n.setAttribute(k, props[k]);
-    });
-    (kids || []).forEach(function (c) { n.appendChild(c); });
-    return n;
-  }
-
-  function $(s) { return document.querySelector(s); }
-
-  async function api(method, url, body) {
-    var res = await fetch(url, {
-      method: method,
-      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body)
-    });
-    var data = null;
-    try { data = await res.json(); } catch (e) { /* no body */ }
-    if (!res.ok) throw new Error((data && data.error) || ('Request failed (' + res.status + ')'));
-    return data;
-  }
-
-  function label(id) { return (FYC.INTERESTS[id] || {}).label || id; }
-  function ago(ts) {
-    if (!ts) return '';
-    var m = Math.floor((Date.now() - ts) / 60000);
-    if (m < 1) return 'just now';
-    if (m < 60) return m + 'm ago';
-    var h = Math.floor(m / 60);
-    if (h < 24) return h + 'h ago';
-    return Math.floor(h / 24) + 'd ago';
-  }
+  // All of these were a local copy, deliberately, so this file depended on
+  // no other feature file. It still does not: dom.js is shared the way
+  // core.js and art.js already are, and the copies had drifted apart.
+  var D = window.FYC_DOM;
+  var el = D.el, svg = D.svg, $ = D.$, api = D.api, label = D.label, ago = D.ago;
 
   // ---------- the sign-in gate ----------
   function interestPicker(selected) {
@@ -153,7 +106,8 @@
       ]) : null,
       signup ? el('label', { class: 'field' }, [
         el('span', { text: 'Your city' }),
-        el('input', { type: 'text', id: 'au-city', placeholder: 'e.g. Boston' })
+        el('input', { type: 'text', id: 'au-city', placeholder: 'e.g. Boston',
+                      autocomplete: 'address-level2', autocapitalize: 'words' })
       ]) : null,
       signup ? el('label', { class: 'field' }, [
         el('span', { text: 'About you' }),
@@ -543,7 +497,9 @@
     host.innerHTML = '';
 
     var list = el('div', { class: 'msg-list', id: 'msg-list' });
-    var input = el('textarea', { class: 'msg-input', placeholder: 'Write a message…', rows: '2' });
+    // Matches the server's cap; the only two textareas in the app that had none.
+    var input = el('textarea', { class: 'msg-input', maxlength: '2000',
+      placeholder: 'Write a message…', rows: '2' });
     var err = el('p', { class: 'err', hidden: true });
     var lastId = 0;
     var seen = Object.create(null);   // message ids already on screen
@@ -629,7 +585,8 @@
     // was the only one without one.
     var me = art() ? art().avatar('person-' + u.id) : null;
     if (me) me.classList.add('lg');
-    var city = el('input', { type: 'text', value: u.city || '', placeholder: 'Your city' });
+    var city = el('input', { type: 'text', value: u.city || '', placeholder: 'Your city',
+      autocomplete: 'address-level2', autocapitalize: 'words' });
     var bio = el('textarea', { maxlength: '280', rows: '2', placeholder: 'A sentence about what you are looking for (optional)' });
     bio.value = u.bio || '';
     var disc = el('input', { type: 'checkbox' });
@@ -821,7 +778,7 @@
 
   /** The Chats / People switch at the top of the inbox. */
   function segBar(active) {
-    return el('div', { class: 'seg', role: 'tablist' }, [
+    var seg = el('div', { class: 'seg', role: 'tablist' }, [
       ['chats', 'Chats'], ['people', 'People']
     ].map(function (pair) {
       return el('button', {
@@ -830,6 +787,8 @@
         onclick: function () { inboxSeg = pair[0]; show(pair[0] === 'people' ? 'people' : 'messages'); }
       }, [pair[1]]);
     }));
+    D.wireTablist(seg);
+    return seg;
   }
 
   window.FYC_SHOW = show;

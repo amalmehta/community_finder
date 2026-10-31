@@ -6,34 +6,10 @@
   var FYC = window.FYC;
 
   // ---------- tiny DOM helpers ----------
-  function el(tag, props, kids) {
-    var n = document.createElement(tag);
-    if (props) {
-      Object.keys(props).forEach(function (k) {
-        if (k === 'class') n.className = props[k];
-        else if (k === 'text') n.textContent = props[k];
-        else if (k === 'html') n.innerHTML = props[k];
-        else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2), props[k]);
-        else if (props[k] === true) n.setAttribute(k, '');
-        else if (props[k] !== false && props[k] != null) n.setAttribute(k, props[k]);
-      });
-    }
-    (kids || []).forEach(function (c) {
-      if (c == null || c === false) return;
-      n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
-    });
-    return n;
-  }
-  /** Namespaced element builder, for the charts on the You tab. */
-  function svg(tag, props, kids) {
-    var n = document.createElementNS('http://www.w3.org/2000/svg', tag);
-    Object.keys(props || {}).forEach(function (k) {
-      if (k === 'text') n.textContent = props[k];
-      else n.setAttribute(k, props[k]);
-    });
-    (kids || []).forEach(function (c) { n.appendChild(c); });
-    return n;
-  }
+  // One copy, in dom.js. This file used to carry its own, which is how its
+  // el() ended up with an innerHTML branch the other two never had.
+  var D = window.FYC_DOM;
+  var el = D.el, svg = D.svg;
 
   /** Note an action against a listing, if tracking is on. */
   /* The drawn half. Guarded: every caller treats a missing drawing as null,
@@ -71,8 +47,7 @@
     if (FYC.prefs) FYC.prefs.record(type, org);
   }
 
-  function $(sel) { return document.querySelector(sel); }
-  function $$(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+  var $ = D.$, $$ = D.$$;
 
   // ---------- storage ----------
   var KEY = {
@@ -166,7 +141,18 @@
     var enough = !!(sofar.location && sofar.interests.length);
 
     if (q.kind === 'text') {
-      var input = el('input', { type: 'text', placeholder: q.placeholder || '', 'aria-label': q.prompt });
+      // City is the only text question, and on a phone it was a bare text
+      // field: no Go key, no capital, and autocorrect quietly turning a
+      // place name into a word it preferred.
+      var isCity = q.id === 'city';
+      var input = el('input', {
+        type: 'text', placeholder: q.placeholder || '', 'aria-label': q.prompt,
+        autocomplete: isCity ? 'address-level2' : 'off',
+        autocapitalize: isCity ? 'words' : null,
+        autocorrect: isCity ? 'off' : null,
+        spellcheck: isCity ? 'false' : null,
+        enterkeyhint: 'go'
+      });
       if (typeof previous === 'string') input.value = previous;
       else if (q.id === 'city' && session.city) input.value = session.city;
       input.addEventListener('keydown', function (e) {
@@ -586,10 +572,19 @@
     var buttons = [];
     var at = 0;                       // which row is open, as a position
 
-    function back() {
+    function closeDetail() {
+      setTitle('');
       wrap.classList.remove('on-detail');
       var cur = buttons[at];
       if (cur) cur.focus();
+    }
+
+    // The back arrow and Escape walk the history rather than closing the
+    // pane directly, so the entry opening it left behind is consumed instead
+    // of stranding one that Back would later replay.
+    function back() {
+      if (CAN_NAV && !popping && urlOrg()) { history.back(); return; }
+      closeDetail();
     }
 
     function pick(i, push) {
@@ -607,6 +602,8 @@
       // row is a navigation. Above it both are on screen and nothing moves.
       if (push) {
         wrap.classList.add('on-detail');
+        mark('find', items[i].r.org.id);
+        setTitle(items[i].r.org.name);
         track('expand', items[i].r.org);
         announce(items[i].r.org.name + '. ' + factLine(items[i].r) + '.');
         var h = detail.querySelector('h2');
@@ -695,9 +692,29 @@
     wrap.appendChild(detail);
     host.appendChild(wrap);
 
+    // Hooks the back button reaches for. They live as long as this list is
+    // the thing on screen, and are replaced wholesale on the next render.
+    closeOpenDetail = closeDetail;
+    openDetailById = function (id) {
+      var found = -1;
+      items.forEach(function (it, i) { if (it.r.org.id === id) found = i; });
+      if (found === -1) return;
+      pick(found, false);
+      wrap.classList.add('on-detail');
+      setTitle(items[found].r.org.name);
+      browsePick = id;
+    };
+
+    // ?org= wins over what was last open: it is either a link someone
+    // followed or a history entry being replayed, and both are explicit.
+    var wanted = urlOrg() || browsePick;
     var was = 0;
-    items.forEach(function (it, i) { if (it.r.org.id === browsePick) was = i; });
+    items.forEach(function (it, i) { if (it.r.org.id === wanted) was = i; });
     pick(was, false);
+    if (urlOrg() && items[was] && items[was].r.org.id === urlOrg()) {
+      wrap.classList.add('on-detail');
+      setTitle(items[was].r.org.name);
+    }
     announce(items.length + (items.length === 1 ? ' place' : ' places') + ' in ' + where + '.');
     host.hidden = false;
   }
@@ -757,8 +774,18 @@
 
   function paintPlanCount() {
     var c = $('#plan-count');
-    c.textContent = String(plan.length);
-    c.hidden = plan.length === 0;
+    var n = plan.length;
+    c.textContent = String(n);
+    c.hidden = n === 0;
+    // The badge is a bare number sitting inside a button that says 'Saved',
+    // so it was announced as 'Saved 3' — a count of nothing stated. The
+    // visible word stays the start of the name, so saying 'Saved' still
+    // reaches it by voice.
+    var tab = $('#tab-plan');
+    if (tab) {
+      if (n) tab.setAttribute('aria-label', 'Saved, ' + n + (n === 1 ? ' place' : ' places'));
+      else tab.removeAttribute('aria-label');
+    }
   }
 
   function renderPlan() {
@@ -1008,10 +1035,82 @@
   }
   window.FYC_LAST_TAB = openAt;
 
+  // ---------- the back button ----------
+  /**
+   * Five tabs and a detail pane, and until now Back left the app from all of
+   * them. In a browser tab that is merely rude; installed to a phone, where
+   * Back is the system gesture, it means the only way out of Saved was to
+   * close the app and open it again.
+   *
+   * So the two things that are navigations — changing tab, opening a listing
+   * — become history entries, written in the ?tab= vocabulary the installed
+   * shortcuts already use. A listing gets ?org=, which makes it linkable as
+   * well as returnable: sharing used to hand someone the group's own website
+   * with no way to point at what the app says about it.
+   */
+  var CAN_NAV = !!(window.history && window.history.pushState);
+  var popping = false;        // true while restoring, so we never re-push a state we just read
+  var closeOpenDetail = null; // set by the result list while it is on screen
+  var openDetailById = null;
+
+  function navUrl(tab, orgId) {
+    var q;
+    try { q = new URLSearchParams(location.search); } catch (e) { q = new URLSearchParams(); }
+    // Find is the default, so it stays out of the URL: a fresh visit and a
+    // walk back to the start then look the same.
+    if (tab && tab !== 'find') q.set('tab', tab); else q.delete('tab');
+    if (orgId) q.set('org', orgId); else q.delete('org');
+    var str = q.toString();
+    return location.pathname + (str ? '?' + str : '') + location.hash;
+  }
+
+  function mark(tab, orgId) {
+    if (!CAN_NAV || popping) return;
+    var to = navUrl(tab, orgId);
+    if (to === location.pathname + location.search + location.hash) return;
+    try { history.pushState({ tab: tab, org: orgId || null }, '', to); } catch (e) { /* file:// */ }
+  }
+
+  /** Which listing the URL is pointing at, if any. */
+  function urlOrg() {
+    try { return new URLSearchParams(location.search).get('org'); } catch (e) { return null; }
+  }
+
+  function onPop() {
+    popping = true;
+    try {
+      var tab = null;
+      try { tab = new URLSearchParams(location.search).get('tab'); } catch (e) { tab = null; }
+      tab = tab && TABS.indexOf(tab) !== -1 ? tab : 'find';
+      var btn = $('#tab-' + tab);
+      if (btn && !btn.hidden) showTab(tab);
+      var org = urlOrg();
+      if (org && openDetailById) openDetailById(org);
+      else if (!org && closeOpenDetail) closeOpenDetail();
+    } finally {
+      popping = false;
+    }
+  }
+
+  // ---------- what the tab is called ----------
+  // One title for every screen meant that browser history, the tab strip and
+  // the app switcher all read 'Community Finder' five times over, and a
+  // screen reader announced nothing on a tab change.
+  var TAB_TITLE = { find: '', plan: 'Saved', you: 'You', circles: 'Circles', messages: 'Inbox' };
+  var BASE_TITLE = 'Community Finder';
+
+  function setTitle(part) {
+    try { document.title = part ? part + ' \u00b7 ' + BASE_TITLE : BASE_TITLE; } catch (e) {}
+  }
+
   function showTab(which) {
     // With a backend there are more tabs than these three; social.js owns the
     // switching in that case so every view is hidden correctly.
     save(KEY.tab, which);
+    // Leaving Find also leaves whatever listing was open, so the entry this
+    // writes carries the tab alone.
+    mark(which, null);
+    setTitle(TAB_TITLE[which] || '');
     keepTabInView(which);
     if (window.FYC_SHOW) return window.FYC_SHOW(which);
     ['find', 'plan', 'you'].forEach(function (name) {
@@ -1193,6 +1292,21 @@
     paint();
   }
 
+  /** Build a throwaway session around one listing. False if the id is unknown. */
+  function seedFromLink(id) {
+    if (!id) return false;
+    var org = null;
+    FYC.allOrgs().forEach(function (o) { if (o.id === id) org = o; });
+    if (!org) return false;
+    session = I.blankState();
+    session.city = org.cityName;
+    session.answers.city = org.cityName;
+    (org.interests || []).slice(0, 3).forEach(function (i) { session.interests[i] = 1; });
+    browsePick = org.id;
+    finish(false);
+    return true;
+  }
+
   // ---------- boot ----------
   function init() {
     wireTheme();
@@ -1207,6 +1321,8 @@
     window.FYC_VIEWS = { plan: renderPlan, you: renderYou };
 
     document.addEventListener('keydown', intakeKeys);
+    window.addEventListener('popstate', onPop);
+    D.wireTablist(document.querySelector('.tabs'));
 
     // Under the breakpoint the detail pane is a whole screen, reached by
     // choosing a row. Escape is how you leave a screen like that; the back
@@ -1220,8 +1336,17 @@
     });
 
     resumeSession();
+    // A link to one listing has to open that listing, including on a first
+    // visit with no answers given. The id names a city and a set of
+    // interests, which is enough of a profile to rank its neighbours around
+    // it — so the link lands on the thing it pointed at, with somewhere to
+    // go next, rather than on question one.
+    //
+    // Answers already given win: following a link should show that group
+    // among your own results, not replace them. The seeded session is never
+    // saved, so a half-finished intake is still there on the next load.
     if (I.done(session) && session.city) finish(false);
-    else paintIntake();
+    else if (!seedFromLink(urlOrg())) paintIntake();
 
     // Gated on the button being available rather than on there being no
     // backend: social.js assigns FYC_SHOW when it parses, before it has

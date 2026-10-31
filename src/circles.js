@@ -25,37 +25,13 @@
     planAsk: 'Say how you will get there: where you are setting off from, when, and how.'
   };
 
-  // ---------- helpers (deliberately a local copy; see social.js) ----------
-  function el(tag, props, kids) {
-    var n = document.createElement(tag);
-    Object.keys(props || {}).forEach(function (k) {
-      if (k === 'class') n.className = props[k];
-      else if (k === 'text') n.textContent = props[k];
-      else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2), props[k]);
-      else if (props[k] === true) n.setAttribute(k, '');
-      else if (props[k] !== false && props[k] != null) n.setAttribute(k, props[k]);
-    });
-    (kids || []).forEach(function (c) {
-      if (c == null || c === false) return;
-      n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
-    });
-    return n;
-  }
-  function $(s) { return document.querySelector(s); }
+  // ---------- helpers ----------
+  // el/$/api/label/ago come from dom.js now. They were a local copy on
+  // purpose — so this file depended on no other feature file — and it still
+  // does not; the copies had simply drifted, ago() most visibly.
+  var D = window.FYC_DOM;
+  var el = D.el, $ = D.$, api = D.api, label = D.label, ago = D.ago;
 
-  async function api(method, url, body) {
-    var res = await fetch(url, {
-      method: method,
-      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body)
-    });
-    var data = null;
-    try { data = await res.json(); } catch (e) { /* no body */ }
-    if (!res.ok) throw new Error((data && data.error) || ('Request failed (' + res.status + ')'));
-    return data;
-  }
-
-  function label(id) { return (FYC.INTERESTS[id] || {}).label || id; }
   function icon(id) { return (FYC.INTERESTS[id] || {}).icon || ''; }
   /* The drawn half, guarded: a missing drawing is null and el() drops it. */
   function art() { return window.FYC_ART || null; }
@@ -64,16 +40,6 @@
   function pic(id) {
     var A = art();
     return (A && A.pictogram(id)) || el('span', { 'aria-hidden': 'true', text: icon(id) });
-  }
-
-  function ago(ts) {
-    if (!ts) return 'never';
-    var m = Math.floor((Date.now() - ts) / 60000);
-    if (m < 1) return 'just now';
-    if (m < 60) return m + 'm ago';
-    var h = Math.floor(m / 60);
-    if (h < 24) return h + 'h ago';
-    return Math.floor(h / 24) + 'd ago';
   }
 
   function whenText(ms) {
@@ -352,7 +318,7 @@
     // app had because it could count them, not because anyone wanted them.
     var bits = [c.members + ' of ' + c.cap + ' people'];
     if (c.live.messages === 0) bits.push('no conversation yet');
-    else if (c.live.week === 0) bits.push('quiet since ' + ago(c.live.lastAt));
+    else if (c.live.week === 0) bits.push('quiet since ' + ago(c.live.lastAt, 'never'));
     return bits.join(' · ');
   }
 
@@ -685,6 +651,7 @@
       if (pair[0] === 'plan') planBtn = b;
       return b;
     }));
+    D.wireTablist(bar);
     host.appendChild(bar);
     S.onReadiness = function (r) { if (planBtn) planBtn.textContent = planLabel(r); };
 
@@ -752,7 +719,10 @@
   // ---------- chat ----------
   function chatCard(host, c) {
     var list = el('div', { class: 'msg-list circle-chat' });
-    var input = el('textarea', { class: 'msg-input', rows: '2', placeholder: 'Say something to the circle…' });
+    // 2000 is the server's cap. Without it here the composer accepted a
+    // message the server then refused, which reads as the app losing it.
+    var input = el('textarea', { class: 'msg-input', rows: '2', maxlength: '2000',
+      placeholder: 'Say something to the circle…' });
     var err = errLine();
     var lastId = 0;
     var seen = Object.create(null);

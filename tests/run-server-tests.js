@@ -190,6 +190,12 @@ async function verifyEmail(call, email) {
     eq((await ava('POST', `/api/threads/${tid}/messages`, { body: 'Hello!' })).status, 201, 'a message can be sent');
     eq((await ben('GET', `/api/threads/${tid}/messages`)).data.messages.length, 1, 'and the other side sees it');
     eq((await ava('POST', `/api/threads/${tid}/messages`, { body: '   ' })).status, 400, 'empty messages are refused');
+    // Capped at the same length as a circle message, and for the same
+    // reason: this was the other body the server stored without a limit.
+    eq((await ava('POST', `/api/threads/${tid}/messages`, { body: 'x'.repeat(2001) })).status, 400,
+       'and so is one past the length cap');
+    eq((await ava('POST', `/api/threads/${tid}/messages`, { body: 'x'.repeat(2000) })).status, 201,
+       'while one exactly at it is sent');
 
     // A third party must not be able to read or write the conversation.
     await mal('POST', '/api/signup', { username: 'mal', password: 'hunter2hunter', display: 'Mal', city: 'Boston', ageOk: true, interests: [{ id: 'outdoors' }] });
@@ -394,6 +400,17 @@ async function verifyEmail(call, email) {
        'the host can let them in');
     eq((await gus('GET', '/api/circles/' + cid + '/messages')).status, 200,
        'and then the conversation opens up');
+
+    // Every other stored field is cut to a length — a display name to 30, a
+    // city to 60 — and the two message bodies were the exception, taking
+    // whatever fitted inside the 64KB body limit. Not a way in to anything,
+    // but a 60,000-character message is one nobody in the circle can scroll
+    // past, kept forever, and the composer gave no sign it would be taken.
+    const huge = 'x'.repeat(2001);
+    eq((await gus('POST', '/api/circles/' + cid + '/messages', { body: huge })).status, 400,
+       'a message past the cap is refused');
+    eq((await gus('POST', '/api/circles/' + cid + '/messages', { body: 'y'.repeat(2000) })).status, 201,
+       'and one exactly at it is not');
 
     await hal('POST', '/api/circles/' + cid + '/apply', { answer: 'Mostly non-fiction and a long-running D&D game. Looking for people to actually talk to rather than a weekly event.' });
     const halApp = (await fay('GET', '/api/circles/' + cid)).data.applications[0].id;

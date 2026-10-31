@@ -1205,7 +1205,9 @@ group('the pass over the whole thing: technical', function () {
   // 8. The list is re-ranked whenever an answer changes, so an index kept
   //    across that opens whatever now sits in the slot.
   ok(app.indexOf('browsePick = items[i].r.org.id') !== -1, 'the open listing is held by id');
-  ok(app.indexOf('it.r.org.id === browsePick') !== -1, 'and found again by id');
+  ok(/it\.r\.org\.id === wanted/.test(app), 'and found again by id');
+  ok(/var wanted = urlOrg\(\) \|\| browsePick/.test(app),
+     'with a listing named in the URL winning over the one last open');
 
   // 9. A results page is a dozen rows plus a badge, and the chooser is
   //    thirty-two pills: the same drawings, rebuilt path by path each time.
@@ -1566,6 +1568,162 @@ group('offline: the app when the network is not there', function () {
   ok(print.indexOf('attr(href)') !== -1, 'a link becomes its address on paper');
   ok(print.indexOf('print-color-adjust: exact') !== -1, 'and the ticks survive the printer');
   ok(/--ink: #000/.test(print), 'dark mode does not follow the page onto paper');
+});
+
+// ------------------------------------------- the pass after the offline one
+group('one copy of each helper, and a back button', function () {
+  var fs = require('fs');
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+  var social = fs.readFileSync(path.join(root, 'src/social.js'), 'utf8');
+  var circles = fs.readFileSync(path.join(root, 'src/circles.js'), 'utf8');
+  var dom = fs.readFileSync(path.join(root, 'src/dom.js'), 'utf8');
+  var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var server = fs.readFileSync(path.join(root, 'server/app.js'), 'utf8');
+  var sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+
+  // --- 1. one copy -------------------------------------------------------
+  // el() was written out three times and had already drifted: only app.js's
+  // copy grew an innerHTML branch, and ago() answered differently in two.
+  [['app.js', app], ['social.js', social], ['circles.js', circles]].forEach(function (pair) {
+    ok(pair[1].indexOf('function el(tag, props, kids)') === -1,
+       pair[0] + ' no longer carries its own el()');
+    ok(pair[1].indexOf('window.FYC_DOM') !== -1, pair[0] + ' takes it from dom.js');
+  });
+  ok(app.indexOf('function svg(tag') === -1, 'nor its own svg()');
+  ok(social.indexOf('async function api(') === -1 && circles.indexOf('async function api(') === -1,
+     'and api() is written once');
+  eq((dom.match(/function el\(/g) || []).length, 1, 'dom.js holds the only el()');
+
+  // The branch nothing used, which was also the only way markup could have
+  // reached a screen. Everything displayed here was typed by somebody.
+  // The comment above el() explains the branch that was removed, so this
+  // has to look at the code rather than the file.
+  var domCode = dom.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  ok(domCode.indexOf('innerHTML') === -1, 'and it cannot be handed markup');
+  ok(app.indexOf("k === 'html'") === -1, 'the html branch is gone with it');
+
+  // --- run dom.js for real ----------------------------------------------
+  var prevDoc = global.document, prevWin = global.window;
+  global.window = undefined;
+  global.document = { baseURI: 'https://amalmehta.github.io/community_finder/' };
+  delete require.cache[require.resolve(path.join(root, 'src/dom.js'))];
+  require(path.join(root, 'src/dom.js'));
+  var D = globalThis.FYC_DOM;
+
+  ok(!!D && typeof D.el === 'function', 'dom.js loads and exports its helpers');
+
+  // Served from a subdirectory, '/api/me' asks the host root — on a user
+  // site that is a path belonging to whatever else is published there.
+  eq(D.apiUrl('/api/me'), 'https://amalmehta.github.io/community_finder/api/me',
+     'an API call stays inside the app when the app is in a subdirectory');
+  eq(D.apiUrl('/api/circles/7/messages'),
+     'https://amalmehta.github.io/community_finder/api/circles/7/messages',
+     'nested routes too');
+  global.document = { baseURI: 'http://localhost:4000/' };
+  eq(D.apiUrl('/api/me'), 'http://localhost:4000/api/me', 'and is unchanged at the root');
+
+  // The two copies disagreed about a missing timestamp, so it is now said
+  // at the call site, where the sentence it lands in is visible.
+  eq(D.ago(0), '', 'no timestamp says nothing by default');
+  eq(D.ago(0, 'never'), 'never', 'unless the sentence needs a word');
+  eq(D.ago(Date.now() - 5 * 60000), '5m ago', 'and minutes read as minutes');
+  eq(D.ago(Date.now() - 3 * 3600000), '3h ago', 'hours as hours');
+  ok(/quiet since ' \+ ago\(c\.live\.lastAt, 'never'\)/.test(circles),
+     "the one sentence that needed 'never' asks for it");
+
+  global.document = prevDoc;
+  global.window = prevWin;
+
+  // --- 2. the back button -------------------------------------------------
+  // Five tabs and a detail pane, and Back left the app from all of them.
+  ok(app.indexOf('history.pushState') !== -1, 'changing tab is a history entry');
+  ok(app.indexOf("window.addEventListener('popstate'") !== -1, 'and Back is listened for');
+  ok(/mark\(which, null\)/.test(app), 'the tab is what the entry carries');
+  ok(/mark\('find', items\[i\]\.r\.org\.id\)/.test(app), 'and an open listing names itself');
+  ok(app.indexOf('function urlOrg()') !== -1, 'the URL is read back');
+  // Back out of a detail pane has to consume the entry that opened it,
+  // rather than leave one for Back to replay later.
+  ok(/if \(CAN_NAV && !popping && urlOrg\(\)\) \{ history\.back\(\); return; \}/.test(app),
+     'closing the pane walks the history rather than hiding it');
+  ok(app.indexOf('var popping = false') !== -1, 'and a restore never re-pushes what it just read');
+  // A link to one listing has to work on a first visit, with no answers.
+  ok(app.indexOf('function seedFromLink(id)') !== -1, 'a cold link opens the listing it names');
+  ok(/session\.city = org\.cityName/.test(app), 'in that listing’s own city');
+  ok(app.indexOf('else if (!seedFromLink(urlOrg())) paintIntake();') !== -1,
+     'and answers already given win over it');
+
+  // --- 3. the title -------------------------------------------------------
+  ok(app.indexOf('function setTitle(') !== -1, 'the page is named after the screen');
+  ok(/TAB_TITLE = \{/.test(app), 'one name per tab');
+  ok(/setTitle\(items\[i\]\.r\.org\.name\)/.test(app), 'and after the listing being read');
+
+  // --- 4. the tablists ----------------------------------------------------
+  // role="tablist" is a promise that arrow keys work. Three of them made it
+  // and none of them kept it.
+  eq((html.match(/role="tablist"/g) || []).length, 1, 'the app bar is a tablist');
+  ok(dom.indexOf('function wireTablist(') !== -1, 'arrow keys are implemented once');
+  ['ArrowRight', 'ArrowLeft', 'Home', 'End'].forEach(function (k) {
+    ok(dom.indexOf("'" + k + "'") !== -1, 'and answer ' + k);
+  });
+  ok(/\(at \+ step \+ tabs\.length\) % tabs\.length/.test(dom), 'wrapping round the ends');
+  [['app.js', app], ['social.js', social], ['circles.js', circles]].forEach(function (pair) {
+    ok(pair[1].indexOf('wireTablist(') !== -1, pair[0] + ' wires its own strip');
+  });
+
+  // --- 5. what the network does -------------------------------------------
+  // 'Failed to fetch' / 'Load failed' / 'NetworkError…' all reached the
+  // screen through the same catch, and the app works offline now.
+  ok(dom.indexOf('You are offline, so this could not be sent.') !== -1,
+     'offline is said in the app’s own words');
+  ok(dom.indexOf('Could not reach the server') !== -1, 'and so is an unreachable server');
+  ok(/TIMEOUT = \d+/.test(dom), 'a request that will never answer stops being waited on');
+  var t = Number((dom.match(/TIMEOUT = (\d+)/) || [])[1]);
+  ok(t >= 5000 && t <= 60000, 'after a wait that suits a slow phone (' + t + 'ms)');
+  ok(dom.indexOf('AbortController') !== -1, 'using a real abort, not a dangling promise');
+
+  // --- 6. message length --------------------------------------------------
+  // Every other stored field is cut to a length; these two took whatever
+  // fitted in the 64KB body limit, and the composer said nothing.
+  ok(/const MAX_MESSAGE = (\d+)/.test(server), 'the server caps a message');
+  var cap = Number((server.match(/const MAX_MESSAGE = (\d+)/) || [])[1]);
+  eq((server.match(/text\.length > MAX_MESSAGE/g) || []).length, 2, 'on both routes that store one');
+  ok(social.indexOf("maxlength: '" + cap + "'") !== -1, 'the direct composer stops there too');
+  ok(circles.indexOf("maxlength: '" + cap + "'") !== -1, 'and the circle composer');
+
+  // --- 7. the theme reaches what the browser draws ------------------------
+  // The palette only ever reached what the stylesheet painted: scrollbars,
+  // the caret and every checkbox stayed light in dark mode.
+  // Anchored, or '@media (prefers-color-scheme: dark)' counts as one.
+  eq((css.match(/^\s*color-scheme: dark;/gm) || []).length, 2, 'dark mode says so to the browser');
+  eq((css.match(/color-scheme: light;/g) || []).length, 2, 'and light mode, including when chosen outright');
+  ok(html.indexOf('name="color-scheme" content="light dark"') !== -1,
+     'and a meta carries it before the stylesheet has loaded');
+
+  // --- 8. the printed sheet, corrected ------------------------------------
+  // The rule written last time named .sc, which nothing has ever been.
+  var print = (css.match(/@media print \{([\s\S]*)$/) || [])[1] || '';
+  ok(print.indexOf('.scene') !== -1, 'print hides the drawings by the class they actually carry');
+  ok(/\.sc,/.test(print) === false, 'and not by one that matches nothing');
+  ok(css.indexOf('@page { margin:') !== -1, 'with a margin that is the same in every browser');
+
+  // --- 9. odds and ends ---------------------------------------------------
+  ok(css.indexOf('::selection') !== -1, 'selected text is in the palette too');
+  ok(css.indexOf('scroll-margin-top') !== -1, 'the skip link does not land under the sticky bar');
+  ok(css.indexOf('.direct-note') === -1, 'and a rule nothing used is gone');
+  // City was a bare text field on a phone: no Go key, no capital, and
+  // autocorrect quietly improving the place name.
+  ok(app.indexOf("autocomplete: isCity ? 'address-level2' : 'off'") !== -1, 'the city field says what it is');
+  ok(app.indexOf("enterkeyhint: 'go'") !== -1, 'and the keyboard offers Go');
+  eq((social.match(/autocomplete: 'address-level2'/g) || []).length, 2, 'both city fields in the account form too');
+  // A bare number inside a button that says 'Saved' was announced as
+  // 'Saved 3', a count of nothing stated.
+  ok(/aria-label', 'Saved, ' \+ n/.test(app), 'the saved count says what it counts');
+
+  // --- 10. the new file is part of the app --------------------------------
+  ok(html.indexOf('src="src/dom.js"') !== -1, 'the page loads dom.js');
+  ok(html.indexOf('src="src/dom.js"') < html.indexOf('src="src/app.js"'), 'before anything that uses it');
+  ok(sw.indexOf("'src/dom.js'") !== -1, 'and it is cached with the rest of the app');
 });
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');

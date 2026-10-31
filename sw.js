@@ -51,6 +51,7 @@ var SHELL = [
   'src/data/city-portland.js',
   'src/data/city-minneapolis.js',
   'src/data/universal.js',
+  'src/dom.js',
   'src/preferences.js',
   'src/intake.js',
   'src/match.js',

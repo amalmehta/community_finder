@@ -1,5 +1,10 @@
 /* community_finder — styles */
 :root {
+  /* Without this, everything the browser draws itself stays light in dark
+     mode: the scrollbars, the text caret, the checkbox in the saved list and
+     the textarea in the feedback panel. The palette below only reaches what
+     the stylesheet paints. */
+  color-scheme: light;
   --bg: #fbf8f4;
   --bg-raised: #ffffff;
   --bg-sunk: #f3ede4;
@@ -53,6 +58,7 @@
    explicitly chosen light — and applied outright when they choose dark. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+  color-scheme: dark;
   --bg: #171512;
   --bg-raised: #201d19;
   --bg-sunk: #131110;
@@ -72,6 +78,7 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #171512;
   --bg-raised: #201d19;
   --bg-sunk: #131110;
@@ -241,6 +248,7 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 .btn:hover { filter: brightness(1.06); }
 /* Only the filled button flips to dark text. Scoping this to .btn alone
    out-specifies .btn.ghost and makes ghost text invisible on dark cards. */
+:root[data-theme="light"] { color-scheme: light; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn:not(.ghost) { color: #171512; } }
 :root[data-theme="dark"] .btn:not(.ghost) { color: #171512; }
 .btn.ghost { background: none; color: var(--ink-soft); border-color: var(--line-strong); font-weight: 500; }
@@ -442,7 +450,6 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 .glabel { font: 500 11px var(--font); fill: var(--ink-soft); }
 .gnode.gme .glabel { fill: var(--ink); font-weight: 700; }
 
-.direct-note { color: var(--accent-ink); font-weight: 600; }
 .person.flash { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .notice.bad { background: var(--accent-soft); border-left-color: var(--accent); }
 .notice.bad b { color: var(--accent-ink); }
@@ -1250,6 +1257,14 @@ main { padding: var(--s6) 0 var(--s7); }
   .badge { border-color: var(--line-strong); }
 }
 
+/* Dragging across any text in the app produced the browser's own blue, the
+   only colour on screen that came from outside the palette. */
+::selection { background: var(--accent-soft); color: var(--accent-ink); }
+
+/* The app bar is sticky, so anything scrolled to by an anchor — the skip
+   link's target above all — arrived underneath it. */
+#main, :target { scroll-margin-top: 72px; }
+
 /* Offline is not a problem with the app, so it does not get the warning
    tint — the listings are in the bundle and the saved list is on the device.
    It reads as a fact about the network, quietly. */
@@ -1260,6 +1275,11 @@ main { padding: var(--s6) 0 var(--s7); }
    to take with them. Everything that only works by being tapped comes off,
    the colour comes off, and the links print their addresses so the sheet is
    still usable away from the screen. */
+/* The browser's default print margin is about half an inch and differs per
+   engine; the saved list is a short document and reads better with a margin
+   that is the same wherever it is printed. */
+@page { margin: 16mm; }
+
 @media print {
   /* Dark mode must not follow the page onto paper. */
   :root, :root[data-theme="dark"] {
@@ -1276,8 +1296,9 @@ main { padding: var(--s6) 0 var(--s7); }
   #auth-gate, .storage-warn, .screen-head .actions { display: none !important; }
 
   /* The drawings are there to make a screen feel inviting; on paper they are
-     a page of toner. */
-  .sc, .guide, .empty svg, .plan-done { display: none !important; }
+     a page of toner. The class is .scene — art.js builds them with it, and
+     the .sc this said first matched nothing at all. */
+  .scene, .guide, .pic, .empty svg, .plan-done { display: none !important; }
 
   main, .wrap { max-width: none; padding: 0; margin: 0; }
 

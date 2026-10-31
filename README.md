@@ -341,7 +341,7 @@ npm test        # both suites
 node tests/run-tests.js
 ```
 
-8370+ assertions covering data integrity (every listing has a valid first step,
+8440+ assertions covering data integrity (every listing has a valid first step,
 a real URL, interests that exist in the taxonomy, ratings in range), city lookup
 and aliasing, the universal fallback engine, matcher behaviour (a nervous person
 gets gentle options first, budget is respected, the comfort dial actually
@@ -423,6 +423,7 @@ src/
   data/core.js        interest taxonomy (32 interests in 6 groups) + city registry
   data/city-*.js      the thirteen hand-curated city datasets
   data/universal.js   fallback recipes → real deep links for any city
+  dom.js              the handful of helpers every screen needs, written once
   intake.js           the adaptive 20-question engine (pure functions, no DOM)
   preferences.js      on-device preference tracker (pure functions, injectable storage)
   social.js           accounts, people and messaging UI (inert without a backend)
@@ -584,6 +585,26 @@ requests to check that every listing still resolves, which is not something to
 do on every commit, and the answer changes whether or not anyone commits. When
 something breaks it opens one issue and comments on it thereafter rather than
 filing a new one every Monday.
+
+## The back button
+
+Five tabs and a detail pane, and until recently Back left the app from all of
+them. In a browser tab that is rude; installed to a phone, where Back is the
+system gesture, the only way out of Saved was to close the app and reopen it.
+
+Changing tab and opening a listing are now history entries, written in the
+`?tab=` vocabulary the installed shortcuts already use. A listing gets `?org=`,
+which makes it linkable as well as returnable — and a cold `?org=` link works
+on a first visit with no answers given: the id names a city and a set of
+interests, which is enough to rank that listing's neighbours around it. Answers
+already given win, and the seeded session is never saved, so a half-finished
+intake survives someone following a link.
+
+Closing a detail pane walks the history rather than hiding the pane, so the
+entry that opened it is consumed instead of waiting to be replayed. The page
+title follows the screen too, which is what browser history, the tab strip and
+the app switcher read.
+
 
 ## Offline, and on paper
 

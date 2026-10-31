@@ -14,6 +14,9 @@
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/icon.svg">
 <link rel="canonical" href="https://amalmehta.github.io/community_finder/">
+<!-- Paired with color-scheme in the stylesheet: this one lands before the
+     stylesheet has loaded, so the native canvas never flashes white. -->
+<meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#fbf8f4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
@@ -150,6 +153,7 @@
 <script src="src/data/city-portland.js"></script>
 <script src="src/data/city-minneapolis.js"></script>
 <script src="src/data/universal.js"></script>
+<script src="src/dom.js"></script>
 <script src="src/preferences.js"></script>
 <script src="src/intake.js"></script>
 <script src="src/match.js"></script>
