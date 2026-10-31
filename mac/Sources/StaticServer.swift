@@ -110,6 +110,12 @@ final class StaticServer {
         case "css":         return "text/css; charset=utf-8"
         case "js":          return "text/javascript; charset=utf-8"
         case "json":        return "application/json; charset=utf-8"
+        // The manifest decides whether the browser offers to install this at
+        // all, and it is ignored outright unless it arrives as JSON. Served
+        // as octet-stream it looked like a download nobody asked for.
+        case "webmanifest": return "application/manifest+json; charset=utf-8"
+        case "xml":         return "application/xml; charset=utf-8"
+        case "txt":         return "text/plain; charset=utf-8"
         case "svg":         return "image/svg+xml"
         case "png":         return "image/png"
         case "jpg", "jpeg": return "image/jpeg"

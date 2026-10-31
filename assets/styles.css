@@ -1,11 +1,20 @@
 /* community_finder — styles */
 :root {
+  /* Without this, everything the browser draws itself stays light in dark
+     mode: the scrollbars, the text caret, the checkbox in the saved list and
+     the textarea in the feedback panel. The palette below only reaches what
+     the stylesheet paints. */
+  color-scheme: light;
   --bg: #fbf8f4;
   --bg-raised: #ffffff;
   --bg-sunk: #f3ede4;
   --ink: #221f1b;
   --ink-soft: #5c554b;
-  --ink-faint: #8a8176;
+  /* The faint tier carries real text — timestamps, counts, the line under the
+     readiness gate — at 13px, so it has to clear 4.5:1 on every surface it
+     lands on. The old #8a8176 measured 3.83:1 on a white card and 3.24:1 on
+     the moss panel. Faintness is carried by size and weight as well as this. */
+  --ink-faint: #6e6659;
   --line: #e3dbcf;
   --line-strong: #cfc4b3;
   --accent: #b1502a;
@@ -14,10 +23,33 @@
   --moss: #2f6b56;
   --moss-soft: #e2efe9;
   --focus: #2f6b56;
-  --radius: 14px;
-  --radius-sm: 9px;
-  --shadow: 0 1px 2px rgba(34, 31, 27, .05), 0 6px 20px -12px rgba(34, 31, 27, .25);
+  /* Warmth pass: the corners were 14/9, which read as panels. Rounder reads
+     as something you can pick up. Everything that uses them softens at once,
+     which is the point of their being tokens. */
+  --radius: 18px;
+  --radius-sm: 12px;
+  --radius-pill: 999px;
+  /* Softer and warmer than the old flat grey: the shadow now has the page's
+     own brown in it, so a raised card looks lit rather than cut out. */
+  --shadow: 0 1px 2px rgba(92, 61, 34, .05), 0 10px 26px -14px rgba(92, 61, 34, .30);
   --maxw: 880px;
+  /* Find is two panes, so it gets more room than a column of prose needs. */
+  --maxw-wide: 1120px;
+
+  /* Type scale, 1.25 ratio. Named by role so the steps stay deliberate
+     rather than drifting into a dozen arbitrary sizes. */
+  --t-micro: 11.5px;
+  --t-small: 13px;
+  --t-meta:  14px;
+  --t-body:  15.5px;
+  --t-lead:  17px;
+  --t-h3:    19px;
+  --t-h2:    clamp(22px, 2.6vw, 27px);
+  --t-h1:    clamp(27px, 4vw, 38px);
+
+  /* Spacing rhythm. Everything vertical should land on one of these. */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
   --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
 }
@@ -26,12 +58,13 @@
    explicitly chosen light — and applied outright when they choose dark. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+  color-scheme: dark;
   --bg: #171512;
   --bg-raised: #201d19;
   --bg-sunk: #131110;
   --ink: #f0ebe4;
   --ink-soft: #b8afa3;
-  --ink-faint: #8a8176;
+  --ink-faint: #9a9185;    /* was #8a8176: 3.86:1 on the moss panel */
   --line: #322d27;
   --line-strong: #453e35;
   --accent: #e08155;
@@ -45,12 +78,13 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #171512;
   --bg-raised: #201d19;
   --bg-sunk: #131110;
   --ink: #f0ebe4;
   --ink-soft: #b8afa3;
-  --ink-faint: #8a8176;
+  --ink-faint: #9a9185;    /* was #8a8176: 3.86:1 on the moss panel */
   --line: #322d27;
   --line-strong: #453e35;
   --accent: #e08155;
@@ -86,69 +120,98 @@ a { color: var(--accent-ink); }
 
 .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
 
-/* ---------- header ---------- */
-.site-header {
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-raised);
+/* ---------- the app bar ----------
+   One row, translucent, always there. On a phone the tab strip leaves it and
+   becomes a bottom bar; the buttons are the same elements either way. */
+.appbar {
   position: sticky; top: 0; z-index: 30;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  -webkit-backdrop-filter: saturate(1.8) blur(14px);
+  backdrop-filter: saturate(1.8) blur(14px);
 }
-.site-header .wrap {
-  display: flex; align-items: center; gap: 16px;
-  min-height: 62px; flex-wrap: wrap;
+@supports not (backdrop-filter: blur(1px)) { .appbar { background: var(--bg); } }
+.appbar-in {
+  max-width: var(--maxw); margin: 0 auto; padding: 0 20px;
+  display: flex; align-items: center; gap: var(--s5);
+  min-height: 56px;
 }
-.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
-.brand b { font-family: var(--serif); font-size: 21px; font-weight: 600; letter-spacing: -.01em; }
-.brand span { color: var(--ink-faint); font-size: 13px; }
-.tabs { display: flex; gap: 4px; }
+.brand {
+  font-weight: 650; font-size: 16px; letter-spacing: -.012em;
+  color: var(--ink); white-space: nowrap;
+}
+
+.tabs { display: flex; gap: 2px; }
 .tab {
-  border: 0; background: none; font: inherit; font-size: 14.5px; cursor: pointer;
-  color: var(--ink-soft); padding: 7px 13px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: var(--s2);
+  border: 0; background: none; font: inherit; font-size: 14px; cursor: pointer;
+  color: var(--ink-soft); padding: 7px 11px; border-radius: 9px;
+  transition: background .14s ease, color .14s ease;
+}
+/* Line icons. Scoped to .ti alone, not .tab .ti: the theme control uses the
+   same class and was drawing unstroked, unfilled paths. */
+.ti {
+  width: 17px; height: 17px; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round;
 }
 .tab:hover { background: var(--bg-sunk); color: var(--ink); }
-.tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.tab[aria-selected="true"] { color: var(--accent-ink); font-weight: 600; }
+.tab[aria-selected="true"] .ti { stroke-width: 2; }
 .tab .count {
-  font-size: 12px; background: var(--accent); color: #fff; border-radius: 999px;
-  padding: 0 6px; margin-left: 6px; font-weight: 700;
+  font-size: 11px; font-style: normal; background: var(--accent); color: var(--bg-raised);
+  border-radius: 999px; min-width: 17px; height: 17px; padding: 0 5px;
+  display: inline-grid; place-items: center; font-weight: 700;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tab .count { color: #171512; } }
-:root[data-theme="dark"] .tab .count { color: #171512; }
 
-/* ---------- intro ---------- */
-.intro { padding: 30px 0 20px; }
-.intro h1 {
-  font-family: var(--serif); font-size: clamp(25px, 3.6vw, 33px);
-  line-height: 1.2; margin: 0 0 8px; letter-spacing: -.015em; font-weight: 600;
-  max-width: 24ch; text-wrap: balance;
+/* Bottom bar. A phone reaches the thumb, not the top of the screen. */
+@media (max-width: 720px) {
+  /* The blur has to go here. backdrop-filter makes an element the containing
+     block for its fixed-position descendants, so with it on the app bar the
+     tab strip's `bottom: 0` resolved against the bar itself and the bottom
+     bar rendered across the top of the screen. The bottom bar keeps the blur;
+     the thin top bar does not need it. */
+  .appbar {
+    background: var(--bg);
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  .appbar-in { padding: 0 var(--s4); gap: var(--s3); }
+  .brand { margin-right: auto; }
+  .tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    margin: 0; gap: 0; justify-content: space-around;
+    border-top: 1px solid var(--line);
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    -webkit-backdrop-filter: saturate(1.8) blur(14px);
+    backdrop-filter: saturate(1.8) blur(14px);
+    padding: var(--s1) var(--s1) calc(var(--s1) + env(safe-area-inset-bottom));
+  }
+  @supports not (backdrop-filter: blur(1px)) { .tabs { background: var(--bg-raised); } }
+  .tab {
+    flex: 1 1 0; min-width: 0; flex-direction: column; gap: 2px;
+    font-size: 10.5px; letter-spacing: .01em; padding: var(--s2) 2px var(--s1);
+    border-radius: 0; position: relative;
+  }
+  .tab:hover { background: none; }
+  .tab .ti { width: 23px; height: 23px; }
+  .tab .count {
+    position: absolute; top: 2px; left: 50%; margin-left: 5px;
+    font-size: 10px; min-width: 15px; height: 15px;
+  }
+  body { padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
 }
-.intro p { margin: 0; color: var(--ink-soft); max-width: 52ch; font-size: 16.5px; text-wrap: pretty; }
 
 /* ---------- form ---------- */
 .card {
   background: var(--bg-raised); border: 1px solid var(--line);
-  border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow);
+  border-radius: var(--radius); padding: var(--s5); box-shadow: var(--shadow);
 }
-.step { margin: 0 0 28px; }
-.step:first-child { margin-top: 2px; }
-.step > h2 {
-  font-size: 15px; text-transform: uppercase; letter-spacing: .07em;
-  color: var(--ink-faint); margin: 0 0 4px; font-weight: 700;
-}
-.step > .hint { margin: 0 0 14px; color: var(--ink-soft); font-size: 14.5px; }
-
 input[type="text"] {
   width: 100%; padding: 12px 14px; font: inherit; font-size: 16px;
   border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
   background: var(--bg); color: var(--ink);
 }
 input[type="text"]::placeholder { color: var(--ink-faint); }
-
-.quick { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; align-items: center; }
-.quick .lbl { font-size: 13px; color: var(--ink-faint); }
-.chip {
-  border: 1px solid var(--line-strong); background: var(--bg-raised); color: var(--ink-soft);
-  font: inherit; font-size: 13.5px; padding: 5px 11px; border-radius: 999px; cursor: pointer;
-}
-.chip:hover { border-color: var(--accent); color: var(--accent-ink); }
 
 .groups { display: grid; gap: 16px; }
 .group h3 {
@@ -166,13 +229,6 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 .pill[aria-pressed="true"] {
   background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); font-weight: 600;
 }
-.pill .rank {
-  font-size: 11px; font-weight: 700; background: var(--accent); color: #fff;
-  width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center;
-}
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill .rank { color: #171512; } }
-:root[data-theme="dark"] .pill .rank { color: #171512; }
-
 .choices { display: grid; gap: 9px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 .choice {
   text-align: left; border: 1px solid var(--line-strong); background: var(--bg-raised);
@@ -184,45 +240,38 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 .choice span { font-size: 13.5px; color: var(--ink-soft); }
 .choice[aria-pressed="true"] span { color: var(--accent-ink); }
 
-details.more { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 14px; }
-details.more > summary {
-  cursor: pointer; font-size: 14.5px; color: var(--ink-soft); list-style: none; user-select: none;
-}
-details.more > summary::-webkit-details-marker { display: none; }
-details.more > summary::before { content: "▸ "; color: var(--ink-faint); }
-details.more[open] > summary::before { content: "▾ "; }
-details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
-
 .btn {
   font: inherit; font-size: 16px; font-weight: 600; cursor: pointer;
   background: var(--accent); color: #fff; border: 1px solid var(--accent);
   padding: 12px 22px; border-radius: 999px;
 }
 .btn:hover { filter: brightness(1.06); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn { color: #171512; } }
-:root[data-theme="dark"] .btn { color: #171512; }
+/* Only the filled button flips to dark text. Scoping this to .btn alone
+   out-specifies .btn.ghost and makes ghost text invisible on dark cards. */
+:root[data-theme="light"] { color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn:not(.ghost) { color: #171512; } }
+:root[data-theme="dark"] .btn:not(.ghost) { color: #171512; }
 .btn.ghost { background: none; color: var(--ink-soft); border-color: var(--line-strong); font-weight: 500; }
 .btn.ghost:hover { border-color: var(--accent); color: var(--accent-ink); filter: none; }
 .btn.sm { font-size: 14px; padding: 7px 14px; }
 .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
 
-/* Keeps the main action in reach while scrolling through the long chip list. */
-.submit-bar {
-  position: sticky; bottom: 0; z-index: 5;
-  margin: 18px -22px -22px; padding: 14px 22px;
-  background: var(--bg-raised); border-top: 1px solid var(--line);
-  border-radius: 0 0 var(--radius) var(--radius);
-}
-.submit-bar #surprise { margin-left: auto; margin-right: 96px; }
-.picked { font-size: 13.5px; color: var(--ink-faint); }
-.picked.ready { color: var(--moss); font-weight: 600; }
 .err { color: var(--accent-ink); font-size: 14px; margin: 10px 0 0; }
 
 /* ---------- results ---------- */
 .results { padding-bottom: 60px; }
-.results-head { margin: 26px 0 8px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.results-head h2 { font-family: var(--serif); font-size: 25px; margin: 0; font-weight: 600; letter-spacing: -.01em; }
-.results-head p { margin: 0; color: var(--ink-soft); font-size: 14.5px; }
+.results-head {
+  margin: var(--s7) 0 var(--s4);
+  display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
+}
+.results-head h2 {
+  font-family: var(--serif); font-size: var(--t-h2); margin: 0;
+  font-weight: 600; letter-spacing: -.02em; line-height: 1.15;
+}
+.results-head p {
+  margin: 0; color: var(--ink-faint); font-size: var(--t-small);
+  letter-spacing: .02em;
+}
 
 .notice {
   background: var(--moss-soft); border: 1px solid transparent; border-left: 3px solid var(--moss);
@@ -230,64 +279,14 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 }
 .notice b { color: var(--moss); }
 
-.starter { border-color: var(--accent); border-width: 2px; }
-.starter-flag {
-  display: inline-block; font-size: 11.5px; font-weight: 800; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--accent-ink); background: var(--accent-soft);
-  padding: 3px 9px; border-radius: 999px; margin-bottom: 10px;
-}
-
-.org { margin: 14px 0; }
-.org-top { display: flex; gap: 14px; align-items: flex-start; }
-.org h3 { margin: 0 0 3px; font-size: 19px; letter-spacing: -.01em; }
-.org h3 a { color: inherit; text-decoration: none; border-bottom: 1.5px solid var(--line-strong); }
-.org h3 a:hover { border-color: var(--accent); color: var(--accent-ink); }
-.org .where { font-size: 13px; color: var(--ink-faint); margin: 0 0 9px; }
-.org .blurb { margin: 0 0 12px; color: var(--ink-soft); font-size: 15px; }
-
-.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.badges { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s4); }
 .badge {
-  font-size: 12.5px; padding: 3px 9px; border-radius: 999px;
-  background: var(--bg-sunk); color: var(--ink-soft); border: 1px solid var(--line);
-}
-.badge.ease3 { background: var(--moss-soft); color: var(--moss); border-color: transparent; font-weight: 600; }
-.badge.ease2 { background: var(--bg-sunk); color: var(--ink-soft); }
-.badge.ease1 { background: var(--accent-soft); color: var(--accent-ink); }
-
-.why { margin: 0 0 14px; padding: 0; list-style: none; display: grid; gap: 3px; }
-.why li { font-size: 13.5px; color: var(--ink-soft); padding-left: 17px; position: relative; }
-.why li::before { content: "✓"; position: absolute; left: 0; color: var(--moss); font-weight: 700; }
-
-.first-step {
-  background: var(--bg-sunk); border-radius: var(--radius-sm); padding: 15px 16px; margin-top: 4px;
-}
-.first-step h4 {
-  margin: 0 0 4px; font-size: 12.5px; text-transform: uppercase;
-  letter-spacing: .07em; color: var(--ink-faint); font-weight: 700;
-}
-.first-step .do { margin: 0 0 3px; font-size: 16px; font-weight: 600; }
-.first-step .when { margin: 0 0 13px; font-size: 13.5px; color: var(--ink-faint); }
-.expect { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 5px; }
-.expect li { font-size: 14px; color: var(--ink-soft); padding-left: 18px; position: relative; }
-.expect li::before { content: "·"; position: absolute; left: 4px; font-weight: 800; color: var(--ink-faint); }
-
-.script { margin-top: 14px; }
-.script label {
-  display: block; font-size: 12.5px; text-transform: uppercase; letter-spacing: .07em;
-  color: var(--ink-faint); font-weight: 700; margin-bottom: 6px;
-}
-.script textarea {
-  width: 100%; min-height: 84px; font: inherit; font-size: 14.5px; line-height: 1.5;
-  padding: 11px 13px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
-  background: var(--bg-raised); color: var(--ink); resize: vertical;
+  font-size: var(--t-small); padding: 3px 10px; border-radius: 999px;
+  background: transparent; color: var(--ink-faint); border: 1px solid var(--line);
+  line-height: 1.6;
 }
 .copied { font-size: 13px; color: var(--moss); margin-left: 8px; font-weight: 600; }
 
-.toggle {
-  font: inherit; font-size: 14px; background: none; border: 0; color: var(--accent-ink);
-  cursor: pointer; padding: 0; font-weight: 600;
-}
-.toggle:hover { text-decoration: underline; }
 
 /* ---------- plan ---------- */
 .plan-item { margin: 14px 0; }
@@ -306,7 +305,7 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 
 /* ---------- feedback ---------- */
 .fb-tab {
-  position: fixed; right: 18px; bottom: 18px; z-index: 40;
+  position: fixed; right: 18px; bottom: 18px; z-index: 39;
   font: inherit; font-size: 13.5px; cursor: pointer;
   background: var(--bg-raised); color: var(--ink-soft);
   border: 1px solid var(--line-strong); border-radius: 999px;
@@ -335,11 +334,11 @@ details.more .sub { margin-top: 16px; display: grid; gap: 18px; }
 .fb-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
 .fb-thanks { font-size: 14px; color: var(--moss); font-weight: 600; }
 
-footer.site-footer {
-  border-top: 1px solid var(--line); margin-top: 40px; padding: 22px 0 80px;
-  color: var(--ink-faint); font-size: 13px;
+/* Privacy and Terms sit on You now. There is no footer. */
+.you-legal {
+  margin: var(--s5) 0 0; color: var(--ink-faint); font-size: var(--t-small);
 }
-footer.site-footer p { margin: 0 0 6px; }
+.you-legal a { color: inherit; }
 
 [hidden] { display: none !important; }
 .sr-only {
@@ -348,20 +347,8 @@ footer.site-footer p { margin: 0 0 6px; }
 }
 
 @media (max-width: 560px) {
-  .intro { padding-top: 26px; }
   .card { padding: 17px; }
-  .submit-bar { margin: 16px -17px -17px; padding: 12px 17px; }
-  .submit-bar #surprise { margin-right: 0; }
-  .picked { order: 3; width: 100%; padding-right: 96px; } /* clear the Feedback tab */
-  /* Keep the header to a single row on a phone — it is sticky, so every
-     wrapped line is permanently stolen from the content. */
-  .site-header .wrap { min-height: 52px; gap: 8px; padding: 0 14px; flex-wrap: nowrap; }
-  .brand span { display: none; }
-  .brand b { font-size: 17px; }
-  .tab { padding: 6px 10px; font-size: 14px; }
   .wrap { padding: 0 14px; }
-  .fb-tab { right: 12px; bottom: 12px; padding: 7px 13px; }
-  .fb-panel { right: 12px; bottom: 54px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -384,11 +371,6 @@ footer.site-footer p { margin: 0 0 6px; }
 
 .leaning { margin-top: 14px; }
 .leaning h4 { margin: 0 0 2px; font-size: 14px; font-weight: 600; color: var(--ink); }
-
-.conf { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
-.conf-label { font-size: 12.5px; color: var(--ink-faint); white-space: nowrap; }
-.conf-bar { flex: 1; height: 5px; background: var(--bg-sunk); border-radius: 999px; overflow: hidden; }
-.conf-bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .25s; }
 
 /* ---------- accounts, people and messages ---------- */
 #auth-gate { padding-bottom: 60px; }
@@ -420,7 +402,23 @@ footer.site-footer p { margin: 0 0 6px; }
 .thread:hover { border-color: var(--accent); }
 .thread:focus-visible { outline: 2.5px solid var(--focus); outline-offset: 2px; }
 
-.msg-list { max-height: 54vh; overflow-y: auto; display: grid; gap: 9px; padding: 2px; }
+/* No scroll-behavior here on purpose: it would also apply to the jump to the
+   newest message when the thread opens, turning that into a slow ride through
+   the whole history. Each scroll says for itself whether it glides. */
+.msg-list {
+  max-height: 54vh; overflow-y: auto; display: grid; gap: 9px; padding: 2px;
+  overscroll-behavior: contain;
+}
+/* Appears only when something arrived while you were reading further up. */
+.chat-wrap { position: relative; }
+.to-latest {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+  font: inherit; font-size: var(--t-small); font-weight: 600; cursor: pointer;
+  background: var(--accent); color: var(--bg-raised); border: 0;
+  border-radius: 999px; padding: 5px 13px; box-shadow: var(--shadow);
+  animation: fyc-fade .2s ease both;
+}
+.to-latest:hover { filter: brightness(1.06); }
 .msg { max-width: 78%; padding: 9px 13px; border-radius: 14px; }
 .msg p { margin: 0; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg-time { font-size: 11.5px; color: var(--ink-faint); display: block; margin-top: 3px; }
@@ -452,7 +450,6 @@ footer.site-footer p { margin: 0 0 6px; }
 .glabel { font: 500 11px var(--font); fill: var(--ink-soft); }
 .gnode.gme .glabel { fill: var(--ink); font-weight: 700; }
 
-.direct-note { color: var(--accent-ink); font-weight: 600; }
 .person.flash { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .notice.bad { background: var(--accent-soft); border-left-color: var(--accent); }
 .notice.bad b { color: var(--accent-ink); }
@@ -465,7 +462,6 @@ footer.site-footer p { margin: 0 0 6px; }
 /* ---------- adaptive intake ---------- */
 .question { max-width: 640px; }
 .q-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
-.q-count { font-size: 12.5px; color: var(--ink-faint); white-space: nowrap; letter-spacing: .03em; }
 .q-head .progress { flex: 1; margin: 0; }
 .q-prompt {
   font-family: var(--serif); font-size: clamp(21px, 3vw, 26px); line-height: 1.25;
@@ -477,21 +473,858 @@ footer.site-footer p { margin: 0 0 6px; }
 .question .choice b { font-size: 16px; }
 .question .pills { margin-top: 6px; }
 .question .actions { margin-top: 18px; }
-.intake-done { margin: 8px 0 4px; gap: 12px; }
-.intake-done .hint { margin: 0; }
 
 .share-wrap { display: inline-flex; align-items: center; gap: 6px; }
 
-/* ---------- theme toggle ---------- */
+/* ---------- theme toggle ----------
+   An icon button. The state is still announced — the label is read, not shown. */
 .theme-btn {
-  border: 1px solid var(--line-strong); background: var(--bg-raised); color: var(--ink-soft);
-  font: inherit; font-size: 13px; cursor: pointer; border-radius: 999px;
-  padding: 5px 11px; margin-left: 4px; white-space: nowrap;
+  /* Pushed right from here rather than by an auto margin on the tab strip,
+     which the sign-in gate hides — and the control then slid to the middle. */
+  flex: none; margin-left: auto; border: 0; background: none; color: var(--ink-soft);
+  font: inherit; font-size: 15px; cursor: pointer; border-radius: 9px;
+  width: 32px; height: 32px; display: grid; place-items: center;
+  transition: background .14s ease, color .14s ease;
 }
-.theme-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
-.theme-btn .theme-icon { margin-right: 5px; }
+.theme-btn:hover { background: var(--bg-sunk); color: var(--ink); }
+.theme-btn .ti { width: 18px; height: 18px; }
+.theme-btn .theme-label {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---------- editorial pass: rhythm, motion, restraint ---------- */
+
+/* Body copy sits on the scale too, not at an arbitrary 16px. */
+body { font-size: var(--t-body); }
+.hint { font-size: var(--t-meta); line-height: 1.5; }
+
+/* Section spacing: let results breathe away from the form above them. */
+.results { padding-bottom: var(--s8); }
+.notice { margin: var(--s4) 0; padding: var(--s3) var(--s4); font-size: var(--t-meta); }
+
+/* Intake: give the question room, and stop the summary line overflowing. */
+.question { padding: var(--s6) var(--s5); }
+.q-head { margin-bottom: var(--s5); }
+.q-prompt { font-size: var(--t-h2); line-height: 1.18; margin-bottom: var(--s2); max-width: 24ch; }
+.question .choices { gap: var(--s3); }
+.question .choice { padding: var(--s3) var(--s4); }
+.question .actions { margin-top: var(--s5); }
+
+/* Motion: results arrive rather than appear. Short, staggered, and only for
+   the first few so a long list never feels slow. */
+@keyframes fyc-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.results .browse-bar, .results .notice {
+  animation: fyc-rise .32s cubic-bezier(.2, .7, .3, 1) both;
+}
+.results > *:nth-child(1) { animation-delay: 0ms; }
+.results > *:nth-child(2) { animation-delay: 40ms; }
+.results > *:nth-child(3) { animation-delay: 80ms; }
+.results > *:nth-child(4) { animation-delay: 120ms; }
+.results > *:nth-child(5) { animation-delay: 160ms; }
+.results > *:nth-child(n+6) { animation-delay: 200ms; }
+
+/* The question changes; the card does not. Fading only the contents, over a
+   height the host animates, reads as one form being filled in rather than
+   twenty cards arriving one after another. */
+#intake { display: block; transition: height .3s cubic-bezier(.2, .7, .3, 1); }
+/* Clipped only while the height is moving. At rest the box is exactly as
+   tall as the card, and overflow:hidden would cut off a focus ring. */
+#intake.settling { overflow: hidden; }
+#intake .question { animation: fyc-fade .24s ease both; }
+@keyframes fyc-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Cards lift slightly on hover, so the list feels handled rather than static.
+   The transition has always named transform; now something actually moves. */
+.plan-item, .card.circle.mine {
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.plan-item:hover, .card.circle.mine:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(34, 31, 27, .05), 0 14px 32px -18px rgba(34, 31, 27, .35);
+}
+/* A lift on something you cannot click is a lie about what it does. */
+.card.circle:not(.mine):hover { transform: none; }
+
+/* Buttons: consistent height and a hint of feedback on press. */
+.btn { transition: filter .15s ease, border-color .15s ease, color .15s ease, transform .08s ease; }
+.btn:active { transform: translateY(1px); }
+.pill, .choice {
+  transition: background .14s ease, border-color .14s ease, color .14s ease, transform .08s ease;
+}
+.pill:active, .choice:active { transform: translateY(1px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .results .browse-bar, .results .notice, #intake .question { animation: none; }
+  /* The global rule below kills transitions, so the animated height would
+     stick at whatever it was told last. Let it be auto instead. */
+  #intake { height: auto !important; }
+  .plan-item:hover, .card.circle.mine:hover { transform: none; }
+}
+
 @media (max-width: 560px) {
-  .theme-btn { padding: 5px 8px; font-size: 12.5px; }
-  .theme-btn .theme-label { display: none; }
-  .theme-btn .theme-icon { margin-right: 0; }
+  .card { padding: var(--s4); }
+  .question { padding: var(--s5) var(--s4); }
+  .results-head { margin: var(--s5) 0 var(--s3); }
+}
+
+/* ---------- friendlier mechanics ---------- */
+
+/* Keyboard hints on options: visible, but never competing with the label. */
+.choice .key, .pill .key {
+  display: inline-grid; place-items: center;
+  width: 18px; height: 18px; margin-right: var(--s2);
+  border-radius: 5px; background: var(--bg-sunk); color: var(--ink-faint);
+  font-size: var(--t-micro); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.choice[aria-pressed="true"] .key, .pill[aria-pressed="true"] .key {
+  background: var(--accent); color: var(--bg-raised);
+}
+.choice { display: flex; align-items: baseline; gap: 0; flex-wrap: wrap; }
+.choice b { flex: 1 1 auto; }
+.choice span:not(.key) { flex: 1 1 100%; }
+@media (hover: none) {
+  /* On a touch device the number is noise. */
+  .choice .key, .pill .key { display: none; }
+}
+
+/* Focusing the question must not draw a box around the heading text. */
+.q-prompt:focus { outline: none; }
+.q-prompt:focus-visible { outline: 2.5px solid var(--focus); outline-offset: 4px; border-radius: 4px; }
+
+/* Loading: something to look at other than an empty column. */
+.loading { display: flex; align-items: center; gap: var(--s3); color: var(--ink-soft); font-size: var(--t-meta); }
+.spinner {
+  width: 15px; height: 15px; border-radius: 50%; flex: 0 0 auto;
+  border: 2px solid var(--line-strong); border-top-color: var(--accent);
+  animation: fyc-spin .7s linear infinite;
+}
+@keyframes fyc-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
+
+/* ---------- skip link, legal pages ---------- */
+.skip {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  background: var(--accent); color: #fff; padding: 10px 16px;
+  border-radius: 0 0 var(--radius-sm) 0; font-size: var(--t-meta); font-weight: 600;
+}
+/* The dark palette's accent is a light orange, so white on it measured
+   2.82:1 — the first thing a keyboard user lands on, below the floor.
+   Flipped to dark text the way the filled buttons already are. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .skip { color: #171512; } }
+:root[data-theme="dark"] .skip { color: #171512; }
+.skip:focus { left: 0; }
+main:focus { outline: none; }
+
+
+.legal { max-width: 62ch; padding-bottom: var(--s8); }
+.legal h1 { font-family: var(--serif); font-size: var(--t-h1); margin: var(--s7) 0 var(--s3); letter-spacing: -.025em; }
+.legal .lede { font-size: var(--t-lead); color: var(--ink-soft); margin: 0 0 var(--s6); }
+.legal h2 { font-family: var(--serif); font-size: var(--t-h3); margin: var(--s6) 0 var(--s2); font-weight: 600; }
+.legal p, .legal li { color: var(--ink-soft); line-height: 1.6; }
+.legal ul { padding-left: var(--s5); display: grid; gap: var(--s1); }
+.legal code { font-size: .92em; background: var(--bg-sunk); padding: 1px 5px; border-radius: 4px; }
+.legal-foot { margin-top: var(--s7); padding-top: var(--s4); border-top: 1px solid var(--line); font-size: var(--t-meta); }
+
+/* ======================================================================
+   Circles — the chat-first half of the app.
+   ====================================================================== */
+
+/* The trust ladder. Ticked rungs read as earned, not as a checklist. */
+.ladder { list-style: none; margin: 0 0 var(--s3); padding: 0; display: grid; gap: var(--s2); }
+.ladder li {
+  font-size: var(--t-meta); color: var(--ink-soft);
+  padding-left: 22px; position: relative;
+}
+.ladder li::before {
+  content: "○"; position: absolute; left: 0; top: -1px; color: var(--ink-faint);
+}
+.ladder li.done::before { content: "●"; color: var(--moss); }
+.ladder li.done b { color: var(--ink); }
+
+/* The readiness gate. The whole product argument lives in this box, so it
+   gets to look like a thing rather than a paragraph. */
+.ready {
+  margin: var(--s3) 0 0; padding: var(--s3) var(--s4);
+  background: var(--bg-sunk); border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+}
+.ready.is-ready { background: var(--moss-soft); border-color: transparent; }
+.ready-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s3); }
+.ready-head b { font-size: var(--t-meta); }
+.ready.is-ready .ready-head b { color: var(--moss); }
+.ready-list { list-style: none; margin: var(--s2) 0 var(--s2); padding: 0; display: grid; gap: var(--s1); }
+.ready-list li {
+  display: flex; gap: var(--s2); align-items: baseline;
+  font-size: var(--t-small); color: var(--ink-soft);
+}
+.ready-list li.done { color: var(--ink); }
+.ready-list .tick { width: 12px; text-align: center; color: var(--ink-faint); }
+.ready-list li.done .tick { color: var(--moss); }
+.ready .hint { margin: 0; color: var(--ink-faint); font-size: var(--t-small); }
+
+.card.circle { cursor: default; }
+.card.circle.mine { cursor: pointer; }
+.card.circle.mine:hover { border-color: var(--line-strong); }
+.badge.hit { background: var(--moss-soft); color: var(--moss); border-color: transparent; font-weight: 600; }
+.badge.unread { background: var(--accent); color: #fff; border-color: transparent; font-weight: 600; }
+.badges.tight { margin: 0; gap: var(--s1); flex: 0 0 auto; }
+/* On a phone the right-hand badge is the first thing to get squeezed into a
+   column of single characters. It never wraps. */
+.person-top > .badge, .badges.tight > .badge { white-space: nowrap; }
+.hint.nudge { color: var(--accent-ink); }
+.hint.locked { color: var(--ink-faint); }
+
+/* The joining question, quoted the way the applicant will see it. Named
+   `.quoted` rather than `.question`, which the intake card already owns:
+   this rule was reaching the whole twenty-question form and rendering its
+   labels, inputs and buttons in the serif meant for one quoted line. */
+.quoted {
+  font-family: var(--serif); font-size: var(--t-lead); line-height: 1.4;
+  margin: var(--s3) 0 var(--s2); padding-left: var(--s3);
+  border-left: 3px solid var(--line-strong); color: var(--ink);
+}
+.applybox { margin-top: var(--s3); }
+.applybox textarea, .proposal textarea, .applybox select {
+  width: 100%; box-sizing: border-box;
+}
+
+.applicant, .member, .meetup {
+  padding: var(--s3) 0; border-top: 1px solid var(--line);
+}
+.applicant:first-of-type, .member:first-of-type, .meetup:first-of-type { border-top: none; }
+.applicant h4, .member h4, .meetup h4 { margin: 0; font-size: var(--t-h3); letter-spacing: -.01em; }
+
+/* Quorum. A proposal is a bar that fills; nobody has to read the numbers. */
+.quorum {
+  height: 6px; background: var(--bg-sunk); border-radius: 99px;
+  overflow: hidden; margin: var(--s2) 0;
+}
+.quorum-fill { height: 100%; background: var(--moss); border-radius: 99px; transition: width .2s ease; }
+.meetup.on { background: var(--moss-soft); border-radius: var(--radius-sm); padding: var(--s3) var(--s4); }
+.meetup.on .quorum { background: rgba(0, 0, 0, .08); }
+
+.safety { margin-top: var(--s3); font-size: var(--t-small); color: var(--ink-soft); }
+.safety summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+.safety ul { margin: var(--s2) 0 0; padding-left: 20px; display: grid; gap: var(--s1); }
+
+.proposal { margin-top: var(--s3); }
+.proposal select, .field select {
+  width: 100%; box-sizing: border-box; padding: 9px 11px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  background: var(--bg-raised); color: var(--ink); font: inherit; font-size: var(--t-meta);
+}
+.field input[type="number"], .field input[type="datetime-local"] {
+  width: 100%; box-sizing: border-box; padding: 9px 11px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  background: var(--bg-raised); color: var(--ink); font: inherit; font-size: var(--t-meta);
+}
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); }
+@media (max-width: 560px) { .row2 { grid-template-columns: 1fr; gap: 0; } }
+
+.results-head.sub { margin-top: var(--s6); }
+.results-head.sub h2 { font-size: var(--t-h3); }
+
+/* Group chat: who said it matters more than in a two-person thread. */
+.circle-chat .msg { max-width: 86%; }
+.msg-who {
+  display: block; font-size: var(--t-micro); font-weight: 700;
+  color: var(--ink-faint); margin-bottom: 2px;
+}
+.msg.system {
+  justify-self: center; max-width: 100%; background: none;
+  color: var(--ink-faint); font-size: var(--t-small); text-align: center; padding: 4px 0;
+}
+.msg.system p { font-size: var(--t-small); }
+.msg.prompt {
+  justify-self: stretch; max-width: 100%; background: var(--bg-sunk);
+  border-left: 3px solid var(--moss); border-radius: var(--radius-sm);
+}
+.msg.prompt p { font-family: var(--serif); font-size: var(--t-lead); }
+.prompt-tag {
+  display: block; font-size: var(--t-micro); text-transform: uppercase;
+  letter-spacing: .06em; color: var(--moss); font-weight: 700; margin-bottom: 3px;
+}
+
+.strip { margin-top: var(--s7); padding-top: var(--s2); border-top: 1px solid var(--line); }
+
+/* The ceiling on the chat phase, and the hours ledger under it. */
+.notice.drift { border-left-color: var(--accent); }
+.notice.drift .hint { margin: var(--s2) 0 0; color: var(--ink-soft); }
+.notice.drift.bad b { color: var(--accent-ink); }
+
+.hours { margin-top: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--line); }
+.hours .hint { margin: var(--s1) 0 0; color: var(--ink-faint); font-size: var(--t-small); }
+.hours .quorum { margin: var(--s2) 0 var(--s2); }
+
+.meetup.past { opacity: .72; }
+.meetup.past h4 { font-size: var(--t-body); font-weight: 600; }
+
+/* The escalating question sets, the plan behind a yes, and the shared
+   interests that make a group of people into particular people. */
+.ladder-box { margin-top: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--line); }
+.ladder-box .ready-head { margin-bottom: var(--s2); }
+.ladder-box .ladder { margin-bottom: var(--s2); }
+.ladder-box .hint { margin: 0; color: var(--ink-faint); font-size: var(--t-small); }
+/* "personal · 2 of 3" breaking across two lines on a phone looks broken. */
+.ladder-box .ready-head .badge { white-space: nowrap; }
+.ladder li.now::before { content: "◉"; color: var(--moss); }
+.ladder li.now { color: var(--ink); }
+.ladder li.now b { color: var(--moss); }
+
+.planbox { margin-top: var(--s3); }
+.planbox .field { margin: var(--s2) 0; }
+.planbox .hint { color: var(--ink-faint); font-size: var(--t-small); }
+.hint.plan { color: var(--ink-soft); font-style: italic; }
+
+.member .badges { margin-top: var(--s1); }
+
+/* What a circle says it is: the lines its members wrote, and the history
+   behind them. And a question handed to the people who have gone quiet. */
+.card.story .where { margin-bottom: var(--s2); }
+.card.story .hint { color: var(--ink-faint); font-size: var(--t-small); }
+.card.story .field { margin-top: var(--s3); }
+.wants { list-style: none; margin: var(--s2) 0; padding: 0; }
+.wants li {
+  padding: var(--s2) 0 var(--s2) var(--s3); margin: 0;
+  border-left: 3px solid var(--moss-soft); font-family: var(--serif);
+  font-size: var(--t-lead); line-height: 1.5;
+}
+.wants li + li { margin-top: var(--s1); }
+.wants li b { font-family: var(--font); font-size: var(--t-small); color: var(--moss); }
+
+.prompt-to {
+  display: block; margin-top: var(--s2); font-size: var(--t-small);
+  color: var(--ink-soft); font-style: italic;
+}
+.msg.prompt.for-me { border-left-color: var(--accent); background: var(--accent-soft); }
+.msg.prompt.for-me .prompt-tag { color: var(--accent-ink); }
+.msg.prompt.for-me .prompt-to { color: var(--accent-ink); font-style: normal; font-weight: 600; }
+
+/* The feedback tab has to clear the bottom bar once there is one. */
+@media (max-width: 720px) {
+  .fb-tab { right: var(--s3); bottom: calc(68px + env(safe-area-inset-bottom)); padding: 7px 13px; }
+  .fb-panel { right: var(--s3); bottom: calc(108px + env(safe-area-inset-bottom)); }
+}
+
+/* ---------- segmented control ----------
+   Two halves of one tab (the inbox), the way an app does it: a single
+   control, not two destinations. */
+.seg {
+  display: inline-flex; gap: 2px; margin: var(--s5) 0 var(--s4);
+  padding: 3px; border-radius: 10px; background: var(--bg-sunk);
+}
+.seg-btn {
+  font: inherit; font-size: var(--t-meta); font-weight: 500; cursor: pointer;
+  border: 0; background: none; color: var(--ink-soft);
+  padding: var(--s2) var(--s4); border-radius: 8px;
+  transition: background .15s ease, color .15s ease;
+}
+.seg-btn[aria-selected="true"] {
+  background: var(--bg-raised); color: var(--ink); font-weight: 600;
+  box-shadow: 0 1px 2px rgba(34, 31, 27, .08);
+}
+
+/* ---------- a fold ----------
+   For the thing worth seeing once. Closed by default so the list is the page. */
+.fold {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg-raised); margin-bottom: var(--s4);
+}
+.fold > summary {
+  cursor: pointer; list-style: none; user-select: none;
+  padding: var(--s3) var(--s4); font-size: var(--t-meta); color: var(--ink-soft);
+  display: flex; align-items: center; gap: var(--s2);
+}
+.fold > summary::-webkit-details-marker { display: none; }
+.fold > summary::after { content: "⌄"; margin-left: auto; color: var(--ink-faint); }
+.fold[open] > summary::after { content: "⌃"; }
+.fold > summary:hover { color: var(--ink); }
+.fold > :not(summary) { padding: 0 var(--s4) var(--s4); }
+
+/* The gate is a screen of its own, so it carries the name. */
+.gate-title {
+  font-family: var(--serif); font-size: var(--t-h1); font-weight: 600;
+  letter-spacing: -.025em; margin: var(--s7) 0 var(--s4); max-width: 16ch;
+}
+.gate-head { margin: 0 0 var(--s4); font-size: var(--t-h3); }
+
+.signout-row { margin-top: var(--s5); }
+
+/* ---------- the question card ----------
+   A back arrow and a bar. The bar is the count, so nothing says the count. */
+.q-back {
+  flex: none; width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--bg-raised); color: var(--ink-soft);
+  font: inherit; font-size: 15px; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+  transition: border-color .15s ease, color .15s ease;
+}
+.q-back:hover { border-color: var(--accent); color: var(--accent-ink); }
+
+/* Ways out of a question. Quiet on purpose: they are escapes, not offers. */
+.q-outs { display: flex; gap: var(--s4); margin-top: var(--s4); }
+.linkish {
+  border: 0; background: none; padding: 0; font: inherit;
+  font-size: var(--t-meta); color: var(--ink-faint); cursor: pointer;
+  text-underline-offset: 3px;
+}
+.linkish:hover { color: var(--accent-ink); text-decoration: underline; }
+
+/* One line, in the warning colour, for anything true of this listing that
+   cuts against what you asked for. */
+.caveat-line {
+  margin: 0 0 var(--s4); font-size: var(--t-meta); color: var(--accent-ink);
+}
+.list-foot {
+  margin: var(--s6) 0 0; font-size: var(--t-small); color: var(--ink-faint);
+}
+
+/* Content needs air under a translucent bar, and room above the bottom one. */
+main { padding: var(--s6) 0 var(--s7); }
+@media (max-width: 720px) { main { padding: var(--s5) 0 var(--s5); } }
+
+/* ---------- screen headers ----------
+   A title and, where there is one, the action that screen is for. */
+.screen-head {
+  display: flex; align-items: center; gap: var(--s4);
+  margin: 0 0 var(--s4);
+}
+.screen-head h2 {
+  font-family: var(--serif); font-size: var(--t-h2); margin: 0; flex: 1 1 auto;
+  font-weight: 600; letter-spacing: -.02em; line-height: 1.15;
+}
+
+/* A detail screen: back, then what you opened. */
+.detail-head {
+  display: flex; align-items: flex-start; gap: var(--s3);
+  margin: 0 0 var(--s4);
+}
+.back-btn {
+  flex: none; width: 32px; height: 32px; margin-top: 1px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--bg-raised); color: var(--ink-soft);
+  font: inherit; font-size: 15px; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+  transition: border-color .15s ease, color .15s ease;
+}
+.back-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+.detail-title { min-width: 0; flex: 1 1 auto; }
+.detail-title h2 {
+  font-family: var(--serif); font-size: var(--t-h2); margin: 0 0 2px;
+  font-weight: 600; letter-spacing: -.02em; line-height: 1.15;
+}
+.detail-title p { margin: 0; color: var(--ink-faint); font-size: var(--t-small); }
+
+/* Inside a detail screen the segmented control sits right under the title. */
+.detail-head + .seg { margin-top: 0; }
+
+/* A fold can carry a badge on its summary line, right of the label. */
+.fold > summary .badge { margin-left: auto; margin-right: var(--s3); }
+.fold > summary > span:first-child { flex: 0 1 auto; }
+.fold.ladder-box { margin-top: var(--s4); }
+
+/* Safety actions, kept to the right and kept quiet. */
+.quiet-acts { display: inline-flex; gap: var(--s4); margin-left: auto; }
+
+/* The legal pages borrow the app bar and label themselves. */
+.brand { text-decoration: none; }
+.page-tag { color: var(--ink-faint); font-size: var(--t-small); }
+
+
+/* ============================================================
+   Browse — Find as a list and the thing you chose
+   ============================================================
+   Find used to be one column of cards that opened in place. On a 1180px
+   window that showed one and a half results at a time, each of them a
+   postcard of eyebrow, title, blurb, three chips, a tinted panel and a
+   three-bullet list; choosing one reflowed everything below the cursor.
+   It is now a list you can see all of and a detail pane that does not move. */
+
+#view-find > .wrap { max-width: var(--maxw-wide); }
+
+.browse-bar {
+  display: flex; align-items: baseline; gap: var(--s4);
+  margin: 0 0 var(--s2); padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--line);
+}
+.browse-bar h2 {
+  flex: 1 1 auto; margin: 0; font-family: var(--serif);
+  font-size: var(--t-h2); font-weight: 600; letter-spacing: -.02em; line-height: 1.1;
+}
+.browse-bar .linkish { flex: none; }
+
+.rows { list-style: none; margin: 0; padding: 0; }
+.rows-head {
+  margin: var(--s5) 0 var(--s1); padding: 0 var(--s3);
+  font-size: var(--t-micro); text-transform: uppercase; letter-spacing: .09em;
+  color: var(--ink-faint); font-weight: 700;
+}
+.row {
+  /* Was display:block with the two lines stacked. The listing's subject is
+     drawn to the left of them now, so the row is a flex line with a text
+     column; min-width:0 is what keeps .row-sub's ellipsis working. */
+  display: flex; align-items: center; gap: var(--s3);
+  width: 100%; text-align: left;
+  border: 0; background: none; font: inherit; color: inherit;
+  padding: var(--s3); border-radius: var(--radius-sm); cursor: pointer;
+  transition: background-color .12s ease;
+}
+.row-text { min-width: 0; flex: 1 1 auto; }
+.row-pic { color: var(--ink-faint); }
+.row[aria-current="true"] .row-pic { color: var(--moss); }
+.row:hover { background: var(--bg-sunk); }
+.row-name { display: block; font-weight: 600; font-size: var(--t-meta); line-height: 1.35; }
+.row-sub {
+  display: block; margin-top: 1px; color: var(--ink-faint); font-size: var(--t-small);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.row[aria-current="true"] { background: var(--moss-soft); }
+.row[aria-current="true"] .row-name,
+.row[aria-current="true"] .row-sub { color: var(--moss); }
+
+.browse-detail { min-width: 0; }
+.detail { animation: fyc-fade .2s ease both; }
+.detail .blurb {
+  margin: 0 0 var(--s3); max-width: 62ch;
+  color: var(--ink-soft); font-size: var(--t-lead); line-height: 1.5;
+}
+/* Ease, cadence and cost, which used to be three chips in a row. */
+.facts { margin: 0 0 var(--s5); color: var(--ink-faint); font-size: var(--t-small); }
+.detail .caveat-line { margin: calc(-1 * var(--s4)) 0 var(--s5); }
+
+.step-box {
+  margin: 0 0 var(--s5); padding: var(--s5);
+  background: var(--moss-soft); border-radius: var(--radius);
+}
+.step-box h3 {
+  margin: 0 0 var(--s1); font-size: var(--t-lead); font-weight: 600;
+  letter-spacing: -.01em; line-height: 1.3;
+}
+.step-box .when { margin: 0 0 var(--s4); color: var(--ink-soft); font-size: var(--t-small); }
+.step-box .actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+
+/* What the place is like. Three bullets under three chips read as a spec
+   sheet; these are sentences about a place, so they are set as sentences. */
+.expect { display: grid; gap: var(--s2); margin: 0 0 var(--s5); }
+.expect p { margin: 0; color: var(--ink-soft); font-size: var(--t-meta); line-height: 1.5; }
+
+.detail .list-foot { margin: 0; }
+
+/* Two panes, each scrolling on its own, together filling the frame below the
+   app bar. Nothing here is a magic number: it is the bar plus main's padding. */
+@media (min-width: 900px) {
+  .browse {
+    display: grid; gap: var(--s6);
+    grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+    height: calc(100dvh - 56px - var(--s6) - var(--s7));
+    min-height: 430px;
+  }
+  .browse-list, .browse-detail {
+    height: 100%; min-height: 0; overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* The rule between the panes, so the list reads as a column and not as
+     text that happens to be left of other text. */
+  .browse-list { border-right: 1px solid var(--line); padding-right: var(--s4); }
+  .browse-detail { padding-right: var(--s2); }
+  /* Left to the platform, the pane scrollbar draws a bright slab down the
+     middle of the dark theme, right where the rule between the panes is. */
+  .browse-list, .browse-detail { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+  .browse-list::-webkit-scrollbar, .browse-detail::-webkit-scrollbar { width: 8px; }
+  .browse-list::-webkit-scrollbar-track, .browse-detail::-webkit-scrollbar-track { background: transparent; }
+  .browse-list::-webkit-scrollbar-thumb, .browse-detail::-webkit-scrollbar-thumb {
+    background: var(--line-strong); border-radius: 4px;
+  }
+  .browse-list .browse-bar {
+    position: sticky; top: 0; z-index: 1; background: var(--bg);
+  }
+  /* Both panes are on screen, so there is nothing to go back to. */
+  .browse-detail .back-btn { display: none; }
+  .detail .detail-head { margin-bottom: var(--s3); }
+}
+
+/* Below that there is room for one pane, so choosing a row is a navigation:
+   the list goes, the detail arrives, and the back button earns its place. */
+@media (max-width: 899px) {
+  .browse-detail { display: none; }
+  .browse.on-detail .browse-list { display: none; }
+  .browse.on-detail .browse-detail { display: block; }
+  .row { padding: var(--s3) var(--s2); }
+  /* The feedback pill floats above the bottom bar, so the last line of the
+     detail has to clear it rather than run underneath. */
+  .browse.on-detail .browse-detail { padding-bottom: var(--s7); }
+}
+
+/* ---------- the question is the screen ----------
+   It used to be a card: a 430px box with a visible edge and a shadow,
+   centred in a 1180px window with a footer stranded below it. There is only
+   ever one question on screen, so the card was drawing a border around the
+   whole app. */
+.question {
+  max-width: 600px; margin: 0 auto;
+  padding: 0; border: 0; background: none; box-shadow: none;
+}
+/* The intake fills the frame rather than floating a box in the middle of it.
+   One consequence worth knowing: every question is now the same height, so
+   settleHeight finds from === to and the card stops animating between
+   questions. That jiggle only existed because the heights differed. */
+#intake .question {
+  min-height: calc(100dvh - 56px - var(--s6) - var(--s7));
+  display: flex; flex-direction: column; justify-content: center;
+}
+.question .choices { grid-template-columns: 1fr; gap: var(--s2); }
+.question .choice {
+  padding: var(--s4) var(--s5); border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+.question .choice b { font-size: var(--t-lead); }
+.question input[type="text"] { font-size: var(--t-lead); padding: var(--s3) var(--s4); }
+.q-outs { margin-top: var(--s4); }
+
+
+/* ===================================================================
+   The drawn half. Everything src/art.js builds is styled here, so the
+   module stays geometry and this file stays colour.
+   =================================================================== */
+
+/* Avatars. The hue is baked into the drawing because a face has to be the
+   same face in both themes; all this does is size and seat it. */
+.av { width: 36px; height: 36px; border-radius: 50%; display: block; flex: 0 0 auto; }
+.av.sm { width: 26px; height: 26px; }
+.av.lg { width: 52px; height: 52px; }
+
+/* A circle drawn as the people in it. The ring is the page behind them, so
+   the overlap reads as depth rather than as a stack of stickers. */
+.av-stack { display: inline-flex; align-items: center; vertical-align: middle; }
+.av-stack .av {
+  width: 26px; height: 26px; margin-right: -9px;
+  box-shadow: 0 0 0 2px var(--bg-raised); border-radius: 50%;
+}
+.av-stack .av:last-of-type { margin-right: 0; }
+.av-more {
+  margin-left: var(--s3); font-size: var(--t-small); font-weight: 600;
+  color: var(--ink-faint);
+}
+
+/* Pictograms and the guide are stroked in currentColor: they take the colour
+   of the text beside them, which is why neither needs a dark-mode rule. */
+.pic, .guide {
+  fill: none; stroke: currentColor; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.pic { width: 20px; height: 20px; flex: 0 0 auto; }
+.pic.lg { width: 26px; height: 26px; }
+
+/* The one interest drawing that is filled rather than stroked: it sits on the
+   result card as the card's subject, so it carries a tint. */
+.pic-badge {
+  width: 40px; height: 40px; border-radius: 12px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: var(--moss-soft); color: var(--moss);
+}
+.pic-badge .pic { width: 22px; height: 22px; }
+.pic-badge.warm { background: var(--accent-soft); color: var(--accent-ink); }
+
+/* The guide. Line everywhere except the jumper, which is the one place the
+   accent lands, so the figure reads as a person and not a pictogram. */
+.guide { width: 44px; height: 44px; color: var(--ink-soft); }
+.guide .g-head { fill: var(--bg-raised); stroke: currentColor; stroke-width: 1.6; }
+.guide .g-body { fill: var(--accent-soft); stroke: currentColor; stroke-width: 1.6; }
+.guide.lg { width: 64px; height: 64px; }
+
+/* Spot illustrations. Four classes carry the whole set. */
+.scene { width: 180px; height: 124px; display: block; margin: 0 auto var(--s4); }
+.sc-line {
+  fill: none; stroke: var(--line-strong); stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.sc-ground { fill: none; stroke: var(--line); stroke-width: 2; stroke-linecap: round; }
+.sc-fill { fill: currentColor; }
+.sc-dash {
+  fill: none; stroke: var(--line-strong); stroke-width: 2; stroke-dasharray: 4 4;
+}
+.sc-glass {
+  fill: var(--bg-raised); fill-opacity: .55;
+  stroke: var(--accent); stroke-width: 2;
+}
+
+/* An empty screen is now a drawing, a line and a way out, in that order. */
+.empty .scene { margin-bottom: var(--s5); }
+.empty .actions { justify-content: center; margin-top: var(--s4); }
+
+/* The guide's seat on the intake: a small presence beside the progress bar,
+   not a screen of its own. The first question is still the first thing. */
+.intake-guide { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s4); }
+.intake-guide p { margin: 0; font-size: var(--t-small); color: var(--ink-faint); }
+
+/* A person on a row: face, then name, then whatever the row is about. */
+.who { display: flex; align-items: center; gap: var(--s3); }
+.who-name { font-weight: 600; }
+
+/* A badge carrying a drawing is a flex line, not a string with an emoji in
+   it. 13px keeps the pictogram the height of the text beside it. */
+.badge { display: inline-flex; align-items: center; gap: 5px; }
+.badge .pic { width: 13px; height: 13px; }
+
+/* .person-top was baseline-aligned for a heading and a badge. With a face at
+   the front it centres instead, and the heading takes the slack so the badge
+   stays pinned right. */
+.person-top { align-items: center; }
+.person-top > .av { flex: 0 0 auto; }
+.person-top > h3, .person-top > h4 { flex: 1 1 auto; min-width: 0; }
+
+/* A conversation is with somebody, so the row leads with their face. */
+.thread .who { margin-bottom: 2px; }
+.thread .who h3 { margin: 0; font-size: 18px; }
+
+
+/* ======================================================================
+   The warmth pass, continued: the pieces added once the drawn half was in.
+   ====================================================================== */
+
+/* The brand is a mark and a word now, not a word on its own. */
+.brand { display: inline-flex; align-items: center; gap: var(--s2); }
+.brand .mark {
+  width: 20px; height: 20px; flex: none;
+  fill: none; stroke: var(--accent); stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+@media (max-width: 560px) { .brand > span { display: none; } }
+
+/* How many places there are. The one number on this screen worth printing:
+   it is the answer to "is this a list I can get through". */
+.browse-n {
+  flex: none; font-size: var(--t-small); font-weight: 600;
+  color: var(--ink-faint); font-variant-numeric: tabular-nums;
+}
+
+/* A saved row says so with a tick. The row is a name and a place; a second
+   word on it would compete with both. */
+.row-saved { flex: none; color: var(--moss); font-weight: 700; opacity: 0; }
+.row.is-saved .row-saved { opacity: 1; }
+/* The selected row already tints; the bar is what makes it read as a
+   position in a column rather than a highlighted word. */
+.row { position: relative; }
+.row[aria-current="true"]::before {
+  content: ""; position: absolute; left: 0; top: 6px; bottom: 6px;
+  width: 3px; border-radius: 3px; background: var(--moss);
+}
+
+/* The subject of the listing, at the top of the thing you do about it. */
+.step-head { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s4); }
+.step-head h3 { margin: 0; }
+.step-head .when { margin: 2px 0 0; }
+.step-box .pic-badge { background: var(--bg-raised); }
+
+/* Three tints rather than one. The taxonomy's six groups map onto them, so
+   a page of listings is not a page of identical green squares. */
+.pic-badge.leaf { background: var(--moss-soft); color: var(--moss); }
+.pic-badge.warm { background: var(--accent-soft); color: var(--accent-ink); }
+.pic-badge.cool { background: var(--bg-sunk); color: var(--ink-soft); }
+
+/* A finished plan item. Four ticks is the whole point of the list. */
+.plan-top { display: flex; align-items: flex-start; gap: var(--s3); }
+.plan-title { flex: 1 1 auto; min-width: 0; }
+.plan-done { flex: none; }
+.plan-done .guide { width: 38px; height: 38px; color: var(--moss); }
+.plan-item.done { border-color: var(--moss); background: var(--moss-soft); }
+.plan-item.done .progress { background: rgba(0, 0, 0, .08); }
+
+/* A face at the head of the card that is about you. */
+.who-head { margin-bottom: var(--s4); }
+.who-head h3 { margin: 0; }
+.who-head .hint { margin: 2px 0 0; }
+
+/* Said once, at the top, when the browser will not keep anything. */
+.storage-warn {
+  max-width: var(--maxw); margin: 0 auto var(--s4); padding: var(--s3) var(--s4);
+  background: var(--accent-soft); color: var(--accent-ink);
+  border-radius: var(--radius-sm); font-size: var(--t-meta);
+}
+
+/* Where the system asks for more contrast, the line work is the first thing
+   to go: --line-strong is a mid grey by design. The drawings keep their
+   shapes and take the text colour instead. */
+@media (prefers-contrast: more) {
+  .sc-line, .sc-ground, .sc-dash { stroke: var(--ink-soft); }
+  .sc-glass { stroke: var(--accent-ink); fill-opacity: .25; }
+  .pic, .guide { stroke-width: 1.9; }
+  .row-pic { color: var(--ink-soft); }
+  .badge { border-color: var(--line-strong); }
+}
+
+/* Dragging across any text in the app produced the browser's own blue, the
+   only colour on screen that came from outside the palette. */
+::selection { background: var(--accent-soft); color: var(--accent-ink); }
+
+/* The app bar is sticky, so anything scrolled to by an anchor — the skip
+   link's target above all — arrived underneath it. */
+#main, :target { scroll-margin-top: 72px; }
+
+/* Offline is not a problem with the app, so it does not get the warning
+   tint — the listings are in the bundle and the saved list is on the device.
+   It reads as a fact about the network, quietly. */
+.offline-warn { background: var(--bg-sunk); color: var(--ink-soft); }
+
+/* Printing. The saved list is a handful of places and the one concrete step
+   into each, which is exactly the thing somebody wants on paper or as a PDF
+   to take with them. Everything that only works by being tapped comes off,
+   the colour comes off, and the links print their addresses so the sheet is
+   still usable away from the screen. */
+/* The browser's default print margin is about half an inch and differs per
+   engine; the saved list is a short document and reads better with a margin
+   that is the same wherever it is printed. */
+@page { margin: 16mm; }
+
+@media print {
+  /* Dark mode must not follow the page onto paper. */
+  :root, :root[data-theme="dark"] {
+    --bg: #fff; --bg-raised: #fff; --bg-sunk: #fff;
+    --ink: #000; --ink-soft: #333; --ink-faint: #555;
+    --line: #bbb; --line-strong: #999;
+    --accent-soft: #fff; --moss-soft: #fff;
+    --shadow: none;
+  }
+  body { background: #fff; color: #000; }
+
+  /* Chrome you cannot use on paper. */
+  .appbar, .tabs, .theme-btn, .skip, .fb-tab, .fb-panel,
+  #auth-gate, .storage-warn, .screen-head .actions { display: none !important; }
+
+  /* The drawings are there to make a screen feel inviting; on paper they are
+     a page of toner. The class is .scene — art.js builds them with it, and
+     the .sc this said first matched nothing at all. */
+  .scene, .guide, .pic, .empty svg, .plan-done { display: none !important; }
+
+  main, .wrap { max-width: none; padding: 0; margin: 0; }
+
+  .card, .plan-item {
+    border: 1px solid #999; box-shadow: none; background: #fff;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+
+  /* Four ticks say how far along you are. A part-filled bar says it in a
+     grey block that means nothing once the colour has gone. */
+  .progress { display: none !important; }
+
+  /* Checked steps have to survive the printer's habit of dropping
+     backgrounds, or the sheet arrives with every box empty. */
+  .steps input[type="checkbox"] { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* A link is an address on paper, not a button: nothing here can be
+     tapped, so the pill comes off and it reads as the line of text it is.
+     Only the ones worth walking away with — the first step into each
+     place, not the app's own pages. */
+  .plan-item .actions a[href^="http"] {
+    border: 0; padding: 0; background: none; border-radius: 0;
+    text-decoration: underline; font-weight: 600;
+  }
+  .plan-item .actions a[href^="http"]::after {
+    content: " — " attr(href); font-size: var(--t-small); color: #333; word-break: break-all;
+  }
+  .plan-item .actions button { display: none !important; }
 }

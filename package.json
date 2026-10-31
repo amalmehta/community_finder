@@ -13,7 +13,9 @@
     "start:bg": "node tools/server-daemon.js start",
     "stop": "node tools/server-daemon.js stop",
     "status": "node tools/server-daemon.js status",
-    "log": "node tools/server-daemon.js log"
+    "log": "node tools/server-daemon.js log",
+    "backup": "node tools/backup.js",
+    "moderate": "node tools/moderate.js"
   },
   "engines": {
     "node": ">=22"

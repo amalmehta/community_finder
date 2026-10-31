@@ -10,58 +10,11 @@
   var S = { user: null, online: false, people: [], threads: [], openThread: null, poll: null };
 
   // ---------- small helpers ----------
-  function el(tag, props, kids) {
-    var n = document.createElement(tag);
-    Object.keys(props || {}).forEach(function (k) {
-      if (k === 'class') n.className = props[k];
-      else if (k === 'text') n.textContent = props[k];
-      else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2), props[k]);
-      else if (props[k] === true) n.setAttribute(k, '');
-      else if (props[k] !== false && props[k] != null) n.setAttribute(k, props[k]);
-    });
-    (kids || []).forEach(function (c) {
-      if (c == null || c === false) return;
-      n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
-    });
-    return n;
-  }
-  /** Namespaced element builder for the graph. (app.js has its own copy; these
-   *  two files are separate scopes on purpose, so neither depends on the other.) */
-  function svg(tag, props, kids) {
-    var n = document.createElementNS('http://www.w3.org/2000/svg', tag);
-    Object.keys(props || {}).forEach(function (k) {
-      if (props[k] == null) return;
-      if (k === 'text') n.textContent = props[k];
-      else n.setAttribute(k, props[k]);
-    });
-    (kids || []).forEach(function (c) { n.appendChild(c); });
-    return n;
-  }
-
-  function $(s) { return document.querySelector(s); }
-
-  async function api(method, url, body) {
-    var res = await fetch(url, {
-      method: method,
-      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body)
-    });
-    var data = null;
-    try { data = await res.json(); } catch (e) { /* no body */ }
-    if (!res.ok) throw new Error((data && data.error) || ('Request failed (' + res.status + ')'));
-    return data;
-  }
-
-  function label(id) { return (FYC.INTERESTS[id] || {}).label || id; }
-  function ago(ts) {
-    if (!ts) return '';
-    var m = Math.floor((Date.now() - ts) / 60000);
-    if (m < 1) return 'just now';
-    if (m < 60) return m + 'm ago';
-    var h = Math.floor(m / 60);
-    if (h < 24) return h + 'h ago';
-    return Math.floor(h / 24) + 'd ago';
-  }
+  // All of these were a local copy, deliberately, so this file depended on
+  // no other feature file. It still does not: dom.js is shared the way
+  // core.js and art.js already are, and the copies had drifted apart.
+  var D = window.FYC_DOM;
+  var el = D.el, svg = D.svg, $ = D.$, api = D.api, label = D.label, ago = D.ago;
 
   // ---------- the sign-in gate ----------
   function interestPicker(selected) {
@@ -78,7 +31,11 @@
             var on = btn.getAttribute('aria-pressed') === 'true';
             btn.setAttribute('aria-pressed', on ? 'false' : 'true');
           }
-        }, [el('span', { 'aria-hidden': 'true', text: i.icon }), el('span', { text: i.label })]);
+        }, [
+          (art() && art().pictogram(i.id)) ||
+            el('span', { 'aria-hidden': 'true', text: i.icon }),
+          el('span', { text: i.label })
+        ]);
         pills.appendChild(btn);
       });
       box.appendChild(el('div', { class: 'group' }, [el('h3', { text: grp.label }), pills]));
@@ -116,6 +73,7 @@
       if (signup) {
         payload.display = $('#au-display').value.trim() || payload.username;
         payload.city = $('#au-city').value.trim();
+        payload.bio = $('#au-bio').value.trim();
         payload.ageOk = $('#au-age').checked;
         payload.interests = pickedInterests(form);
       }
@@ -128,15 +86,13 @@
         err.hidden = false;
       }
     } }, [
-      el('h2', { class: 'gate-title', text: signup ? 'Create your profile' : 'Welcome back' }),
-      el('p', { class: 'hint', text: signup
-        ? 'Username and password. No email stored, so there is no password reset.'
-        : 'Sign in.' }),
+      el('h2', { class: 'gate-head', text: signup ? 'Create your profile' : 'Welcome back' }),
+      signup ? el('p', { class: 'hint', text: 'No email at this step, so there is no password reset.' }) : null,
 
       el('label', { class: 'field' }, [
         el('span', { text: 'Username' }),
         el('input', { type: 'text', id: 'au-user', required: true, autocomplete: 'username',
-                      placeholder: 'lowercase letters, numbers, underscores' })
+                      placeholder: 'lowercase, numbers, underscores' })
       ]),
       el('label', { class: 'field' }, [
         el('span', { text: 'Password' }),
@@ -146,16 +102,21 @@
       ]),
       signup ? el('label', { class: 'field' }, [
         el('span', { text: 'Name people will see' }),
-        el('input', { type: 'text', id: 'au-display', placeholder: 'optional — your username by default' })
+        el('input', { type: 'text', id: 'au-display', placeholder: 'optional' })
       ]) : null,
       signup ? el('label', { class: 'field' }, [
         el('span', { text: 'Your city' }),
-        el('input', { type: 'text', id: 'au-city', placeholder: 'e.g. Boston' })
+        el('input', { type: 'text', id: 'au-city', placeholder: 'e.g. Boston',
+                      autocomplete: 'address-level2', autocapitalize: 'words' })
+      ]) : null,
+      signup ? el('label', { class: 'field' }, [
+        el('span', { text: 'About you' }),
+        el('textarea', { id: 'au-bio', rows: '2', maxlength: '280',
+                         placeholder: 'What you are looking for, and what you are like to be around' })
       ]) : null,
 
       signup ? el('div', { class: 'field' }, [
         el('span', { text: 'What are you into?' }),
-        el('p', { class: 'hint', text: 'Used for discovery. Any of these can be hidden later while still shaping your results.' }),
         interestPicker(pre)
       ]) : null,
 
@@ -173,10 +134,7 @@
     ]);
 
     gate.appendChild(el('div', { class: 'wrap' }, [
-      el('div', { class: 'intro' }, [
-        el('h1', { text: 'Find your people.' }),
-        el('p', { text: 'Real local groups, and the people near you with the same interests.' })
-      ]),
+      el('h1', { class: 'gate-title', text: 'Find your people.' }),
       form
     ]));
   }
@@ -191,12 +149,11 @@
 
   // ---------- tabs ----------
   function paintAccountTabs() {
-    ['people', 'messages'].forEach(function (name) {
+    ['circles', 'messages'].forEach(function (name) {
       var t = document.getElementById('tab-' + name);
       if (t) t.hidden = !S.user;
     });
-    var out = document.getElementById('tab-signout');
-    if (out) out.hidden = !S.user;
+    if (window.FYC_CIRCLES) window.FYC_CIRCLES.enable(S);
   }
 
   async function refreshCounts() {
@@ -207,6 +164,7 @@
       var badge = document.getElementById('msg-count');
       badge.textContent = String(n);
       badge.hidden = n === 0;
+      if (window.FYC_CIRCLES) window.FYC_CIRCLES.refreshBadge();
     } catch (e) { /* offline */ }
   }
 
@@ -310,44 +268,57 @@
   }
 
   // ---------- People ----------
+  function loading(text) {
+    return el('div', { class: 'card loading' }, [
+      el('span', { class: 'spinner', 'aria-hidden': 'true' }),
+      el('span', { text: text })
+    ]);
+  }
+
   async function renderPeople() {
     var host = $('#people-body');
-    host.innerHTML = '';
-    host.appendChild(el('div', { class: 'results-head' }, [
-      el('h2', { text: 'People with something in common' }),
-      el('p', { text: 'Shared visible interests. Contact requires your acceptance.' })
-    ]));
+    function reset() { host.innerHTML = ''; host.appendChild(segBar('people')); }
+    reset();
+    host.appendChild(loading('Looking…'));
 
     var data, graph;
     try {
       data = await api('GET', '/api/people');
       graph = await api('GET', '/api/graph');
     }
-    catch (e) { host.appendChild(el('p', { class: 'err', text: e.message })); return; }
+    catch (e) {
+      reset();
+      host.appendChild(el('p', { class: 'err', text: e.message }));
+      return;
+    }
+    reset();
     S.people = data.people;
 
     if (!data.meVerified) {
       host.appendChild(el('div', { class: 'notice' }, [
-        el('b', { text: 'Verify your email to contact people. ' }),
-        'Add an address on the You tab. Until then you can look, but not message.'
+        el('b', { text: 'Verify your email to message people. ' }),
+        'Add an address on the You tab.'
       ]));
     }
 
+    // The overlap picture is a nice thing to look at once, not something to
+    // scroll past every time. Folded away; the list is the page.
     if (graph && graph.nodes.filter(function (n) { return n.kind === 'person'; }).length) {
-      host.appendChild(el('article', { class: 'card' }, [
-        el('h3', { text: 'How you overlap' }),
-        el('p', { class: 'hint', text: 'Lines run through the interests you have in common. Ringed names can be messaged directly: ' + graph.rule.minShared + '+ shared interests, same city, both verified.' }),
+      var fold = el('details', { class: 'fold' }, [
+        el('summary', { text: 'How you overlap' }),
         graphSvg(graph, function (n) {
           var card = document.getElementById('person-' + n.userId);
           if (card) { card.scrollIntoView({ block: 'center' }); card.classList.add('flash'); setTimeout(function () { card.classList.remove('flash'); }, 1200); }
         })
-      ]));
+      ]);
+      host.appendChild(fold);
     }
 
     if (!S.people.length) {
       host.appendChild(el('div', { class: 'card empty' }, [
-        el('h2', { text: 'Nobody matches.' }),
-        el('p', { text: 'No one shares your visible interests, or you have none showing. Set them on the You tab.' })
+        sceneFor('welcome'),
+        el('h2', { text: 'Nobody yet.' }),
+        el('p', { text: 'Show a few more interests on the You tab.' })
       ]));
       return;
     }
@@ -362,24 +333,25 @@
       var direct = !c && p.canDirect;
       var intro = el('textarea', {
         class: 'intro-box', hidden: true, maxlength: direct ? '2000' : '300',
-        placeholder: direct ? 'Your message' : 'Your introduction (300 characters)'
+        placeholder: direct ? 'Message' : 'Say hello in 300 characters'
       });
       var err = el('p', { class: 'err', hidden: true });
 
       var card = el('article', { class: 'card person', id: 'person-' + p.id }, [
         el('div', { class: 'person-top' }, [
+          faceFor('person-' + p.id),
           el('h3', { text: p.display }),
           el('span', { class: 'badge', text: p.shared + ' shared' })
         ]),
         el('p', { class: 'where', text: [p.city, 'active ' + ago(p.lastSeen)].filter(Boolean).join(' · ') }),
         p.bio ? el('p', { class: 'blurb', text: p.bio }) : null,
         el('div', { class: 'badges' }, p.interests.slice(0, 6).map(function (i) {
-          return el('span', { class: 'badge', text: label(i) });
+          var A = art();
+          return el('span', { class: 'badge' }, [
+            A ? A.pictogram(i) : null, el('span', { text: label(i) })
+          ]);
         })),
         statusText ? el('p', { class: 'hint', text: statusText }) : null,
-        (!c && p.canDirect) ? el('p', { class: 'hint direct-note', text: 'Enough in common to message directly — no waiting to be accepted.' }) : null,
-        (!c && !p.canDirect && p.directBlockedBecause && data.meVerified)
-          ? el('p', { class: 'hint', text: 'Introduction only: ' + p.directBlockedBecause }) : null,
         intro, err,
         el('div', { class: 'actions' }, [
           (!c) ? el('button', { class: 'btn sm', type: 'button', onclick: async function (ev) {
@@ -402,18 +374,22 @@
               intro.hidden = true;
             } catch (e2) { err.textContent = e2.message; err.hidden = false; }
           } }, [direct ? 'Message directly' : 'Say hello']) : null,
-          el('button', { class: 'btn ghost sm', type: 'button', onclick: async function () {
-            if (!confirm('Block ' + p.display + '? They will disappear from your results and cannot contact you.')) return;
-            await api('POST', '/api/blocks', { userId: p.id });
-            renderPeople();
-          } }, ['Block']),
-          el('button', { class: 'btn ghost sm', type: 'button', onclick: async function () {
-            var reason = prompt('What is the problem? (harassment, spam, fake profile, other)');
-            if (!reason) return;
-            await api('POST', '/api/reports', { userId: p.id, reason: reason });
-            alert('Reported, and they are now blocked.');
-            renderPeople();
-          } }, ['Report'])
+          // Block and report are safety valves, not things you do to five
+          // people a day. One button per card, and these as quiet text.
+          el('span', { class: 'quiet-acts' }, [
+            el('button', { class: 'linkish', type: 'button', onclick: async function () {
+              if (!confirm('Block ' + p.display + '? They will disappear from your results and cannot contact you.')) return;
+              await api('POST', '/api/blocks', { userId: p.id });
+              renderPeople();
+            } }, ['Block']),
+            el('button', { class: 'linkish', type: 'button', onclick: async function () {
+              var reason = prompt('What is the problem? (harassment, spam, fake profile, other)');
+              if (!reason) return;
+              await api('POST', '/api/reports', { userId: p.id, reason: reason });
+              alert('Reported, and they are now blocked.');
+              renderPeople();
+            } }, ['Report'])
+          ])
         ])
       ]);
       host.appendChild(card);
@@ -423,7 +399,9 @@
   // ---------- Messages ----------
   async function renderMessages() {
     var host = $('#messages-body');
-    host.innerHTML = '';
+    function reset() { host.innerHTML = ''; host.appendChild(segBar('chats')); }
+    reset();
+    host.appendChild(loading('Loading…'));
     stopPolling();
 
     var reqs, threads;
@@ -431,15 +409,16 @@
       reqs = await api('GET', '/api/requests');
       threads = (await api('GET', '/api/threads')).threads;
     } catch (e) {
+      reset();
       host.appendChild(el('p', { class: 'err', text: e.message }));
       return;
     }
+    reset();
     S.threads = threads;
 
     if (reqs.incoming.length) {
       host.appendChild(el('div', { class: 'results-head' }, [
-        el('h2', { text: 'Introductions for you' }),
-        el('p', { text: 'One message each until accepted.' })
+        el('h2', { text: 'Introductions' })
       ]));
       reqs.incoming.forEach(function (r) {
         host.appendChild(el('article', { class: 'card' }, [
@@ -475,11 +454,14 @@
       });
     }
 
-    host.appendChild(el('div', { class: 'results-head' }, [el('h2', { text: 'Conversations' })]));
+    if (reqs.incoming.length || reqs.outgoing.length) {
+      host.appendChild(el('div', { class: 'results-head' }, [el('h2', { text: 'Conversations' })]));
+    }
     if (!threads.length) {
       host.appendChild(el('div', { class: 'card empty' }, [
-        el('h2', { text: 'No conversations.' }),
-        el('p', { text: 'Send an introduction from the People tab.' })
+        sceneFor('inbox'),
+        el('h2', { text: 'No conversations yet.' }),
+        el('p', { text: 'Say hello to someone under People.' })
       ]));
       return;
     }
@@ -490,12 +472,20 @@
         onclick: function () { openThread(t); },
         onkeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openThread(t); } }
       }, [
-        el('h3', { text: t.other_name }),
+        el('div', { class: 'who' }, [
+          faceFor('person-' + (t.other_id || t.other_name)),
+          el('h3', { class: 'who-name', text: t.other_name })
+        ]),
         el('p', { class: 'where', text: [t.other_city, t.last_at ? ago(t.last_at) : 'no messages yet'].filter(Boolean).join(' · ') }),
         t.last_body ? el('p', { class: 'blurb', text: t.last_body }) : null
       ]));
     });
   }
+
+  /* The drawn half, guarded: a missing drawing is null and el() drops it. */
+  function art() { return window.FYC_ART || null; }
+  function faceFor(id) { var A = art(); return A ? A.avatar(id) : null; }
+  function sceneFor(n) { var A = art(); return A ? A.scene(n) : null; }
 
   function stopPolling() {
     if (S.poll) { clearInterval(S.poll); S.poll = null; }
@@ -507,7 +497,9 @@
     host.innerHTML = '';
 
     var list = el('div', { class: 'msg-list', id: 'msg-list' });
-    var input = el('textarea', { class: 'msg-input', placeholder: 'Write a message…', rows: '2' });
+    // Matches the server's cap; the only two textareas in the app that had none.
+    var input = el('textarea', { class: 'msg-input', maxlength: '2000',
+      placeholder: 'Write a message…', rows: '2' });
     var err = el('p', { class: 'err', hidden: true });
     var lastId = 0;
     var seen = Object.create(null);   // message ids already on screen
@@ -589,7 +581,12 @@
   function profileCard() {
     if (!S.user) return null;
     var u = S.user;
-    var city = el('input', { type: 'text', value: u.city || '', placeholder: 'Your city' });
+    // Everyone else on People has a face; the card where you set yours up
+    // was the only one without one.
+    var me = art() ? art().avatar('person-' + u.id) : null;
+    if (me) me.classList.add('lg');
+    var city = el('input', { type: 'text', value: u.city || '', placeholder: 'Your city',
+      autocomplete: 'address-level2', autocapitalize: 'words' });
     var bio = el('textarea', { maxlength: '280', rows: '2', placeholder: 'A sentence about what you are looking for (optional)' });
     bio.value = u.bio || '';
     var disc = el('input', { type: 'checkbox' });
@@ -611,8 +608,8 @@
     var emailCard = el('article', { class: 'card' }, [
       el('h3', { text: 'Email' }),
       el('p', { class: 'hint', text: u.emailVerified
-        ? 'Verified. You can contact people and be contacted.'
-        : 'Optional for the finder. Required before you can message anyone — it is the only accountability this place has.' }),
+        ? 'Verified.'
+        : 'Needed before you can message anyone.' }),
       el('label', { class: 'field' }, [
         el('span', { text: u.emailVerified ? 'Verified address' : 'Address' }),
         emailInput
@@ -635,20 +632,23 @@
       ]),
       el('label', { class: 'check' }, [
         directCb,
-        el('span', { text: 'Let people with a lot in common message me without sending a request first' })
-      ]),
-      el('p', { class: 'hint', text: 'Only applies to people in your city who share at least three of your visible interests and have a verified email. Blocking always wins.' })
+        el('span', { text: 'Let people with a lot in common message me directly' })
+      ])
     ]);
 
     var profile = el('article', { class: 'card' }, [
-      el('h3', { text: 'Your profile' }),
-      el('p', { class: 'hint', text: 'Signed in as ' + u.display + ' (@' + u.username + ').' }),
+      el('div', { class: 'who who-head' }, [
+        me,
+        el('div', {}, [
+          el('h3', { text: 'Your profile' }),
+          el('p', { class: 'hint', text: 'Signed in as ' + u.display + ' (@' + u.username + ').' })
+        ])
+      ]),
       el('label', { class: 'field' }, [el('span', { text: 'City' }), city]),
       el('label', { class: 'field' }, [el('span', { text: 'About you' }), bio]),
       el('label', { class: 'check' }, [disc, el('span', { text: 'Let people with shared interests find me' })]),
       u.interests.length ? el('div', { class: 'field' }, [
-        el('span', { text: 'Which interests are visible to others' }),
-        el('p', { class: 'hint', text: 'Unticked: still used for your results, never exposed or searchable.' }),
+        el('span', { text: 'Visible to others' }),
         rows
       ]) : null,
       el('div', { class: 'actions' }, [
@@ -669,9 +669,19 @@
       ])
     ]);
 
+    var account = el('div', { class: 'actions signout-row' }, [
+      el('button', { class: 'btn ghost sm', type: 'button', onclick: async function () {
+        await api('POST', '/api/logout');
+        S.user = null;
+        stopPolling();
+        renderGate('login');
+      } }, ['Sign out'])
+    ]);
+
     var wrap = document.createDocumentFragment();
     wrap.appendChild(profile);
     wrap.appendChild(emailCard);
+    wrap.appendChild(account);
     return wrap;
   }
 
@@ -705,32 +715,29 @@
 
     document.body.classList.add('has-accounts');
 
-    // The static build's footer promises there is no server. With accounts on,
-    // that is no longer true, so say what is actually happening instead.
-    var foot = document.querySelector('.site-footer .wrap p');
-    if (foot) {
-      foot.textContent = 'Your searches, plan and what you click stay on this device. Your profile and messages are stored on this server so that other people can reach you — only your city, your shown interests and anything you write are visible to them.';
-    }
+    // This used to be printed in the footer, which put it under every screen
+    // in the app. It is a fact about where your data lives, so it belongs on
+    // the one screen that is about you. You reads it from here.
+    window.FYC_STORAGE_NOTE = 'Your profile, messages and circles are stored on this server. Anything you say in a circle is visible to that circle.';
 
-    document.getElementById('tab-people').addEventListener('click', function () { show('people'); });
     document.getElementById('tab-messages').addEventListener('click', function () { show('messages'); });
-    document.getElementById('tab-signout').addEventListener('click', async function () {
-      await api('POST', '/api/logout');
-      S.user = null;
-      stopPolling();
-      renderGate('login');
-    });
 
     if (!S.user) renderGate('signup');
-    else closeGate();
+    else {
+      closeGate();
+      // Signed in, so every tab exists and the one you were last on is worth
+      // reopening. app.js remembers it; show() is this file's with accounts.
+      var last = window.FYC_LAST_TAB ? window.FYC_LAST_TAB() : 'find';
+      if (last !== 'find' && document.getElementById('tab-' + last)) show(last);
+    }
 
     if (verifyNote) {
       var banner = el('div', { class: 'notice' + (verifyNote.ok ? '' : ' bad') }, [
         el('b', { text: verifyNote.ok ? 'Done. ' : 'That did not work. ' }),
         verifyNote.text
       ]);
-      var intro = document.querySelector('#view-find .intro');
-      if (intro && intro.parentNode) intro.parentNode.insertBefore(banner, intro.nextSibling);
+      var find = document.querySelector('#view-find .wrap');
+      if (find) find.insertBefore(banner, find.firstChild);
     }
 
     // Let the You tab render the profile editor underneath its charts.
@@ -738,21 +745,50 @@
     setInterval(refreshCounts, 30000);
   }
 
+  /** Which half of the inbox is showing. Remembered so the tab reopens where
+   *  you left it, the way a mail app does. */
+  var inboxSeg = 'chats';
+
   function show(which) {
-    ['find', 'plan', 'you', 'people', 'messages'].forEach(function (name) {
+    // People is a segment inside the inbox now, so both panels answer to the
+    // Inbox tab and neither has a tab of its own.
+    var inbox = which === 'messages' || which === 'people';
+    ['find', 'plan', 'you', 'circles', 'messages', 'people'].forEach(function (name) {
       var view = document.getElementById('view-' + name);
-      var tab = document.getElementById('tab-' + name);
-      if (!view || !tab) return;
-      var on = which === name;
-      view.hidden = !on;
-      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      if (!view) return;
+      view.hidden = name === 'messages' ? !(inbox && inboxSeg === 'chats')
+        : name === 'people' ? !(inbox && inboxSeg === 'people')
+        : which !== name;
     });
+    ['find', 'plan', 'you', 'circles', 'messages'].forEach(function (name) {
+      var tab = document.getElementById('tab-' + name);
+      if (tab) tab.setAttribute('aria-selected', (name === 'messages' ? inbox : which === name) ? 'true' : 'false');
+    });
+    if (window.FYC_TAB_IN_VIEW) window.FYC_TAB_IN_VIEW(inbox ? 'messages' : which);
     stopPolling();
-    if (which === 'people') renderPeople();
-    if (which === 'messages') renderMessages();
+    if (window.FYC_CIRCLES) {
+      window.FYC_CIRCLES.stop();
+      if (which === 'circles') window.FYC_CIRCLES.render();
+    }
+    if (inbox) { if (inboxSeg === 'people') renderPeople(); else renderMessages(); }
     // The finder's own tabs are rendered by app.js.
     if (window.FYC_VIEWS && window.FYC_VIEWS[which]) window.FYC_VIEWS[which]();
     window.scrollTo({ top: 0 });
+  }
+
+  /** The Chats / People switch at the top of the inbox. */
+  function segBar(active) {
+    var seg = el('div', { class: 'seg', role: 'tablist' }, [
+      ['chats', 'Chats'], ['people', 'People']
+    ].map(function (pair) {
+      return el('button', {
+        class: 'seg-btn', type: 'button', role: 'tab',
+        'aria-selected': active === pair[0] ? 'true' : 'false',
+        onclick: function () { inboxSeg = pair[0]; show(pair[0] === 'people' ? 'people' : 'messages'); }
+      }, [pair[1]]);
+    }));
+    D.wireTablist(seg);
+    return seg;
   }
 
   window.FYC_SHOW = show;

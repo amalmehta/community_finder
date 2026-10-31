@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terms — Community Finder</title>
+<meta name="description" content="The rules for using Community Finder, and the limits of what it promises.">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<!-- Paired with color-scheme in the stylesheet: this one lands before the
+     stylesheet has loaded, so the native canvas never flashes white. -->
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fbf8f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
+<!-- The server sends this as a header; GitHub Pages cannot send headers, so
+     the static build carries its own. frame-ancestors is deliberately absent:
+     it is ignored in a meta element, and a directive that does nothing but
+     log an error on every load is worse than none. Framing is refused by the
+     server's header, which is the only place it can be. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<link rel="stylesheet" href="assets/styles.css">
+<script>
+  // The same four lines the app runs, so arriving here from a dark app does
+  // not flash a cream page. These pages carry no toggle of their own: the
+  // choice is the app's, and this honours it.
+  try {
+    var t = localStorage.getItem('fyc.theme.v1');
+    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+</script>
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="appbar"><div class="appbar-in">
+  <a class="brand" href="/">Community Finder</a>
+  <span class="page-tag">terms</span>
+</div></header>
+
+<main id="main" tabindex="-1"><div class="wrap legal">
+  <h1>Terms</h1>
+  <p class="lede">Short, because the service is small.</p>
+
+  <h2>Who can use it</h2>
+  <p>You must be 18 or over to create an account. You confirm this at sign-up.</p>
+
+  <h2>How to behave</h2>
+  <p>Messaging here exists so people can arrange to do something together. Do not use it to harass, threaten, abuse, impersonate, solicit, scam, or send unwanted repeat contact. Do not use it to advertise. If someone declines or does not reply, that is the answer.</p>
+  <p>Accounts that do these things are suspended, which ends their sessions and removes them from discovery.</p>
+
+  <h2>Blocking and reporting</h2>
+  <p>You can block anyone, immediately and in both directions. Reporting someone also blocks them. Reports are read by whoever operates this server.</p>
+
+  <h2>Meeting people</h2>
+  <p>This software introduces people; it does not vet them. Accounts are not identity-verified, and a verified email proves only that an address works. Meet in public, tell someone where you are going, and leave if you want to. Use your judgement as you would with any stranger.</p>
+
+  <h2>The listings</h2>
+  <p>Organisations listed here are independent and have no relationship with this app. They are hand-checked and link-checked weekly, but groups fold, move and change their schedules. Confirm details on the organisation's own page before you turn up. Costs, timings and commitments described here may be out of date.</p>
+
+  <h2>No warranty</h2>
+  <p>This is provided as-is, with no warranty of any kind. It may be unavailable, lose data, or be discontinued. Do not rely on it for anything that matters urgently.</p>
+
+  <h2>Your content</h2>
+  <p>What you write stays yours. You give whoever runs this server permission to store and display it for the purpose of making the app work — showing your messages to the person you sent them to, and your profile to people who share your visible interests.</p>
+
+  <h2>Ending it</h2>
+  <p>You can stop using it whenever you like and ask the operator to delete your account. The operator can suspend accounts that break these terms.</p>
+
+  <p class="legal-foot"><a href="/">← Back to the app</a> · <a href="privacy.html">Privacy</a></p>
+</div></main>
+</body>
+</html>

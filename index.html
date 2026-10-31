@@ -2,10 +2,30 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>community_finder</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- The server sends this as a header; GitHub Pages cannot send headers, so
+     the static build carries its own. frame-ancestors is deliberately absent:
+     it is ignored in a meta element, and a directive that does nothing but
+     log an error on every load is worse than none. Framing is refused by the
+     server's header, which is the only place it can be. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'none'; base-uri 'none'">
+<title>Community Finder</title>
 <meta name="description" content="Real local communities by city and interest, with the concrete first step, the cost and the commitment for each.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🫂</text></svg>">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon.svg">
+<link rel="canonical" href="https://amalmehta.github.io/community_finder/">
+<!-- Paired with color-scheme in the stylesheet: this one lands before the
+     stylesheet has loaded, so the native canvas never flashes white. -->
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fbf8f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Community Finder">
+<meta property="og:description" content="Real local groups near you, and small vetted circles that chat first and decide to meet up later.">
+<meta property="og:url" content="https://amalmehta.github.io/community_finder/">
+<meta property="og:image" content="https://amalmehta.github.io/community_finder/assets/social.svg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="manifest" href="site.webmanifest">
 <link rel="stylesheet" href="assets/styles.css">
 <script>
   // Inline and before the stylesheet renders: avoids a flash of the wrong theme.
@@ -17,72 +37,91 @@
 </head>
 <body>
 
-<header class="site-header">
-  <div class="wrap">
-    <div class="brand"><b>community_finder</b><span>real groups, real first steps</span></div>
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- The app bar. Tabs sit here on a wide screen and drop to a bottom bar on a
+     narrow one; they are the same buttons either way. -->
+<header class="appbar">
+  <div class="appbar-in">
+    <span class="brand">
+      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="8.5" cy="8.5" r="3.4"/><circle cx="15.5" cy="8.5" r="3.4"/>
+        <path d="M3 19c0-3.1 2.5-5 5.5-5s5.5 1.9 5.5 5"/>
+        <path d="M10 19c0-3.1 2.5-5 5.5-5s5.5 1.9 5.5 5"/>
+      </svg>
+      <span>Community Finder</span>
+    </span>
     <nav class="tabs" role="tablist" aria-label="Sections">
-      <button class="tab" id="tab-find" role="tab" aria-selected="true" aria-controls="view-find">Find</button>
-      <button class="tab" id="tab-plan" role="tab" aria-selected="false" aria-controls="view-plan">My plan<span class="count" id="plan-count" hidden>0</span></button>
-      <button class="tab" id="tab-you" role="tab" aria-selected="false" aria-controls="view-you">You</button>
-      <button class="tab" id="tab-people" role="tab" aria-selected="false" aria-controls="view-people" hidden>People</button>
-      <button class="tab" id="tab-messages" role="tab" aria-selected="false" aria-controls="view-messages" hidden>Messages<span class="count" id="msg-count" hidden>0</span></button>
-      <button class="tab" id="tab-signout" type="button" hidden>Sign out</button>
-      <button class="theme-btn" id="theme-toggle" type="button" aria-label="Colour theme"></button>
+      <button class="tab" id="tab-find" role="tab" aria-selected="true" aria-controls="view-find">
+        <svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+        <span>Find</span>
+      </button>
+      <button class="tab" id="tab-plan" role="tab" aria-selected="false" aria-controls="view-plan">
+        <svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 4h11v16l-5.5-3.6L6.5 20z"/></svg>
+        <span>Saved</span><i class="count" id="plan-count" hidden>0</i>
+      </button>
+      <button class="tab" id="tab-circles" role="tab" aria-selected="false" aria-controls="view-circles" hidden>
+        <svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9.5" cy="9.5" r="5"/><circle cx="15" cy="15" r="5"/></svg>
+        <span>Circles</span><i class="count" id="circles-count" hidden>0</i>
+      </button>
+      <button class="tab" id="tab-messages" role="tab" aria-selected="false" aria-controls="view-messages" hidden>
+        <svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 6.5a2 2 0 012-2h11a2 2 0 012 2v7a2 2 0 01-2 2H9l-4.5 3.5z"/></svg>
+        <span>Inbox</span><i class="count" id="msg-count" hidden>0</i>
+      </button>
+      <button class="tab" id="tab-you" role="tab" aria-selected="false" aria-controls="view-you">
+        <svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 19.5c0-3.6 2.9-5.6 6.5-5.6s6.5 2 6.5 5.6"/></svg>
+        <span>You</span>
+      </button>
     </nav>
+    <button class="theme-btn" id="theme-toggle" type="button" aria-label="Colour theme"></button>
   </div>
 </header>
 
 <div id="auth-gate" hidden></div>
 
-<main>
-  <!-- ============================ FIND ============================ -->
+<main id="main" tabindex="-1">
   <section id="view-find" role="tabpanel" aria-labelledby="tab-find">
     <div class="wrap">
-
-      <div class="intro" id="intro">
-        <h1>Find your people.</h1>
-        <p>Twenty questions, adapting as you go. Then real local groups, what they cost, and what actually happens when you turn up.</p>
-      </div>
-
+      <noscript>
+        <div class="notice">
+          <b>This one needs JavaScript.</b> The whole app runs in your browser —
+          there is no server doing the work — so with scripting off there is
+          nothing to show. Nothing is sent anywhere either way:
+          <a href="privacy.html">what it stores</a>.
+        </div>
+      </noscript>
       <div id="intake"></div>
-
-      <div class="results" id="results" hidden></div>
+      <p class="sr-only" id="results-status" role="status" aria-live="polite"></p>
+      <div class="results" id="results" role="region" aria-label="Results" hidden></div>
     </div>
   </section>
 
-  <!-- ============================ YOU ============================= -->
   <section id="view-you" role="tabpanel" aria-labelledby="tab-you" hidden>
     <div class="wrap" id="you-body"></div>
   </section>
 
-  <!-- =========================== PEOPLE =========================== -->
-  <section id="view-people" role="tabpanel" aria-labelledby="tab-people" hidden>
-    <div class="wrap" id="people-body"></div>
+  <section id="view-circles" role="tabpanel" aria-labelledby="tab-circles" hidden>
+    <div class="wrap" id="circles-body"></div>
   </section>
 
-  <!-- ========================== MESSAGES ========================== -->
   <section id="view-messages" role="tabpanel" aria-labelledby="tab-messages" hidden>
     <div class="wrap" id="messages-body"></div>
   </section>
 
-  <!-- ============================ PLAN ============================ -->
+  <!-- Still its own panel so the two halves of the inbox keep separate DOM,
+       but it is reached through the Inbox tab's segmented control, not a tab. -->
+  <section id="view-people" role="tabpanel" aria-labelledby="tab-messages" hidden>
+    <div class="wrap" id="people-body"></div>
+  </section>
+
   <section id="view-plan" role="tabpanel" aria-labelledby="tab-plan" hidden>
     <div class="wrap" id="plan-body"></div>
   </section>
 </main>
 
-<footer class="site-footer">
-  <div class="wrap">
-    <p>Everything stays in this browser &mdash; including the record of what you click, which is used to improve your results. There is no account and no server, and nothing is ever sent anywhere. See it, pause it or erase it on the <strong>You</strong> tab.</p>
-    <p>Listings are hand-checked and link-checked weekly, but groups change. Verify before you go.</p>
-  </div>
-</footer>
-
-<!-- ============================ FEEDBACK ============================ -->
 <button class="fb-tab" id="fb-tab" aria-expanded="false" aria-controls="fb-panel">Feedback</button>
 <div class="fb-panel" id="fb-panel" role="dialog" aria-labelledby="fb-title" hidden>
   <h2 id="fb-title">How&rsquo;s this working?</h2>
-  <p class="hint">Saved in your browser. Use Copy to send it on.</p>
   <div class="fb-stars" id="fb-stars" role="group" aria-label="Rating out of 5">
     <button type="button" data-v="1" aria-pressed="false" aria-label="1 star">★</button>
     <button type="button" data-v="2" aria-pressed="false" aria-label="2 stars">★</button>
@@ -110,11 +149,34 @@
 <script src="src/data/city-dc.js"></script>
 <script src="src/data/city-la.js"></script>
 <script src="src/data/city-sandiego.js"></script>
+<script src="src/data/city-denver.js"></script>
+<script src="src/data/city-portland.js"></script>
+<script src="src/data/city-minneapolis.js"></script>
 <script src="src/data/universal.js"></script>
+<script src="src/dom.js"></script>
 <script src="src/preferences.js"></script>
 <script src="src/intake.js"></script>
 <script src="src/match.js"></script>
+<script src="src/art.js"></script>
 <script src="src/app.js"></script>
 <script src="src/social.js"></script>
+<script src="src/circles.js"></script>
+
+<script>
+  // Caches the app so it opens with the network off — see sw.js for what it
+  // will and will not keep. Registered after load so it never competes with
+  // the first paint, and only where it can work: a worker cannot be
+  // registered over file://, and an app opened that way should carry on
+  // working rather than throwing on boot.
+  if ('serviceWorker' in navigator
+      && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {
+        // Private windows and some enterprise policies refuse outright. The
+        // app works online regardless, so this is not worth a word to anyone.
+      });
+    });
+  }
+</script>
 </body>
 </html>

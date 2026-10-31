@@ -5,7 +5,8 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$HERE")"
-APP_NAME="community_finder"
+APP_NAME="community_finder"          # the bundle on disk, and the repo name
+DISPLAY_NAME="Community Finder"      # what macOS shows: Dock, menu bar, Finder
 BUILD="$HERE/build"
 DIST="$HERE/dist"
 APP="$DIST/$APP_NAME.app"
@@ -33,8 +34,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>$APP_NAME</string>
-  <key>CFBundleDisplayName</key><string>$APP_NAME</string>
+  <key>CFBundleName</key><string>$DISPLAY_NAME</string>
+  <key>CFBundleDisplayName</key><string>$DISPLAY_NAME</string>
   <key>CFBundleExecutable</key><string>fyc</string>
   <key>CFBundleIdentifier</key><string>com.amalmehta.communityfinder</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>

@@ -1,0 +1,12 @@
+# The finder is public and worth indexing. Anything to do with accounts,
+# people or messages is not.
+User-agent: *
+Allow: /$
+Allow: /index.html
+Allow: /privacy.html
+Allow: /terms.html
+Allow: /assets/
+Disallow: /api/
+Disallow: /verify
+
+Sitemap: https://amalmehta.github.io/community_finder/sitemap.xml

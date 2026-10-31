@@ -1,0 +1,21 @@
+{
+  "name": "Community Finder",
+  "short_name": "Community",
+  "description": "Real local groups and the concrete first step into each.",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["lifestyle", "social", "utilities"],
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#fbf8f4",
+  "theme_color": "#b1502a",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Saved", "short_name": "Saved", "url": "./?tab=plan", "description": "The places you put aside, and the first step into each." },
+    { "name": "You", "short_name": "You", "url": "./?tab=you", "description": "What this device has learned, and the controls for it." }
+  ]
+}

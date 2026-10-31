@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — Community Finder</title>
+<meta name="description" content="What Community Finder stores, what it does not, and how to get rid of it.">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<!-- Paired with color-scheme in the stylesheet: this one lands before the
+     stylesheet has loaded, so the native canvas never flashes white. -->
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fbf8f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
+<!-- The server sends this as a header; GitHub Pages cannot send headers, so
+     the static build carries its own. frame-ancestors is deliberately absent:
+     it is ignored in a meta element, and a directive that does nothing but
+     log an error on every load is worse than none. Framing is refused by the
+     server's header, which is the only place it can be. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<link rel="stylesheet" href="assets/styles.css">
+<script>
+  // The same four lines the app runs, so arriving here from a dark app does
+  // not flash a cream page. These pages carry no toggle of their own: the
+  // choice is the app's, and this honours it.
+  try {
+    var t = localStorage.getItem('fyc.theme.v1');
+    if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+</script>
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="appbar"><div class="appbar-in">
+  <a class="brand" href="/">Community Finder</a>
+  <span class="page-tag">privacy</span>
+</div></header>
+
+<main id="main" tabindex="-1"><div class="wrap legal">
+  <h1>Privacy</h1>
+  <p class="lede">Written to describe what the software actually does. If you find a gap between this page and the behaviour, the behaviour is the bug.</p>
+
+  <h2>Without an account</h2>
+  <p>The published site runs entirely in your browser. Your answers to the twenty questions, your saved plan, the record of what you click, your theme and any feedback you leave are stored in that browser's <code>localStorage</code>. None of it is transmitted. There is no analytics script, no tracking pixel, no third-party font or CDN. The only network requests are for the app's own files, and whatever link you choose to open.</p>
+  <p>Clearing your browser data removes all of it. The <strong>You</strong> tab also has buttons to pause the behavioural record or erase it outright.</p>
+
+  <h2>With an account</h2>
+  <p>Running against a server adds the parts that cannot work on-device. Stored on the server:</p>
+  <ul>
+    <li>Your username, a scrypt hash of your password, and a random session token</li>
+    <li>Your display name, city, short bio, and which interests you chose — each flagged visible or hidden</li>
+    <li>Your email address, only if you add one, and whether it is verified</li>
+    <li>Connection requests and the messages in your conversations</li>
+    <li>Circles you host or belong to, what you wrote when applying to one, everything said in a circle&rsquo;s group chat, who you have vouched for, meetup proposals and your yes/maybe/no on each, the plan you write for getting to a meetup, whether you confirmed you were at one, your one line on what you want out of a circle, and which questions the app handed to you</li>
+    <li>Blocks and reports you make</li>
+    <li>A log line per request: method, path, status and duration. No query strings, no bodies, no cookies</li>
+  </ul>
+  <p>Your twenty answers, your plan and your click history are <em>not</em> sent to the server. They stay in your browser even when you are signed in.</p>
+
+  <h2>What other people can see</h2>
+  <p>Your display name, your city, your bio, and only the interests you marked visible. A hidden interest still shapes your own results and is never used to find you, shown to anyone, or searchable. Location is city-level only; the app never asks for or stores anything finer. Turning off discovery removes you from other people's results entirely.</p>
+
+  <h2>Circles</h2>
+  <p>A circle is a group, so everything in it is seen by everyone in it. The answer you write when applying is read by the host and by the members, who can second you; it stays in the database after a decision either way. Your messages in a circle are visible to every member, including people admitted after you wrote them. A vouch is visible to the person you vouched for and counts towards their trust tier. Leaving a circle removes you and your vouches from it; what you already said stays in the conversation, attributed to a name the others can still see.</p>
+  <p>A circle you have not joined shows you its name, city, description, joining question, how many people are in it and how busy it has been. It never shows you the conversation or who is in it.</p>
+  <p>Two things inside a circle are narrower than the group chat. The plan you write when you say yes to a meetup &mdash; where you are setting off from, when, and how &mdash; is shown back only to you; no other member, the host included, ever sees it, which is why it is safe to put a route in it. And a one-to-one thread you start with someone from a circle is an ordinary conversation between the two of you: nobody else in the circle can see it, and blocking, reporting and the daily limits work there exactly as they do anywhere else.</p>
+  <p>The circle shows every member what any two of you both picked, built only from interests you both marked visible. A hidden interest stays hidden from the people in your circles too.</p>
+  <p>When someone answers a question and nobody replies for four hours, the other members are told so that one of them does. The person who answered is never shown that notice.</p>
+  <p>Your line on what you want out of a circle is written for the other members of that circle and shown to them with your name on it. It is per circle, not part of your profile, and never appears outside the circle you wrote it in. Taking it down removes it, and needs no explanation.</p>
+  <p>When the app posts a question it sometimes addresses it to up to two members who have not said anything for a couple of days &mdash; never the person who asked for the question, and never the same people as the previous one. That is visible to the whole circle, by name, because a question handed over privately is not an invitation anybody can take up. Nothing about how much or how little you have said is shown beyond the message count that has always been on your card in the member list, and there is currently no way to opt out of being asked.</p>
+
+  <h2>Messages</h2>
+  <p>Messages, in a conversation or a circle, are stored in plain text in the database so they can be shown to everyone who should see them. They are not end-to-end encrypted. Anyone with access to the server can read them, which in a self-hosted deployment means whoever runs it. Do not use this for anything you would not want an administrator to see.</p>
+
+  <h2>Reports</h2>
+  <p>Reporting someone stores your username, theirs, your reason and any detail, and blocks them. Reports are read by whoever operates the server, so that they can act on them.</p>
+
+  <h2>Email</h2>
+  <p>An address is optional and used for one thing: verifying that you can be contacted, which is what unlocks messaging. It is never shared, sold, or used for anything you did not ask for. There is no mailing list.</p>
+
+  <h2>Getting rid of it</h2>
+  <p>Ask whoever runs the server to delete your account and they can remove it and everything attached to it. On the published site with no account, clearing your browser data is complete and immediate — there is nothing held anywhere else.</p>
+
+  <h2>Changes</h2>
+  <p>This page is versioned with the code. Its history is in the repository, so you can see exactly what changed and when.</p>
+
+  <p class="legal-foot"><a href="/">← Back to the app</a> · <a href="terms.html">Terms</a></p>
+</div></main>
+</body>
+</html>
