@@ -305,16 +305,19 @@ function send(res, status, body, headers = {}) {
 }
 const fail = (res, status, error) => send(res, status, { error });
 
+/** An error the caller caused, and can be told about. Anything else is ours. */
+class BadRequest extends Error {}
+
 function readJson(req, limit = 64 * 1024) {
   return new Promise((resolve, reject) => {
     let buf = '';
     req.on('data', (c) => {
       buf += c;
-      if (buf.length > limit) { reject(new Error('body too large')); req.destroy(); }
+      if (buf.length > limit) { reject(new BadRequest('body too large')); req.destroy(); }
     });
     req.on('end', () => {
       if (!buf) return resolve({});
-      try { resolve(JSON.parse(buf)); } catch (e) { reject(new Error('invalid JSON')); }
+      try { resolve(JSON.parse(buf)); } catch (e) { reject(new BadRequest('invalid JSON')); }
     });
     req.on('error', reject);
   });
@@ -400,6 +403,9 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
   // for ten, and only loses the empty seats above it.
   store.lowerCaps(CAP_RANGE.max);
   const mail = mailer || createMailer();
+  // Once now, then hourly. Only ever scheduling it meant a server that is
+  // restarted more often than once an hour never pruned anything at all.
+  store.prune();
   setInterval(() => store.prune(), HOUR).unref?.();
 
   function setSession(res, token) {
@@ -1535,7 +1541,18 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
       if (pathname === '/verify') return serveStatic(req, res, '/index.html');
       serveStatic(req, res, pathname);
     } catch (err) {
-      fail(res, 400, err.message || 'Bad request');
+      // This used to be `fail(res, 400, err.message)` for everything, which
+      // got two things wrong at once. A constraint violation or a TypeError
+      // is not the caller's fault, and calling it 400 tells them — and any
+      // monitoring watching status codes — that it was. And err.message on
+      // an internal fault is our own text: a column name, a file path, the
+      // SQL that failed. Only the errors we raise deliberately say anything.
+      if (err instanceof BadRequest) return fail(res, 400, err.message);
+      if (log) {
+        const pathOnly = String(req.url || '').split('?')[0];
+        log(`${new Date().toISOString()} ERROR ${req.method} ${pathOnly} ${err && err.stack || err}`);
+      }
+      fail(res, 500, 'Something went wrong at our end.');
     }
   });
 

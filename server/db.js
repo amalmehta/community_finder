@@ -9,6 +9,20 @@ const fs = require('node:fs');
 const SCHEMA = `
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
+-- Without this a writer that finds the database locked fails immediately
+-- rather than waiting. WAL lets readers and one writer work at once, but
+-- tools/backup.js runs VACUUM INTO against the live file on a schedule, and
+-- that is exactly the window where a write would have been refused outright
+-- instead of waiting the moment out.
+PRAGMA busy_timeout = 5000;
+-- FULL is the default and costs an fsync per write: measured at 346µs an
+-- insert against 105µs here, so better than three times the write cost. In
+-- WAL mode NORMAL is still safe against the application crashing — SQLite
+-- recommends it as the pairing — and the exposure it adds is losing the
+-- last transactions to a power cut or an OS crash, not to a bug or a
+-- restart. Worth knowing before changing it back: that means a message
+-- somebody saw send.
+PRAGMA synchronous = NORMAL;
 
 CREATE TABLE IF NOT EXISTS users (
   id          INTEGER PRIMARY KEY,
@@ -239,6 +253,23 @@ CREATE INDEX IF NOT EXISTS idx_att ON attendance(user_id, attended);
 CREATE INDEX IF NOT EXISTS idx_cmsg ON circle_messages(circle_id, id);
 CREATE INDEX IF NOT EXISTS idx_cmem ON circle_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_cint ON circle_interests(interest);
+
+-- Three queries had nothing to search and scanned the whole table instead.
+-- The UNIQUE(from_id, to_id) on connections covers from_id, so asking "who
+-- has written to me" — which every signed-in client asks every thirty
+-- seconds — was the one that scanned. The other two are read per member row
+-- when a circle is opened.
+CREATE INDEX IF NOT EXISTS idx_conn_to ON connections(to_id, status);
+CREATE INDEX IF NOT EXISTS idx_capp_user ON circle_applications(user_id);
+CREATE INDEX IF NOT EXISTS idx_vouch_to ON vouches(to_id);
+
+-- prune() runs hourly and scanned every table it cleaned. idx_actions is
+-- (who, kind, at), which cannot answer "everything older than X" — and
+-- actions is the largest table here, one row per rate-limited action.
+CREATE INDEX IF NOT EXISTS idx_actions_at ON actions(at);
+CREATE INDEX IF NOT EXISTS idx_sess_exp ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_verif_exp ON verifications(expires_at);
+CREATE INDEX IF NOT EXISTS idx_verif_used ON verifications(used_at);
 `;
 
 // Columns added after the first release. Existing databases are migrated in
@@ -285,8 +316,58 @@ function open(file) {
 
 /** Everything the API needs, bound to one database handle. */
 function createStore(db) {
-  const q = (sql) => db.prepare(sql);
+  /**
+   * Prepared statements, kept.
+   *
+   * This was `db.prepare(sql)` on every call, so every query in the file
+   * recompiled its SQL each time it ran — and a single request runs several
+   * (the session, the user, their interests, then whatever it was actually
+   * asked for). Measured on the people-discovery query, preparing each time
+   * costs about 92µs more per call than reusing the statement, which is
+   * most of a millisecond on a request that does ten.
+   *
+   * The SQL strings here are literals and a handful of templates whose only
+   * variable is the number of placeholders, so the map is bounded by the
+   * code rather than by traffic.
+   */
+  const statements = new Map();
+  const q = (sql) => {
+    let stmt = statements.get(sql);
+    if (!stmt) { stmt = db.prepare(sql); statements.set(sql, stmt); }
+    return stmt;
+  };
   const now = () => Date.now();
+
+  /**
+   * Run several writes as one.
+   *
+   * Nothing in here was atomic. Most of these functions write once and are
+   * fine, but the ones that do not are the dangerous kind: setInterests and
+   * setCircleInterests DELETE every row and then INSERT the replacements, so
+   * a failure between the two does not leave the old value — it leaves
+   * nothing. createCircle writes the circle, its interests and its host as
+   * three separate statements, and losing either of the last two leaves a
+   * circle nobody hosts and nobody can find.
+   *
+   * Depth-counted because these call each other: createCircle calls
+   * setCircleInterests, and SQLite has no nested BEGIN.
+   */
+  let depth = 0;
+  const tx = (fn) => {
+    if (depth > 0) return fn();          // already inside one
+    depth++;
+    db.exec('BEGIN');
+    try {
+      const out = fn();
+      db.exec('COMMIT');
+      return out;
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch (_) { /* already unwound */ }
+      throw e;
+    } finally {
+      depth--;
+    }
+  };
 
   const S = {
     db,
@@ -315,10 +396,14 @@ function createStore(db) {
 
     // ---- interests ----
     setInterests(userId, list) {
-      q('DELETE FROM user_interests WHERE user_id = ?').run(userId);
-      const ins = q('INSERT INTO user_interests (user_id, interest, visible) VALUES (?, ?, ?)');
-      (list || []).slice(0, 12).forEach((it) => {
-        ins.run(userId, String(it.id), it.visible === false ? 0 : 1);
+      // Clear-then-replace: without the transaction a failure part way
+      // through does not leave the old interests, it leaves none.
+      tx(() => {
+        q('DELETE FROM user_interests WHERE user_id = ?').run(userId);
+        const ins = q('INSERT INTO user_interests (user_id, interest, visible) VALUES (?, ?, ?)');
+        (list || []).slice(0, 12).forEach((it) => {
+          ins.run(userId, String(it.id), it.visible === false ? 0 : 1);
+        });
       });
     },
     interestsOf(userId) {
@@ -417,10 +502,28 @@ function createStore(db) {
         .run(connectionId, senderId, String(body).slice(0, 2000), now());
       return Number(info.lastInsertRowid);
     },
+    /**
+     * A page of a conversation.
+     *
+     * The cap was always here, but with `id > 0 ORDER BY id ASC LIMIT 300`
+     * the first load of a long thread returned the three hundred *oldest*
+     * messages. The client polls every five seconds and appends, so opening
+     * a thread with a thousand messages in it put you at the beginning of
+     * last year and walked you forward three hundred at a time, taking
+     * fifteen seconds to reach today.
+     *
+     * Opening a conversation means opening it at the end. Catching up
+     * (sinceId > 0) still reads forwards, which is what the poll wants.
+     */
     messages(connectionId, sinceId = 0) {
+      if (sinceId > 0) {
+        return q(`SELECT id, sender_id, body, created_at FROM messages
+                  WHERE connection_id = ? AND id > ? ORDER BY id ASC LIMIT 300`)
+          .all(connectionId, sinceId);
+      }
       return q(`SELECT id, sender_id, body, created_at FROM messages
-                WHERE connection_id = ? AND id > ? ORDER BY id ASC LIMIT 300`)
-        .all(connectionId, sinceId);
+                WHERE connection_id = ? ORDER BY id DESC LIMIT 300`)
+        .all(connectionId).reverse();
     },
 
     // ---- safety ----
@@ -514,25 +617,32 @@ function createStore(db) {
 
     // ---------------------------------------------------------- circles
     createCircle({ name, city, blurb, question, hostId, cap, minTrust, interests }) {
-      const t = now();
-      const info = q(`INSERT INTO circles (name, city, blurb, question, host_id, cap, min_trust, created_at)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(String(name).slice(0, 60), String(city || '').slice(0, 60),
-             String(blurb || '').slice(0, 400), String(question || '').slice(0, 200),
-             hostId, cap, minTrust, t);
-      const id = Number(info.lastInsertRowid);
-      S.setCircleInterests(id, interests);
-      q(`INSERT INTO circle_members (circle_id, user_id, role, joined_at) VALUES (?, ?, 'host', ?)`)
-        .run(id, hostId, t);
-      return id;
+      // The circle, what it is about and who hosts it are three statements.
+      // Lose either of the last two and there is a circle nobody hosts and
+      // nobody can find, which no later request can repair.
+      return tx(() => {
+        const t = now();
+        const info = q(`INSERT INTO circles (name, city, blurb, question, host_id, cap, min_trust, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+          .run(String(name).slice(0, 60), String(city || '').slice(0, 60),
+               String(blurb || '').slice(0, 400), String(question || '').slice(0, 200),
+               hostId, cap, minTrust, t);
+        const id = Number(info.lastInsertRowid);
+        S.setCircleInterests(id, interests);
+        q(`INSERT INTO circle_members (circle_id, user_id, role, joined_at) VALUES (?, ?, 'host', ?)`)
+          .run(id, hostId, t);
+        return id;
+      });
     },
     circleById(id) {
       return q('SELECT * FROM circles WHERE id = ?').get(Number(id));
     },
     setCircleInterests(circleId, list) {
-      q('DELETE FROM circle_interests WHERE circle_id = ?').run(circleId);
-      const ins = q('INSERT OR IGNORE INTO circle_interests (circle_id, interest) VALUES (?, ?)');
-      (list || []).slice(0, 6).forEach((i) => ins.run(circleId, String(i)));
+      tx(() => {
+        q('DELETE FROM circle_interests WHERE circle_id = ?').run(circleId);
+        const ins = q('INSERT OR IGNORE INTO circle_interests (circle_id, interest) VALUES (?, ?)');
+        (list || []).slice(0, 6).forEach((i) => ins.run(circleId, String(i)));
+      });
     },
     circleInterests(circleId) {
       return q('SELECT interest FROM circle_interests WHERE circle_id = ?').all(circleId)
@@ -584,9 +694,14 @@ function createStore(db) {
          VALUES (?, ?, ?, ?)`).run(circleId, userId, role, now());
     },
     removeMember(circleId, userId) {
-      q('DELETE FROM circle_members WHERE circle_id = ? AND user_id = ?').run(circleId, userId);
-      q('DELETE FROM vouches WHERE circle_id = ? AND (from_id = ? OR to_id = ?)')
-        .run(circleId, userId, userId);
+      // Leaving the circle and the vouches that only made sense inside it go
+      // together: half of this leaves vouches pointing at a non-member, which
+      // the trust tiers then count.
+      tx(() => {
+        q('DELETE FROM circle_members WHERE circle_id = ? AND user_id = ?').run(circleId, userId);
+        q('DELETE FROM vouches WHERE circle_id = ? AND (from_id = ? OR to_id = ?)')
+          .run(circleId, userId, userId);
+      });
     },
     circleIdsOf(userId) {
       return q('SELECT circle_id FROM circle_members WHERE user_id = ?').all(userId)
@@ -690,12 +805,20 @@ function createStore(db) {
              (invites || []).map(Number).join(','));
       return Number(info.lastInsertRowid);
     },
+    /** Same as messages(): a circle opens at the end, not at its beginning. */
     circleMessages(circleId, sinceId = 0) {
-      return q(`SELECT m.id, m.sender_id, m.body, m.kind, m.created_at, m.invites,
-                       COALESCE(u.display, 'someone who left') AS sender_name
+      const COLS = `m.id, m.sender_id, m.body, m.kind, m.created_at, m.invites,
+                    COALESCE(u.display, 'someone who left') AS sender_name`;
+      if (sinceId > 0) {
+        return q(`SELECT ${COLS}
+                  FROM circle_messages m LEFT JOIN users u ON u.id = m.sender_id
+                  WHERE m.circle_id = ? AND m.id > ?
+                  ORDER BY m.id ASC LIMIT 300`).all(circleId, sinceId);
+      }
+      return q(`SELECT ${COLS}
                 FROM circle_messages m LEFT JOIN users u ON u.id = m.sender_id
-                WHERE m.circle_id = ? AND m.id > ?
-                ORDER BY m.id ASC LIMIT 300`).all(circleId, sinceId);
+                WHERE m.circle_id = ?
+                ORDER BY m.id DESC LIMIT 300`).all(circleId).reverse();
     },
     promptsUsed(circleId) {
       return q(`SELECT body FROM circle_messages WHERE circle_id = ? AND kind = 'prompt'`)
@@ -1016,8 +1139,18 @@ function createStore(db) {
         .get(who, kind, now() - sinceMs).n;
     },
     prune() {
-      q('DELETE FROM actions WHERE at < ?').run(now() - 7 * 86400000);
-      q('DELETE FROM sessions WHERE expires_at < ?').run(now());
+      const t = now();
+      q('DELETE FROM actions WHERE at < ?').run(t - 7 * 86400000);
+      q('DELETE FROM sessions WHERE expires_at < ?').run(t);
+      // Verification rows were never cleared. One is written per address
+      // confirmed, it is single-use and short-lived, and it holds the email
+      // — so a table of addresses grew for the life of the install, every
+      // row of it long dead. The address is already on the user; this copy
+      // exists to carry a token that has been spent or has expired.
+      // Two statements rather than one OR: an OR across two columns cannot
+      // use either index, and this is the shape that lets both be used.
+      q('DELETE FROM verifications WHERE used_at IS NOT NULL').run();
+      q('DELETE FROM verifications WHERE expires_at < ?').run(t);
     }
   };
   return S;

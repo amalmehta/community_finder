@@ -1139,6 +1139,122 @@ async function verifyEmail(call, email) {
     eq(cross.status, 403, 'cross-origin writes are refused');
   });
 
+  await group('the data layer: atomic writes, real indexes, and what gets kept', async () => {
+    const { DatabaseSync } = require('node:sqlite');
+    const { open, createStore, SCHEMA } = require(path.join(__dirname, '..', 'server', 'db.js'));
+
+    // --- the pragmas every connection gets ---------------------------------
+    // WAL lets a reader and a writer work at once, but tools/backup.js runs
+    // VACUUM INTO against the live file: without a busy timeout a write in
+    // that window failed outright rather than waiting it out.
+    eq(store.db.prepare('PRAGMA busy_timeout').get().timeout, 5000, 'a writer waits for the lock');
+    eq(store.db.prepare('PRAGMA journal_mode').get().journal_mode, 'wal', 'still WAL');
+    eq(store.db.prepare('PRAGMA foreign_keys').get().foreign_keys, 1, 'with foreign keys on');
+    // FULL costs an fsync per write (measured 346µs an insert against 105µs).
+    // NORMAL is what SQLite recommends with WAL and is still safe against the
+    // application crashing; the exposure is a power cut, not a bug.
+    eq(store.db.prepare('PRAGMA synchronous').get().synchronous, 1, 'and NORMAL, as WAL wants');
+
+    // --- writes that touch more than one table -----------------------------
+    // setInterests clears every row then inserts the replacements. Without a
+    // transaction a failure between the two does not leave the old value, it
+    // leaves nothing — and a duplicate in the list is enough to cause one.
+    const solo = createStore(open(':memory:'));
+    const uid = Number(solo.createUser({ username: 'tess', display: 'Tess', pass: 'x', salt: 'y', city: 'Denver', ageOk: 1 }));
+    solo.setInterests(uid, [{ id: 'outdoors' }, { id: 'books' }]);
+    const before = solo.interestsOf(uid).map((r) => r.interest).sort().join(',');
+    eq(before, 'books,outdoors', 'interests are set');
+    let threw = false;
+    try { solo.setInterests(uid, [{ id: 'music' }, { id: 'music' }]); } catch (e) { threw = true; }
+    ok(threw, 'a duplicate in the replacement list fails the write');
+    eq(solo.interestsOf(uid).map((r) => r.interest).sort().join(','), before,
+       'and the interests that were there are still there');
+
+    // createCircle writes the circle, its interests and its host separately.
+    const host = Number(solo.createUser({ username: 'hugo', display: 'Hugo', pass: 'x', salt: 'y', city: 'Denver', ageOk: 1 }));
+    const cid = solo.createCircle({ name: 'Walks', city: 'Denver', blurb: 'b', question: 'q',
+                                    hostId: host, cap: 6, minTrust: 'introduced', interests: ['outdoors'] });
+    eq(solo.circleMembers(cid).length, 1, 'a new circle has its host in it');
+    eq(solo.circleInterests(cid).join(','), 'outdoors', 'and what it is about');
+
+    // --- the indexes ------------------------------------------------------
+    // Asking "who has written to me" is what every signed-in client asks
+    // every thirty seconds, and the UNIQUE(from_id, to_id) covers from_id
+    // only, so that one scanned the whole table.
+    const probe = new DatabaseSync(':memory:');
+    probe.exec(SCHEMA);
+    const plan = (sql) => probe.prepare('EXPLAIN QUERY PLAN ' + sql).all().map((r) => r.detail).join(' ; ');
+    const indexed = (sql, name) => ok(!/SCAN (?!.*USING (COVERING )?INDEX)/.test(plan(sql)) && /USING .*INDEX/.test(plan(sql)), name);
+    indexed("SELECT * FROM connections WHERE to_id = ? AND status = 'pending'", 'incoming requests use an index');
+    indexed('SELECT * FROM circle_applications WHERE user_id = ?', 'and a member’s own applications');
+    indexed('SELECT COUNT(*) FROM vouches WHERE to_id = ?', 'and the vouches counted per member');
+    // prune() runs hourly and scanned every table it cleaned; actions is the
+    // largest of them, one row per rate-limited action.
+    indexed('DELETE FROM actions WHERE at < ?', 'pruning actions uses an index');
+    indexed('DELETE FROM sessions WHERE expires_at < ?', 'and expired sessions');
+    indexed('DELETE FROM verifications WHERE expires_at < ?', 'and expired verifications');
+    indexed('DELETE FROM verifications WHERE used_at IS NOT NULL', 'and spent ones, split out of the OR');
+    probe.close();
+
+    // --- what prune() clears ----------------------------------------------
+    // One verification row per address confirmed, single-use, short-lived,
+    // and holding the email. They were never deleted.
+    const keeper = createStore(open(':memory:'));
+    const vu = Number(keeper.createUser({ username: 'vera', display: 'Vera', pass: 'x', salt: 'y', city: 'Denver', ageOk: 1 }));
+    const tok = 'tok-' + vu;
+    keeper.createVerification(tok, vu, 'vera@example.com', 24 * 3600 * 1000);
+    eq(keeper.db.prepare('SELECT COUNT(*) AS n FROM verifications').get().n, 1, 'and stored with the address');
+    keeper.useVerification(tok);
+    keeper.prune();
+    eq(keeper.db.prepare('SELECT COUNT(*) AS n FROM verifications').get().n, 0,
+       'a spent token, and the address with it, does not outlive its use');
+
+    // --- a conversation opens at its end ----------------------------------
+    // The 300 cap was always here, but `id > 0 ORDER BY id ASC` meant the
+    // first load of a long thread returned the three hundred oldest, and the
+    // five-second poll then walked forwards to today.
+    const chat = createStore(open(':memory:'));
+    const a = Number(chat.createUser({ username: 'ann', display: 'Ann', pass: 'x', salt: 'y', city: 'X', ageOk: 1 }));
+    const b = Number(chat.createUser({ username: 'bo', display: 'Bo', pass: 'x', salt: 'y', city: 'X', ageOk: 1 }));
+    const conn = chat.createRequest(a, b, 'hello there, this is an introduction');
+    chat.decideRequest(conn, b, 'accepted');
+    for (let i = 1; i <= 350; i++) chat.addMessage(conn, a, 'message ' + i);
+    const first = chat.messages(conn, 0);
+    eq(first.length, 300, 'a long thread still answers with at most 300');
+    eq(first[first.length - 1].body, 'message 350', 'and the last of them is the newest');
+    eq(first[0].body, 'message 51', 'so the window sits at the end, not the start');
+    ok(first[0].id < first[1].id, 'still oldest-first within the page');
+    const rest = chat.messages(conn, first[first.length - 1].id);
+    eq(rest.length, 0, 'and catching up from there has nothing to add');
+  });
+
+  await group('an error at our end is not the caller’s fault', async () => {
+    // This used to be fail(res, 400, err.message) for everything thrown,
+    // which got two things wrong: a fault here is not a bad request, and
+    // err.message on an internal error is our own text — a column name, a
+    // path, the SQL that failed.
+    // Signed in, so the request reaches the handler rather than stopping at
+    // the auth check.
+    const who = client();
+    await who('POST', '/api/signup', { username: 'erra', password: 'hunter2hunter', city: 'Denver',
+                                       ageOk: true, interests: [{ id: 'outdoors' }] });
+    const real = store.circleById;
+    store.circleById = () => { throw new Error('SQLITE_ERROR: no such column: secret_internal_detail'); };
+    const r = await who('GET', '/api/circles/1');
+    store.circleById = real;
+
+    eq(r.status, 500, 'an internal fault answers 500, not 400');
+    ok(!/secret_internal_detail/.test(JSON.stringify(r.data)), 'and does not hand the caller our error text');
+    ok(/wrong at our end/i.test((r.data && r.data.error) || ''), 'it says whose fault it is');
+
+    // The ones we raise deliberately still say what is wrong.
+    const bad = await fetch(base + '/api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{not json'
+    });
+    eq(bad.status, 400, 'malformed JSON is still the caller’s problem');
+    ok(/invalid JSON/.test((await bad.json()).error || ''), 'and still says so');
+  });
+
   server.close();
   fs.rmSync(tmp, { recursive: true, force: true });
 

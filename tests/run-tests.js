@@ -1870,6 +1870,82 @@ group('the quiet pass: polling, announcements and an icon iOS will take', functi
   eq(manifest.id, './', 'the manifest pins an id');
 });
 
+// --------------------------------------------- the layer under the server
+group('the data layer and the tools around it', function () {
+  var fs = require('fs');
+  var db = fs.readFileSync(path.join(root, 'server/db.js'), 'utf8');
+  var app = fs.readFileSync(path.join(root, 'server/app.js'), 'utf8');
+  var backup = fs.readFileSync(path.join(root, 'tools/backup.js'), 'utf8');
+  var daemon = fs.readFileSync(path.join(root, 'tools/server-daemon.js'), 'utf8');
+
+  // Every query in db.js recompiled its SQL on each call, and one request
+  // runs several. Measured at about 92µs a call on the discovery query.
+  ok(/const statements = new Map\(\)/.test(db), 'prepared statements are kept');
+  ok(/statements\.get\(sql\)/.test(db) && /statements\.set\(sql, stmt\)/.test(db),
+     'and looked up by their SQL');
+  ok(db.indexOf('const q = (sql) => db.prepare(sql);') === -1,
+     'rather than prepared again every time');
+
+  // SQLite has no nested BEGIN, and createCircle calls setCircleInterests.
+  ok(/let depth = 0;/.test(db) && /if \(depth > 0\) return fn\(\);/.test(db),
+     'transactions nest without a second BEGIN');
+  ok(/db\.exec\('ROLLBACK'\)/.test(db), 'and unwind on failure');
+  ['setInterests', 'setCircleInterests', 'createCircle', 'removeMember'].forEach(function (fn) {
+    var body = (db.split('    ' + fn + '(')[1] || '').slice(0, 900);
+    ok(/tx\(/.test(body), fn + ' writes atomically');
+  });
+
+  // An error at our end was answered 400 with its own message in it.
+  ok(/class BadRequest extends Error/.test(app), 'the caller’s mistakes have a type of their own');
+  ok(/new BadRequest\('invalid JSON'\)/.test(app) && /new BadRequest\('body too large'\)/.test(app),
+     'and the two that are really theirs use it');
+  ok(/if \(err instanceof BadRequest\) return fail\(res, 400, err\.message\);/.test(app),
+     'those still answer 400 and say what was wrong');
+  ok(/fail\(res, 500, 'Something went wrong at our end\.'\)/.test(app),
+     'and everything else is 500 with nothing of ours in it');
+  ok(app.indexOf("fail(res, 400, err.message || 'Bad request')") === -1,
+     'with the old catch-all gone');
+
+  // Pruning only ever ran an hour in, so a server restarted more often than
+  // that never pruned at all.
+  ok(/store\.prune\(\);\n  setInterval\(\(\) => store\.prune\(\), HOUR\)/.test(app),
+     'pruning runs once at startup as well as hourly');
+
+  // The pragmas, and the indexes that were not there.
+  ok(/PRAGMA busy_timeout = \d+/.test(db), 'a writer waits rather than failing');
+  ok(/PRAGMA synchronous = NORMAL/.test(db), 'and does not fsync every write');
+  ['idx_conn_to', 'idx_capp_user', 'idx_vouch_to', 'idx_actions_at', 'idx_sess_exp',
+   'idx_verif_exp', 'idx_verif_used'].forEach(function (ix) {
+    ok(db.indexOf(ix) !== -1, 'index exists: ' + ix);
+  });
+  ok(db.indexOf("DELETE FROM verifications WHERE used_at IS NOT NULL OR") === -1,
+     'the OR no index could answer is split in two');
+  ok(/DELETE FROM verifications WHERE used_at IS NOT NULL/.test(db),
+     'and spent verification rows are cleared at all');
+
+  // A conversation opens at its end.
+  ok(/ORDER BY id DESC LIMIT 300`\)\n\s*\.all\(connectionId\)\.reverse\(\)/.test(db),
+     'the first page of a thread is its newest messages');
+  ok(/ORDER BY m\.id DESC LIMIT 300`\)\.all\(circleId\)\.reverse\(\)/.test(db),
+     'and of a circle');
+
+  // The tools.
+  // A clean stop checkpoints the WAL away; the time you restore is the time
+  // it did not stop cleanly, and then SQLite replays what it finds.
+  ok(/rm -f "\$\{rel\(SRC\)\}-wal" "\$\{rel\(SRC\)\}-shm"/.test(backup),
+     'the restore takes the WAL sidecars with it');
+  ok(/PRAGMA busy_timeout/.test(backup),
+     'the backup waits for the lock it is most likely to meet');
+  ok(/quick_check/.test(backup), 'and reads the snapshot back before trusting it');
+  ok(/Keeping every older backup\. Nothing pruned\./.test(backup),
+     'a snapshot that will not read back does not cost you an older one');
+  // 'Stopped' used to be printed the instant the signal was sent, so
+  // anything chained after it with && raced the shutdown — including the
+  // restore that backup.js prints.
+  ok(/process\.kill\(pid, 'SIGTERM'\)/.test(daemon), 'stop asks politely');
+  ok(/did not stop within 10s/.test(daemon), 'and waits, rather than assuming');
+});
+
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail) {
   failures.slice(0, 25).forEach(function (f) { console.log('   ✗ ' + f); });

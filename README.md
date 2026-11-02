@@ -341,7 +341,7 @@ npm test        # both suites
 node tests/run-tests.js
 ```
 
-8440+ assertions covering data integrity (every listing has a valid first step,
+8510+ assertions covering data integrity (every listing has a valid first step,
 a real URL, interests that exist in the taxonomy, ratings in range), city lookup
 and aliasing, the universal fallback engine, matcher behaviour (a nervous person
 gets gentle options first, budget is respected, the comfort dial actually
@@ -651,6 +651,39 @@ a blocked tap would be wrong about as often as it was right.
 The saved list also prints. `@media print` drops everything that only works by
 being tapped, drops the colour, and prints each first step's address after it,
 so the sheet is still usable away from the screen.
+
+
+## The data layer
+
+SQLite through `node:sqlite`, in WAL mode, with no ORM and no migrations
+framework — columns added after the first release are listed in `db.js` and
+applied on open.
+
+- **Statements are prepared once and kept.** Every query used to recompile
+  its SQL on each call, and one request runs several (the session, the user,
+  their interests, then whatever was asked for). Measured at ~109µs a call on
+  the discovery query, about 1.45x.
+- **`synchronous = NORMAL`**, which SQLite recommends with WAL: an fsync per
+  write costs roughly 3.3x (346µs an insert against 105µs). It stays safe
+  against the application crashing; what it gives up is the last transactions
+  in a power cut or OS crash. For a thing people send messages through, that
+  is worth knowing before changing it back.
+- **`busy_timeout = 5000`**, because `tools/backup.js` runs `VACUUM INTO`
+  against the live file and a write in that window used to fail outright
+  rather than wait.
+- **Writes that touch more than one table run in a transaction.** The
+  dangerous ones are not the long ones but the clear-then-replace pairs:
+  `setInterests` deletes every row and inserts the replacements, so a failure
+  between the two left *nothing*, not the old value. A duplicate in the list
+  is enough to cause one, and there is a test that does exactly that.
+- **Pruning** runs at startup and hourly: rate-limit actions older than a
+  week, expired sessions, and verification rows that have been spent or have
+  expired. That last one holds an email address, and used to be kept forever.
+
+Every query the app runs on a hot path is index-backed; `EXPLAIN QUERY PLAN`
+is asserted in the test suite for the ones that were not. What still scans is
+the moderation console's own queries, over small tables, where an index would
+cost writes to save nothing worth measuring.
 
 
 ## Known limits
