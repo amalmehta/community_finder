@@ -221,7 +221,7 @@
         class: 'linkish', type: 'button', onclick: function () { finish(true); }
       }, ['See results now']) : null
     ]));
-    box.appendChild(el('p', { class: 'err', id: 'q-error', hidden: true }));
+    box.appendChild(el('p', { class: 'err', role: 'alert', id: 'q-error', hidden: true }));
     return box;
   }
 
@@ -1103,14 +1103,30 @@
     try { document.title = part ? part + ' \u00b7 ' + BASE_TITLE : BASE_TITLE; } catch (e) {}
   }
 
-  function showTab(which) {
-    // With a backend there are more tabs than these three; social.js owns the
-    // switching in that case so every view is hidden correctly.
+  /**
+   * What a tab change owes the rest of the app: remembered for next time,
+   * written to the history, and named in the title bar.
+   *
+   * Exposed because showTab is not the only way a tab changes. With an
+   * account there are five, and social.js owns the switching — its Circles
+   * and Inbox buttons call its own show() directly, so those two did none of
+   * this. Back skipped them, the title did not follow them, and the comment
+   * promising app.js remembered which tab you were last on was describing
+   * something that could not happen for either.
+   */
+  function noteTab(which) {
     save(KEY.tab, which);
     // Leaving Find also leaves whatever listing was open, so the entry this
     // writes carries the tab alone.
     mark(which, null);
     setTitle(TAB_TITLE[which] || '');
+  }
+  window.FYC_NAV = { noteTab: noteTab };
+
+  function showTab(which) {
+    // With a backend there are more tabs than these three; social.js owns the
+    // switching in that case so every view is hidden correctly.
+    noteTab(which);
     keepTabInView(which);
     if (window.FYC_SHOW) return window.FYC_SHOW(which);
     ['find', 'plan', 'you'].forEach(function (name) {

@@ -157,6 +157,40 @@
     });
   }
 
+  /**
+   * setInterval that stops while the tab is hidden.
+   *
+   * Three loops poll this server — an open thread and an open circle every
+   * five seconds, the unread counts every thirty — and none of them asked
+   * whether anyone was looking. A backgrounded tab kept asking all day: the
+   * phone's battery, the server's time, and with the app now working
+   * offline, a request guaranteed to fail every five seconds.
+   *
+   * Coming back runs it immediately rather than waiting out the rest of the
+   * interval, which is also the better behaviour: messages that arrived
+   * while you were away are there when you look, not up to five seconds
+   * later.
+   *
+   * Returns the function that stops it. The old call sites held a numeric id
+   * and passed it to clearInterval; they hold this instead and call it.
+   */
+  function every(ms, fn) {
+    var id = null;
+    function start() { if (id === null) id = setInterval(fn, ms); }
+    function stop() { if (id !== null) { clearInterval(id); id = null; } }
+    function onVisibility() {
+      if (document.hidden) { stop(); return; }
+      start();
+      fn();
+    }
+    document.addEventListener('visibilitychange', onVisibility);
+    if (!document.hidden) start();
+    return function cancel() {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }
+
   // ---------- small shared formatting ----------
 
   function label(id) {
@@ -182,7 +216,7 @@
   g.FYC_DOM = {
     $: $, $$: $$, el: el, svg: svg,
     api: api, apiUrl: apiUrl, API_TIMEOUT: TIMEOUT,
-    wireTablist: wireTablist,
+    wireTablist: wireTablist, every: every,
     label: label, ago: ago
   };
 }(typeof window !== 'undefined' ? window : globalThis));

@@ -105,7 +105,6 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font);
-  font-size: 16px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
@@ -259,7 +258,7 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 .err { color: var(--accent-ink); font-size: 14px; margin: 10px 0 0; }
 
 /* ---------- results ---------- */
-.results { padding-bottom: 60px; }
+.results {}
 .results-head {
   margin: var(--s7) 0 var(--s4);
   display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
@@ -275,7 +274,7 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 
 .notice {
   background: var(--moss-soft); border: 1px solid transparent; border-left: 3px solid var(--moss);
-  border-radius: var(--radius-sm); padding: 13px 16px; margin: 16px 0; font-size: 14.5px; color: var(--ink);
+  border-radius: var(--radius-sm); color: var(--ink);
 }
 .notice b { color: var(--moss); }
 
@@ -374,7 +373,7 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 
 /* ---------- accounts, people and messages ---------- */
 #auth-gate { padding-bottom: 60px; }
-.gate-title { font-family: var(--serif); font-size: 22px; margin: 0 0 4px; font-weight: 600; }
+.gate-title {}
 
 .field { display: block; margin: 0 0 14px; }
 .field > span { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: var(--ink); }
@@ -386,7 +385,7 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 .check { display: flex; gap: 9px; align-items: flex-start; margin: 0 0 14px; font-size: 14.5px; }
 .check input { margin-top: 3px; width: 17px; height: 17px; accent-color: var(--moss); }
 
-.person-top { display: flex; align-items: baseline; gap: 10px; justify-content: space-between; }
+.person-top { display: flex; gap: 10px; justify-content: space-between; }
 .person h3 { margin: 0 0 2px; font-size: 18px; }
 .intro-box {
   width: 100%; min-height: 76px; font: inherit; font-size: 14.5px; margin: 10px 0 0;
@@ -460,19 +459,19 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 }
 
 /* ---------- adaptive intake ---------- */
-.question { max-width: 640px; }
-.q-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.question {}
+.q-head { display: flex; align-items: center; gap: 14px; }
 .q-head .progress { flex: 1; margin: 0; }
 .q-prompt {
-  font-family: var(--serif); font-size: clamp(21px, 3vw, 26px); line-height: 1.25;
+  font-family: var(--serif);
   margin: 0 0 6px; font-weight: 600; letter-spacing: -.01em; text-wrap: balance;
 }
 .question .hint { margin: 0 0 16px; }
 .question input[type="text"] { margin-bottom: 4px; }
-.question .choices { margin-top: 4px; gap: 10px; }
-.question .choice b { font-size: 16px; }
+.question .choices { margin-top: 4px; }
+.question .choice b {}
 .question .pills { margin-top: 6px; }
-.question .actions { margin-top: 18px; }
+.question .actions {}
 
 .share-wrap { display: inline-flex; align-items: center; gap: 6px; }
 
@@ -504,11 +503,11 @@ body { font-size: var(--t-body); }
 .notice { margin: var(--s4) 0; padding: var(--s3) var(--s4); font-size: var(--t-meta); }
 
 /* Intake: give the question room, and stop the summary line overflowing. */
-.question { padding: var(--s6) var(--s5); }
+.question {}
 .q-head { margin-bottom: var(--s5); }
 .q-prompt { font-size: var(--t-h2); line-height: 1.18; margin-bottom: var(--s2); max-width: 24ch; }
-.question .choices { gap: var(--s3); }
-.question .choice { padding: var(--s3) var(--s4); }
+.question .choices {}
+.question .choice {}
 .question .actions { margin-top: var(--s5); }
 
 /* Motion: results arrive rather than appear. Short, staggered, and only for
@@ -867,7 +866,7 @@ main:focus { outline: none; }
 .q-back:hover { border-color: var(--accent); color: var(--accent-ink); }
 
 /* Ways out of a question. Quiet on purpose: they are escapes, not offers. */
-.q-outs { display: flex; gap: var(--s4); margin-top: var(--s4); }
+.q-outs { display: flex; gap: var(--s4); }
 .linkish {
   border: 0; background: none; padding: 0; font: inherit;
   font-size: var(--t-meta); color: var(--ink-faint); cursor: pointer;
@@ -1127,7 +1126,7 @@ main { padding: var(--s6) 0 var(--s7); }
   background: var(--moss-soft); color: var(--moss);
 }
 .pic-badge .pic { width: 22px; height: 22px; }
-.pic-badge.warm { background: var(--accent-soft); color: var(--accent-ink); }
+.pic-badge.warm {}
 
 /* The guide. Line everywhere except the jumper, which is the one place the
    accent lands, so the figure reads as a person and not a pictogram. */

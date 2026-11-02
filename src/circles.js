@@ -240,13 +240,15 @@
   }
 
   function loading(text) {
-    return el('div', { class: 'card loading' }, [
+    // Swapping a panel for a spinner said nothing at all to a screen
+    // reader; role=status reads the line out as the panel changes.
+    return el('div', { class: 'card loading', role: 'status' }, [
       el('span', { class: 'spinner', 'aria-hidden': 'true' }),
       el('span', { text: text })
     ]);
   }
 
-  function errLine() { return el('p', { class: 'err', hidden: true }); }
+  function errLine() { return el('p', { class: 'err', role: 'alert', hidden: true }); }
   function showErr(node, e) { node.textContent = e.message || String(e); node.hidden = false; }
 
   // ---------- the unread badge ----------
@@ -258,6 +260,13 @@
       var n = r.circles + r.pending;
       badge.textContent = String(n);
       badge.hidden = n === 0;
+      // Same as the Saved badge: a bare number inside a button that says
+      // 'Circles' is announced as 'Circles 3', a count of nothing stated.
+      var tab = document.getElementById('tab-circles');
+      if (tab) {
+        if (n) tab.setAttribute('aria-label', 'Circles, ' + n + ' waiting');
+        else tab.removeAttribute('aria-label');
+      }
     } catch (e) { /* offline */ }
   }
 
@@ -516,7 +525,7 @@
       unread = await api('GET', '/api/unread');
     } catch (e) {
       host.innerHTML = '';
-      host.appendChild(el('p', { class: 'err', text: e.message }));
+      host.appendChild(el('p', { class: 'err', role: 'alert', text: e.message }));
       return;
     }
     host.innerHTML = '';
@@ -576,7 +585,8 @@
 
   // ---------- one circle ----------
   function stop() {
-    if (S.poll) { clearInterval(S.poll); S.poll = null; }
+    // D.every returns its own canceller rather than a numeric id.
+    if (S.poll) { S.poll(); S.poll = null; }
   }
 
   async function openCircle(id) {
@@ -590,7 +600,7 @@
     try { d = await api('GET', '/api/circles/' + id); }
     catch (e) {
       host.innerHTML = '';
-      host.appendChild(el('p', { class: 'err', text: e.message }));
+      host.appendChild(el('p', { class: 'err', role: 'alert', text: e.message }));
       return;
     }
     host.innerHTML = '';
@@ -861,7 +871,7 @@
     ]));
 
     pull();
-    S.poll = setInterval(pull, 5000);
+    S.poll = D.every(5000, pull);
   }
 
   // ---------- meetups ----------

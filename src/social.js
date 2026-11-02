@@ -56,7 +56,7 @@
     $('.tabs').hidden = true;
 
     var signup = mode !== 'login';
-    var err = el('p', { class: 'err', hidden: true });
+    var err = el('p', { class: 'err', role: 'alert', hidden: true });
 
     // Reuse whatever they already picked in the finder, if anything.
     var saved = null;
@@ -162,8 +162,16 @@
       var r = await api('GET', '/api/requests');
       var n = r.incoming.length;
       var badge = document.getElementById('msg-count');
+      // circles.js guards this lookup and this did not, so a missing badge
+      // would have thrown here and taken the circles refresh below with it.
+      if (!badge) return;
       badge.textContent = String(n);
       badge.hidden = n === 0;
+      var tab = document.getElementById('tab-messages');
+      if (tab) {
+        if (n) tab.setAttribute('aria-label', 'Inbox, ' + n + ' waiting');
+        else tab.removeAttribute('aria-label');
+      }
       if (window.FYC_CIRCLES) window.FYC_CIRCLES.refreshBadge();
     } catch (e) { /* offline */ }
   }
@@ -269,7 +277,9 @@
 
   // ---------- People ----------
   function loading(text) {
-    return el('div', { class: 'card loading' }, [
+    // Swapping a panel for a spinner said nothing at all to a screen
+    // reader; role=status reads the line out as the panel changes.
+    return el('div', { class: 'card loading', role: 'status' }, [
       el('span', { class: 'spinner', 'aria-hidden': 'true' }),
       el('span', { text: text })
     ]);
@@ -288,7 +298,7 @@
     }
     catch (e) {
       reset();
-      host.appendChild(el('p', { class: 'err', text: e.message }));
+      host.appendChild(el('p', { class: 'err', role: 'alert', text: e.message }));
       return;
     }
     reset();
@@ -335,7 +345,7 @@
         class: 'intro-box', hidden: true, maxlength: direct ? '2000' : '300',
         placeholder: direct ? 'Message' : 'Say hello in 300 characters'
       });
-      var err = el('p', { class: 'err', hidden: true });
+      var err = el('p', { class: 'err', role: 'alert', hidden: true });
 
       var card = el('article', { class: 'card person', id: 'person-' + p.id }, [
         el('div', { class: 'person-top' }, [
@@ -410,7 +420,7 @@
       threads = (await api('GET', '/api/threads')).threads;
     } catch (e) {
       reset();
-      host.appendChild(el('p', { class: 'err', text: e.message }));
+      host.appendChild(el('p', { class: 'err', role: 'alert', text: e.message }));
       return;
     }
     reset();
@@ -488,7 +498,8 @@
   function sceneFor(n) { var A = art(); return A ? A.scene(n) : null; }
 
   function stopPolling() {
-    if (S.poll) { clearInterval(S.poll); S.poll = null; }
+    // D.every returns its own canceller rather than a numeric id.
+    if (S.poll) { S.poll(); S.poll = null; }
   }
 
   async function openThread(t) {
@@ -500,7 +511,7 @@
     // Matches the server's cap; the only two textareas in the app that had none.
     var input = el('textarea', { class: 'msg-input', maxlength: '2000',
       placeholder: 'Write a message…', rows: '2' });
-    var err = el('p', { class: 'err', hidden: true });
+    var err = el('p', { class: 'err', role: 'alert', hidden: true });
     var lastId = 0;
     var seen = Object.create(null);   // message ids already on screen
     var pulling = false;              // only one request in flight at a time
@@ -574,7 +585,7 @@
     });
 
     await pull();
-    S.poll = setInterval(pull, 5000);
+    S.poll = D.every(5000, pull);
   }
 
   // ---------- profile editing (lives on the You tab) ----------
@@ -601,7 +612,7 @@
 
     var emailInput = el('input', { type: 'email', value: u.email || '', placeholder: 'you@example.com' });
     var emailMsg = el('p', { class: 'hint', hidden: true });
-    var emailErr = el('p', { class: 'err', hidden: true });
+    var emailErr = el('p', { class: 'err', role: 'alert', hidden: true });
     var directCb = el('input', { type: 'checkbox' });
     directCb.checked = u.openToDirect !== false;
 
@@ -742,7 +753,10 @@
 
     // Let the You tab render the profile editor underneath its charts.
     window.FYC_SOCIAL = { profileCard: profileCard, state: S };
-    setInterval(refreshCounts, 30000);
+    // Held so it can be stopped, which it never could be: this one ran
+    // every thirty seconds for as long as the page was open, signed out or
+    // not, visible or not.
+    S.counts = D.every(30000, refreshCounts);
   }
 
   /** Which half of the inbox is showing. Remembered so the tab reopens where
@@ -765,6 +779,9 @@
       if (tab) tab.setAttribute('aria-selected', (name === 'messages' ? inbox : which === name) ? 'true' : 'false');
     });
     if (window.FYC_TAB_IN_VIEW) window.FYC_TAB_IN_VIEW(inbox ? 'messages' : which);
+    // Circles and Inbox reach this without going through app.js's showTab,
+    // so this is where they get remembered, pushed and named like the rest.
+    if (window.FYC_NAV) window.FYC_NAV.noteTab(inbox ? 'messages' : which);
     stopPolling();
     if (window.FYC_CIRCLES) {
       window.FYC_CIRCLES.stop();

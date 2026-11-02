@@ -36,6 +36,7 @@ var SHELL = [
   'site.webmanifest',
   'assets/styles.css',
   'assets/icon.svg',
+  'assets/apple-touch-icon.png',
   'src/data/core.js',
   'src/data/city-sf.js',
   'src/data/city-nyc.js',

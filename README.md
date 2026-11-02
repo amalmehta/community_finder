@@ -419,6 +419,11 @@ confirm you get the national-routes view instead.
 ```
 index.html            the whole UI
 assets/styles.css     styling, light + dark, mobile-first breakpoints
+assets/icon.svg       the mark; the source for every other icon
+assets/apple-touch-icon.png  180px raster of it, because iOS ignores an SVG
+                      here. Regenerate with:
+                        rsvg-convert -w 180 -h 180 assets/icon.svg \
+                          -o assets/apple-touch-icon.png
 src/
   data/core.js        interest taxonomy (32 interests in 6 groups) + city registry
   data/city-*.js      the thirteen hand-curated city datasets

@@ -1726,6 +1726,150 @@ group('one copy of each helper, and a back button', function () {
   ok(sw.indexOf("'src/dom.js'") !== -1, 'and it is cached with the rest of the app');
 });
 
+// ------------------------------------------------- ten, none of them large
+group('the quiet pass: polling, announcements and an icon iOS will take', function () {
+  var fs = require('fs');
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+  var social = fs.readFileSync(path.join(root, 'src/social.js'), 'utf8');
+  var circles = fs.readFileSync(path.join(root, 'src/circles.js'), 'utf8');
+  var dom = fs.readFileSync(path.join(root, 'src/dom.js'), 'utf8');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  var sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+  var manifest = JSON.parse(fs.readFileSync(path.join(root, 'site.webmanifest'), 'utf8'));
+
+  // 1. Three loops polled this server and none asked whether anyone was
+  //    looking. A backgrounded tab kept asking all day — battery, server
+  //    time, and with the app working offline, a request certain to fail
+  //    every five seconds.
+  ok(dom.indexOf('function every(ms, fn)') !== -1, 'there is an interval that knows about the tab');
+  ok(dom.indexOf("addEventListener('visibilitychange'") !== -1, 'it watches for the tab being hidden');
+  ok(/if \(document\.hidden\) \{ stop\(\); return; \}/.test(dom), 'and stops while it is');
+  // Coming back should not wait out the rest of the interval: messages that
+  // arrived while you were away are there when you look.
+  ok(/start\(\);\n      fn\(\);/.test(dom), 'coming back runs it at once rather than waiting');
+  [['social.js', social], ['circles.js', circles]].forEach(function (pair) {
+    ok(pair[1].indexOf('setInterval(') === -1, pair[0] + ' no longer sets a raw interval');
+    ok(pair[1].indexOf('D.every(') !== -1, pair[0] + ' uses the one that pauses');
+  });
+  // The old call sites held a numeric id for clearInterval; they hold the
+  // canceller now, and passing one to clearInterval would silently leak.
+  ok(social.indexOf('clearInterval') === -1 && circles.indexOf('clearInterval') === -1,
+     'and nothing still tries to clear an id it no longer has');
+  ok(/S\.counts = D\.every\(30000, refreshCounts\)/.test(social),
+     'the counts loop can be stopped, which it never could be');
+
+  // 2. Ten error nodes, and the only live region in the app was the results
+  //    counter: a failed sign-in or send said nothing at all. This is where
+  //    the network messages from the last commit land.
+  eq((app.match(/class: 'err', role: 'alert'/g) || []).length, 1, 'the intake error announces itself');
+  eq((social.match(/class: 'err', role: 'alert'/g) || []).length, 6, 'and all six in social.js');
+  eq((circles.match(/class: 'err', role: 'alert'/g) || []).length, 3, 'and all three in circles.js');
+  ok(social.indexOf("class: 'err' }") === -1 && circles.indexOf("class: 'err' }") === -1,
+     'with none left silent');
+
+  // 3. Same fault as the Saved badge, left in two places when that was fixed.
+  ok(/aria-label', 'Circles, ' \+ n \+ ' waiting'/.test(circles), 'the circles badge says what it counts');
+  ok(/aria-label', 'Inbox, ' \+ n \+ ' waiting'/.test(social), 'and the inbox badge');
+
+  // 4. Swapping a panel for a spinner said nothing.
+  eq((social.match(/class: 'card loading', role: 'status'/g) || []).length, 1, 'a loading panel announces itself');
+  eq((circles.match(/class: 'card loading', role: 'status'/g) || []).length, 1, 'in both files');
+
+  // 5. Circles and Inbox reach the switch without going through showTab, so
+  //    Back skipped them, the title did not follow them, and the comment
+  //    saying app.js remembered the last tab could not be true for either.
+  ok(app.indexOf('function noteTab(which)') !== -1, 'what a tab change owes is written once');
+  ok(app.indexOf('window.FYC_NAV = { noteTab: noteTab }') !== -1, 'and reachable from the file that owns the extra tabs');
+  ok(/FYC_NAV\.noteTab\(inbox \? 'messages' : which\)/.test(social), 'which calls it');
+  ok(/function showTab\(which\) \{[\s\S]{0,220}noteTab\(which\);/.test(app), 'and showTab goes through the same path');
+
+  // 6 + 7. Robustness around those two badges.
+  ok(/var badge = document\.getElementById\('msg-count'\);\n[\s\S]{0,200}if \(!badge\) return;/.test(social),
+     'the msg-count lookup is guarded, as the circles one already was');
+
+  // 8. Declarations that have never had any effect: same selector, same
+  //    property, overridden further down the file. Checked by diffing the
+  //    computed value of every affected selector before and after.
+  // The real invariant, rather than a hunt for particular values: no
+  // top-level rule declares the same property twice. Twenty-three did —
+  // each one overridden further down by the same selector, most of them
+  // pre-token values left behind by the warmth pass. Proved harmless by
+  // diffing the computed value of every affected selector before and after.
+  var flat = (function () {
+    var out = '', i = 0;
+    while (i < css.length) {
+      if (css[i] === '@') {                      // skip at-rule blocks whole
+        var j = css.indexOf('{', i);
+        if (j < 0) break;
+        var d = 1; j++;
+        while (j < css.length && d > 0) { if (css[j] === '{') d++; else if (css[j] === '}') d--; j++; }
+        i = j; continue;
+      }
+      if (css[i] === '/' && css[i + 1] === '*') {
+        var k = css.indexOf('*/', i);
+        i = k < 0 ? css.length : k + 2; continue;
+      }
+      out += css[i++];
+    }
+    return out;
+  }());
+  var seen = {}, repeats = [];
+  flat.replace(/([^{}]+)\{([^{}]*)\}/g, function (all, sel, body) {
+    sel = sel.trim().replace(/\s+/g, ' ');
+    body.split(';').forEach(function (decl) {
+      if (decl.indexOf(':') === -1) return;
+      var key = sel + ' || ' + decl.split(':')[0].trim();
+      if (seen[key]) repeats.push(key); else seen[key] = true;
+    });
+    return all;
+  });
+  eq(repeats.length, 0, 'no rule declares the same property twice: ' + repeats.slice(0, 4).join(', '));
+
+  // 9. iOS ignores an SVG apple-touch-icon outright, so adding the app to
+  //    the Home Screen gave a screenshot of the page instead of the mark —
+  //    on the one platform the last commit was about.
+  ok(html.indexOf('rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png"') !== -1,
+     'the touch icon is a PNG at the size iOS asks for');
+  ok(html.indexOf('apple-touch-icon" href="assets/icon.svg"') === -1, 'and not the SVG it ignores');
+  ok(fs.existsSync(path.join(root, 'assets/apple-touch-icon.png')), 'the file is there');
+  var png = fs.readFileSync(path.join(root, 'assets/apple-touch-icon.png'));
+  eq(png.slice(1, 4).toString('ascii'), 'PNG', 'and is really a PNG');
+  // Width and height live in the IHDR, bytes 16-23.
+  eq(png.readUInt32BE(16), 180, 'with the width it claims');
+  eq(png.readUInt32BE(20), 180, 'and the height');
+  // And it has to actually contain them. The first attempt at this file was
+  // structurally a PNG, declared 180x180, and was damaged in the middle: it
+  // drew the top fifth and nothing else. Walking the chunks and inflating
+  // the image data is what tells the difference.
+  (function () {
+    var zlib = require('zlib'), i = 8, idat = [], w = 0, h = 0, ct = 0, bad = 0;
+    while (i + 8 <= png.length) {
+      var len = png.readUInt32BE(i);
+      var type = png.slice(i + 4, i + 8).toString('ascii');
+      var data = png.slice(i + 8, i + 8 + len);
+      if (type === 'IHDR') { w = data.readUInt32BE(0); h = data.readUInt32BE(4); ct = data[9]; }
+      if (type === 'IDAT') idat.push(data);
+      i += 12 + len;
+      if (type === 'IEND') break;
+    }
+    eq(i, png.length, 'its chunks account for every byte of the file');
+    var raw = null;
+    try { raw = zlib.inflateSync(Buffer.concat(idat)); } catch (e) { bad = 1; }
+    ok(!bad, 'and the image data inflates, rather than failing its checksum');
+    if (raw) {
+      var channels = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[ct];
+      eq(raw.length, h * (1 + w * channels), 'with every one of its 180 rows present');
+    }
+  }());
+  ok(sw.indexOf("'assets/apple-touch-icon.png'") !== -1, 'cached with the rest of the app');
+  ok(manifest.icons.some(function (i) { return i.type === 'image/png'; }), 'and offered in the manifest');
+
+  // 10. Without an id the app's identity is its start_url, so changing that
+  //     later reads as a different app and installs a second time.
+  eq(manifest.id, './', 'the manifest pins an id');
+});
+
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail) {
   failures.slice(0, 25).forEach(function (f) { console.log('   ✗ ' + f); });
