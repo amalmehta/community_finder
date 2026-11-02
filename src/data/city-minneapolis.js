@@ -7,6 +7,9 @@
     id: 'msp',
     name: 'Minneapolis',
     region: 'MN',
+    // A metro area is not a state: Hudson and River Falls are Wisconsin, and someone
+    // typing either should land here rather than nowhere.
+    states: ['MN', 'WI'],
     aliases: ['minneapolis', 'msp', 'twin cities', 'st paul', 'saint paul', 'minneapolis mn', 'northeast minneapolis', 'uptown minneapolis'],
     orgs: [
       {

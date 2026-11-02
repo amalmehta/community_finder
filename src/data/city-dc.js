@@ -7,6 +7,9 @@
     id: 'dc',
     name: 'Washington, DC',
     region: 'DC',
+    // A metro area is not a state: Arlington and Alexandria are Virginia, Bethesda and Silver Spring are Maryland, and someone
+    // typing either should land here rather than nowhere.
+    states: ['DC', 'VA', 'MD'],
     aliases: ['washington', 'washington dc', 'dc', 'district of columbia', 'arlington', 'alexandria', 'bethesda', 'silver spring', 'dmv'],
     orgs: [
       {

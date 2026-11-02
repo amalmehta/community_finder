@@ -183,13 +183,18 @@
 
   /**
    * Register a curated city.
-   * @param {{id:string,name:string,aliases:string[],region:string,orgs:Object[]}} city
+   * @param {{id:string,name:string,aliases:string[],region:string,
+   *          states?:string[],orgs:Object[]}} city
    */
   FYC.addCity = function (city) {
     city.orgs.forEach(function (o) {
       o.cityId = city.id;
       o.cityName = city.name;
     });
+    // Which states this city's aliases legitimately reach into. A metro area
+    // crosses state lines — Arlington is DC, Cambridge is Boston — so the
+    // city's own region is only the default.
+    if (!city.states) city.states = [city.region];
     FYC.cities.push(city);
     return city;
   };
@@ -203,17 +208,121 @@
       .trim();
   };
 
+  // --- Location matching ----------------------------------------------------
+  // Matching used to be done on raw substrings, and the short aliases made
+  // that a lottery: 'la' is inside Dallas, Atlanta, Cleveland and Orlando,
+  // 'chi' is inside Wichita, 'den' is inside Ogden. Every one of those typed
+  // in the box came back with a city on the other side of the country, and
+  // "Portland, Maine" came back as Los Angeles, because 'la' is inside
+  // Portland too and LA is registered first. Everything below matches whole
+  // words instead, and throws out a match the typed state contradicts.
+
+  var STATES = {
+    al: 'alabama', ak: 'alaska', az: 'arizona', ar: 'arkansas', ca: 'california',
+    co: 'colorado', ct: 'connecticut', de: 'delaware', dc: 'district of columbia',
+    fl: 'florida', ga: 'georgia', hi: 'hawaii', id: 'idaho', il: 'illinois',
+    in: 'indiana', ia: 'iowa', ks: 'kansas', ky: 'kentucky', la: 'louisiana',
+    me: 'maine', md: 'maryland', ma: 'massachusetts', mi: 'michigan',
+    mn: 'minnesota', ms: 'mississippi', mo: 'missouri', mt: 'montana',
+    ne: 'nebraska', nv: 'nevada', nh: 'new hampshire', nj: 'new jersey',
+    nm: 'new mexico', ny: 'new york', nc: 'north carolina', nd: 'north dakota',
+    oh: 'ohio', ok: 'oklahoma', or: 'oregon', pa: 'pennsylvania',
+    ri: 'rhode island', sc: 'south carolina', sd: 'south dakota',
+    tn: 'tennessee', tx: 'texas', ut: 'utah', vt: 'vermont', va: 'virginia',
+    wa: 'washington', wv: 'west virginia', wi: 'wisconsin', wy: 'wyoming'
+  };
+  var STATE_OF_NAME = {};
+  Object.keys(STATES).forEach(function (ab) {
+    STATE_OF_NAME[STATES[ab]] = ab.toUpperCase();
+  });
+
+  function words(s) {
+    var n = FYC.normalize(s);
+    return n ? n.split(' ') : [];
+  }
+
+  /** Where the token run `kt` starts inside `qt`, or -1. Whole words only, so
+   *  'la' is found in "los angeles la" and not in "dallas". */
+  function runAt(qt, kt) {
+    for (var i = 0; i + kt.length <= qt.length; i++) {
+      var hit = true;
+      for (var j = 0; j < kt.length; j++) {
+        if (qt[i + j] !== kt[j]) { hit = false; break; }
+      }
+      if (hit) return i;
+    }
+    return -1;
+  }
+
+  /** Still typing: same number of words, the last one a prefix of the key's.
+   *  "san fran" finds San Francisco, "minneapol" finds Minneapolis. Four
+   *  characters minimum, or two letters would pick a city for you. */
+  function isPrefixOf(qt, kt) {
+    if (qt.length !== kt.length || qt.join('').length < 4) return false;
+    for (var i = 0; i < qt.length; i++) {
+      var last = i === qt.length - 1;
+      if (last ? kt[i].indexOf(qt[i]) !== 0 : kt[i] !== qt[i]) return false;
+    }
+    return !(qt.length === 1 && qt[0] === kt[0]);
+  }
+
+  /**
+   * The state the typed location names *outside* the words that matched a city
+   * key — the "ME" in "Portland, ME". Null when it names none.
+   * @param {string[]} qt the whole query, in words
+   * @param {number} from first word the city key matched
+   * @param {number} len how many words it matched
+   */
+  function statedState(qt, from, len) {
+    // "Washington State": the key itself was a state's name and the next word
+    // says to read it that way. "New York State" lands on New York, correctly.
+    var key = qt.slice(from, from + len).join(' ');
+    if (qt[from + len] === 'state' && STATE_OF_NAME[key]) return STATE_OF_NAME[key];
+
+    // A state's full name, anywhere in what is left: "Portland, Maine".
+    var rest = qt.slice(0, from).concat(qt.slice(from + len));
+    for (var i = 0; i < rest.length; i++) {
+      for (var n = 2; n >= 1; n--) {
+        if (i + n > rest.length) continue;
+        var phrase = rest.slice(i, i + n).join(' ');
+        if (STATE_OF_NAME[phrase]) return STATE_OF_NAME[phrase];
+      }
+    }
+
+    // A two-letter abbreviation, but only as the final word, which is the
+    // "City, ST" convention. Half of them are ordinary English words, and
+    // "Portland in the rain" is not a question about Indiana.
+    var last = qt[qt.length - 1];
+    if (from + len <= qt.length - 1 && last.length === 2 && STATES[last]) {
+      return last.toUpperCase();
+    }
+    return null;
+  }
+
   /** Find the curated city whose name or alias matches the typed location. */
   FYC.findCity = function (input) {
-    var q = FYC.normalize(input);
-    if (!q) return null;
+    var qt = words(input);
+    if (!qt.length) return null;
     var best = null;
     FYC.cities.forEach(function (c) {
-      var keys = [c.name].concat(c.aliases || []).map(FYC.normalize);
-      keys.forEach(function (k) {
-        if (!k) return;
-        var hit = q === k ? 3 : q.indexOf(k) !== -1 ? 2 : k.indexOf(q) !== -1 && q.length >= 4 ? 1 : 0;
-        if (hit && (!best || hit > best.score)) best = { city: c, score: hit };
+      var reaches = c.states || [c.region];
+      [c.name].concat(c.aliases || []).forEach(function (raw) {
+        var kt = words(raw);
+        if (!kt.length) return;
+        var at = runAt(qt, kt);
+        var score = 0, from = 0, len = kt.length;
+        if (at === 0 && kt.length === qt.length) score = 3;        // the whole box
+        else if (at !== -1) { score = 2; from = at; }              // a run inside it
+        else if (isPrefixOf(qt, kt)) { score = 1; len = qt.length; }
+        if (!score) return;
+        // Named a state this city does not reach? Then it is not this city.
+        var st = statedState(qt, from, len);
+        if (st && reaches.indexOf(st) === -1) return;
+        // Longest key wins a tie, so the answer does not depend on which
+        // city file happened to be loaded first.
+        if (!best || score > best.score || (score === best.score && kt.length > best.span)) {
+          best = { city: c, score: score, span: kt.length };
+        }
       });
     });
     return best ? best.city : null;

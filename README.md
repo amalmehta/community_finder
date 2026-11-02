@@ -341,9 +341,10 @@ npm test        # both suites
 node tests/run-tests.js
 ```
 
-8510+ assertions covering data integrity (every listing has a valid first step,
+8580+ assertions covering data integrity (every listing has a valid first step,
 a real URL, interests that exist in the taxonomy, ratings in range), city lookup
-and aliasing, the universal fallback engine, matcher behaviour (a nervous person
+and aliasing (whole words only, and a named state that contradicts the match
+throws it out — 'la' is inside Dallas), the universal fallback engine, matcher behaviour (a nervous person
 gets gentle options first, budget is respected, the comfort dial actually
 re-ranks, no duplicate results), that `index.html` loads every file it needs,
 and that every number the circles argument rests on is still the number the
@@ -382,7 +383,7 @@ each week. You can also run it on demand from the Actions tab.
 node tests/run-server-tests.js
 ```
 
-315 assertions against a real HTTP server on a throwaway database: signup and
+393 assertions against a real HTTP server on a throwaway database: signup and
 sign-in, session isolation, that a hidden interest cannot be used to find you,
 the request/accept/message flow, outsiders being locked out of other people's
 threads, blocking, reporting, rate limits, the whole life of a circle — vetting,
@@ -392,8 +393,11 @@ being closed to anyone who has not spoken, if-then plans being required on a yes
 and shown to nobody else, the gate staying shut on a circle where one person
 wrote most of it, a question being handed to the member who has never spoken and
 not to the one who asked for it, and what a circle says it is for staying inside
-it — and that the server serves only the front end, not
-its own source, the database, or anything reachable by path traversal.
+it — that a request body cut at any byte offset arrives intact rather than
+with its accented and non-Latin characters replaced, that the rate limits
+count against the visitor's address and not the reverse proxy's, and that the
+server serves only the front end, not its own source, the database, or
+anything reachable by path traversal.
 
 **Moving around it:** every question has **Back**, which replays your earlier
 answers from scratch rather than keeping undo state — the engine is pure, so the
@@ -425,8 +429,11 @@ assets/apple-touch-icon.png  180px raster of it, because iOS ignores an SVG
                         rsvg-convert -w 180 -h 180 assets/icon.svg \
                           -o assets/apple-touch-icon.png
 src/
-  data/core.js        interest taxonomy (32 interests in 6 groups) + city registry
-  data/city-*.js      the thirteen hand-curated city datasets
+  data/core.js        interest taxonomy (32 interests in 6 groups), city registry
+                      and the location matcher
+  data/city-*.js      the thirteen hand-curated city datasets. Loaded off the
+                      directory by the tests and the link checker, so a new one
+                      needs adding to index.html and sw.js and nowhere else
   data/universal.js   fallback recipes → real deep links for any city
   dom.js              the handful of helpers every screen needs, written once
   intake.js           the adaptive 20-question engine (pure functions, no DOM)

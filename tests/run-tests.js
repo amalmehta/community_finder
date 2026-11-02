@@ -6,10 +6,14 @@ var path = require('path');
 var root = path.join(__dirname, '..');
 
 require(path.join(root, 'src/data/core.js'));
-['sf', 'nyc', 'chicago', 'seattle', 'austin', 'boston', 'philadelphia', 'dc', 'la', 'sandiego',
- 'denver', 'portland', 'minneapolis'].forEach(function (c) {
-  require(path.join(root, 'src/data/city-' + c + '.js'));
-});
+// The city files, read off the directory. This was a hand-written list of
+// thirteen ids, which meant adding a city to the app and forgetting to add it
+// here left the whole of it untested — with nothing to
+// say so, because everything it did check still passed.
+var cityFiles = require('fs').readdirSync(path.join(root, 'src/data'))
+  .filter(function (f) { return /^city-.+\.js$/.test(f); })
+  .sort();
+cityFiles.forEach(function (f) { require(path.join(root, 'src/data', f)); });
 require(path.join(root, 'src/data/universal.js'));
 require(path.join(root, 'src/intake.js'));
 require(path.join(root, 'src/preferences.js'));
@@ -1944,6 +1948,158 @@ group('the data layer and the tools around it', function () {
   // restore that backup.js prints.
   ok(/process\.kill\(pid, 'SIGTERM'\)/.test(daemon), 'stop asks politely');
   ok(/did not stop within 10s/.test(daemon), 'and waits, rather than assuming');
+});
+
+group('the box you type your city into', function () {
+  var city = function (s) { var c = FYC.findCity(s); return c ? c.id : null; };
+
+  // Matching was done on raw substrings, and the two-and-three-letter aliases
+  // turned that into a lottery. Every one of these came back with a city
+  // thousands of miles from the one typed.
+  eq(city('Dallas'), null, "'la' is inside Dallas, which is not Los Angeles");
+  eq(city('Atlanta'), null, 'nor inside Atlanta');
+  eq(city('Cleveland'), null, 'nor Cleveland');
+  eq(city('Orlando'), null, 'nor Orlando');
+  eq(city('Wichita'), null, "'chi' is inside Wichita, which is not Chicago");
+  eq(city('Ogden'), null, "'den' is inside Ogden, which is not Denver");
+  eq(city('Portland, Maine'), null, 'and Portland, Maine was answered with Los Angeles');
+  eq(city('Portland ME'), null, 'however it was typed');
+
+  // What should still work, and now does for the right reason.
+  eq(city('Portland'), 'pdx', 'the Portland we do have');
+  eq(city('portland or'), 'pdx', 'with its state');
+  eq(city('LA'), 'la', 'a two-letter alias on its own is still a city');
+  eq(city('la ca'), 'la', 'and with its state after it');
+  eq(city('Los Angeles'), 'la', 'as is the name');
+  eq(city('  SEATTLE '), 'sea', 'case and whitespace insensitive');
+  eq(city('South Boston'), 'bos', 'a city name inside a longer phrase');
+  eq(city('the bay area'), 'sf', 'a two-word alias');
+  eq(city('boston massachusetts'), 'bos', 'a state that agrees changes nothing');
+
+  // Still typing. Four characters, so two letters never pick a city for you.
+  eq(city('minneapol'), 'msp', 'a prefix of a city name resolves');
+  eq(city('san fran'), 'sf', 'and of a two-word one');
+  eq(city('san'), null, 'but not a fragment that fits two cities');
+  eq(city('bay'), null, 'nor one word of a two-word alias');
+
+  // A metro area crosses state lines, so each city says which it reaches.
+  eq(city('Arlington VA'), 'dc', 'Arlington is the DC metro');
+  eq(city('Alexandria VA'), 'dc', 'so is Alexandria');
+  eq(city('Arlington TX'), null, 'the Arlington in Texas is not');
+  eq(city('Aurora CO'), 'den', 'Aurora is the Denver metro');
+  eq(city('Aurora IL'), null, 'the Aurora near Chicago is not');
+  eq(city('Cambridge MA'), 'bos', 'Cambridge is Boston');
+  eq(city('Beaverton OR'), 'pdx', 'Beaverton is Portland');
+  ok(FYC.cities.every(function (c) { return c.states && c.states.length; }),
+    'every city declares the states it reaches');
+  ok(FYC.cities.every(function (c) { return c.states.indexOf(c.region) !== -1; }),
+    'and includes its own');
+
+  // "Washington" is a city and a state, and the word after it says which.
+  eq(city('Washington'), 'dc', 'Washington on its own is the city');
+  eq(city('Washington DC'), 'dc', 'as it is with DC after it');
+  eq(city('Washington State'), null, 'but not with "state" after it');
+  eq(city('New York State'), 'nyc', 'while New York State is still New York');
+
+  // Two-letter abbreviations are mostly ordinary English words, so only the
+  // last word of the box is read as one.
+  eq(city('Portland in the rain'), 'pdx', '"in" mid-sentence is not Indiana');
+
+  // The answer must not depend on which city file was loaded first.
+  var order = FYC.cities.map(function (c) { return c.id; });
+  FYC.cities.reverse();
+  eq(city('Portland'), 'pdx', 'load order does not decide a match');
+  eq(city('Dallas'), null, 'nor a non-match');
+  FYC.cities.reverse();
+  eq(FYC.cities.map(function (c) { return c.id; }).join(), order.join(), 'and the registry is left alone');
+
+  eq(city(''), null, 'empty input returns null');
+  eq(city(null), null, 'and so does nothing at all');
+});
+
+group('seven smaller things, each in its own place', function () {
+  var fs = require('fs');
+  var vm = require('vm');
+  var read = function (p) { return fs.readFileSync(path.join(root, p), 'utf8'); };
+  var html = read('index.html');
+  var server = read('server/app.js');
+
+  // 1. A HEAD response carries the headers and none of the body. The Swift
+  //    server accepted HEAD and then sent the whole file.
+  var swift = read('mac/Sources/StaticServer.swift');
+  ok(/let bodyless = parts\[0\] == "HEAD"/.test(swift), 'the Swift server knows a HEAD when it sees one');
+  ok(/bodyless \? Data\(header\.utf8\) : Data\(header\.utf8\) \+ body/.test(swift),
+     'and sends the headers without the file');
+  ok((swift.match(/bodyless: bodyless/g) || []).length === 2,
+     'on the 404 as well as the 200');
+  ok(/Content-Length: \\\(body\.count\)/.test(swift),
+     'with the length it would have sent, which is the point of asking');
+
+  // 2. Two copies of one app, two policies over the same files, and each was
+  //    missing a directive the other had.
+  var meta = (html.match(/Content-Security-Policy" content="([^"]+)"/) || [])[1] || '';
+  var sent = (server.match(/const CSP = \[([\s\S]*?)\]\.join/) || [])[1] || '';
+  ok(meta.indexOf("object-src 'none'") !== -1, 'the page policy refuses plugins');
+  ok(/"object-src 'none'"/.test(sent), 'as the header always did');
+  ok(meta.indexOf("form-action 'none'") !== -1, 'the page policy allows no submission');
+  ok(/"form-action 'none'"/.test(sent), 'and now neither does the header');
+  // Nothing they both name may disagree again.
+  var disagreed = [];
+  meta.split(';').map(function (d) { return d.trim(); }).filter(Boolean).forEach(function (d) {
+    var name = d.split(' ')[0];
+    var mine = new RegExp('"' + name + ' ([^"]*)"').exec(sent);
+    if (mine && mine[1] !== d.slice(name.length + 1)) disagreed.push(name);
+  });
+  eq(disagreed.join(), '', 'and the directives in both agree');
+
+  // 3. The uptime check prepared a statement on every probe, which is every
+  //    few seconds for the life of the process.
+  ok(read('server/db.js').indexOf('    ping() {') !== -1, 'the store answers a ping');
+  ok(/store\.ping\(\)/.test(server), 'and the health route asks it');
+  ok(!/db\.prepare\('SELECT 1'\)/.test(server), 'rather than preparing its own each time');
+
+  // 4 and 5 are about a running server and a failed start; they are in the
+  //    server suite, where there is one of each.
+
+  // 6. The city list was written out by hand in two more places, so adding a
+  //    city left it unchecked by the link checker and untested by this file.
+  var files = fs.readdirSync(path.join(root, 'src/data'))
+    .filter(function (f) { return /^city-.+\.js$/.test(f); });
+  var tags = (html.match(/<script src="src\/data\/city-[^"]+\.js"><\/script>/g) || []);
+  eq(FYC.cities.length, files.length, 'every city file on disk is loaded here');
+  eq(tags.length, files.length, 'and every one is loaded by the page');
+  ok(files.length >= 13, 'and there are at least the thirteen we had');
+  [['tests/run-tests.js', 'this suite'], ['tools/check-links.js', 'the link checker']]
+    .forEach(function (pair) {
+      var src = read(pair[0]);
+      ok(/readdirSync\(path\.join\(root, 'src\/data'\)\)/.test(src),
+         pair[1] + ' reads them off the directory');
+      // The old construction, which is also the shape of the bug: a list of
+      // ids glued onto a filename. Searching for one of the ids matched this
+      // very assertion, which is its own small lesson.
+      ok(!/city-' \+ \w+ \+ '\.js/.test(src), pair[1] + ': and keeps no list of its own');
+    });
+
+  // 7. The cache was named after a version number somebody had to remember to
+  //    bump, and the first time the shell changed nobody did.
+  var swSrc = read('sw.js');
+  function cacheName(src) {
+    var sandbox = {
+      self: { location: new URL('https://amalmehta.github.io/community_finder/sw.js'),
+              addEventListener: function () {} },
+      URL: URL, caches: {}, fetch: function () {}, Promise: Promise,
+      Request: function () {}, setTimeout: setTimeout, clearTimeout: clearTimeout, console: console
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(src, sandbox, { filename: 'sw.js' });
+    return sandbox.CACHE;
+  }
+  var name = cacheName(swSrc);
+  ok(/^fyc-shell-v1-[0-9a-z]+$/.test(name), 'the cache name carries a fingerprint as well as a version');
+  var moved = cacheName(swSrc.replace("  'src/circles.js'\n];", "  'src/circles.js',\n  'src/something-new.js'\n];"));
+  ok(moved !== name, 'and it changes when a file is added to the shell');
+  eq(cacheName(swSrc), name, 'while the same list always gives the same name');
+  ok(swSrc.indexOf('src/dom.js') !== -1, 'the file that was forgotten is in the shell');
 });
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');

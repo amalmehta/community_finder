@@ -1255,6 +1255,218 @@ async function verifyEmail(call, email) {
     ok(/invalid JSON/.test((await bad.json()).error || ''), 'and still says so');
   });
 
+  await group('the body on the wire, and who sent it', async () => {
+    const net = require('node:net');
+
+    /** Send a request as raw bytes, cut wherever asked — the way TCP, a TLS
+     *  record boundary or a proxy cuts one.
+     *
+     *  The pause between the pieces is the whole point. Written back to back
+     *  they go out in one segment and arrive as one chunk, which is how the
+     *  first version of this test passed against the bug it was written for. */
+    function raw(method, url, bytes, cuts, cookie) {
+      return new Promise((resolve, reject) => {
+        const port = server.address().port;
+        const sock = net.connect(port, '127.0.0.1', async () => {
+          sock.write(
+            `${method} ${url} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n` +
+            (cookie ? `Cookie: ${cookie}\r\n` : '') +
+            `Content-Type: application/json\r\nContent-Length: ${bytes.length}\r\n` +
+            'Connection: close\r\n\r\n'
+          );
+          let at = 0;
+          for (const cut of cuts.concat([bytes.length])) {
+            if (cut <= at) continue;
+            await new Promise((r) => setTimeout(r, 2));
+            sock.write(bytes.subarray(at, cut));
+            at = cut;
+          }
+        });
+        let buf = '';
+        sock.setEncoding('utf8');
+        sock.on('data', (d) => { buf += d; });
+        sock.on('error', reject);
+        sock.on('close', () => {
+          const status = Number((buf.match(/^HTTP\/1\.\d (\d+)/) || [])[1]);
+          let data = null;
+          const body = buf.slice(buf.indexOf('\r\n\r\n') + 4);
+          try { data = JSON.parse(body.slice(body.indexOf('{'), body.lastIndexOf('}') + 1)); } catch (e) {}
+          resolve({ status, data });
+        });
+      });
+    }
+
+    // One account, written to over and over, so nothing here is near a limit.
+    const wire = client();
+    const made = await wire('POST', '/api/signup', {
+      username: 'onthewire', password: 'hunter2hunter', city: 'Denver', ageOk: true
+    });
+    eq(made.status, 201, 'an account to write to');
+    const jar = (await (async () => {
+      const r = await fetch(base + '/api/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'onthewire', password: 'hunter2hunter' })
+      });
+      return (r.headers.getSetCookie ? r.headers.getSetCookie() : [])[0].split(';')[0];
+    })());
+
+    // A bio whose characters are mostly multi-byte. Cut one byte into the
+    // first of them and `buf += chunk` decoded each half on its own, which
+    // turned the character into replacement characters — and then stored it.
+    const bio = 'José runs a café ☕, 田中 comes too 🏳️‍🌈 — every week without fail.';
+    const bytes = Buffer.from(JSON.stringify({ bio, city: 'Denver' }), 'utf8');
+    const firstMulti = bytes.indexOf(Buffer.from('é', 'utf8'));
+    ok(firstMulti > 0, 'the test body really does contain a multi-byte character');
+
+    const one = await raw('PATCH', '/api/me', bytes, [firstMulti + 1], jar);
+    eq(one.status, 200, 'a body cut mid-character is still accepted');
+    eq(one.data && one.data.user && one.data.user.bio, bio,
+      'and arrives exactly as it was sent');
+    ok(!/�/.test(JSON.stringify(one.data)), 'with nothing replaced');
+
+    // Then every other place it could have been cut.
+    let broke = 0;
+    for (let i = 1; i < bytes.length; i++) {
+      const got = await raw('PATCH', '/api/me', bytes, [i], jar);
+      if (got.status !== 200 || !got.data || !got.data.user || got.data.user.bio !== bio) broke++;
+    }
+    eq(broke, 0, 'as is a body cut at each of its other ' + (bytes.length - 2) + ' byte offsets');
+
+    // And in more than two pieces, one byte at a time.
+    const slow = await raw('PATCH', '/api/me', bytes,
+      Array.from({ length: bytes.length }, (_, i) => i + 1), jar);
+    eq(slow.data && slow.data.user && slow.data.user.bio, bio, 'or a byte at a time');
+
+    // The size limit is in bytes. A flag emoji is six UTF-16 units and
+    // fourteen bytes, so counting the string's length let a body through at
+    // more than twice the limit.
+    const flag = '🏳️‍🌈'.repeat(8000);
+    ok(JSON.stringify({ bio: flag }).length < 64 * 1024, 'this body is under the limit as a string');
+    const fat = Buffer.from(JSON.stringify({ bio: flag }), 'utf8');
+    ok(fat.length > 64 * 1024, 'and over it in bytes, which is how it used to get in');
+    const big = await raw('PATCH', '/api/me', fat, [1 << 14, 1 << 15], jar);
+    eq(big.status, 400, 'measured in bytes, it is refused');
+    const after = await wire('GET', '/api/me');
+    eq(after.data && after.data.user && after.data.user.bio, bio, 'and the refusal changed nothing');
+
+    // ---- which address the limits count against ----
+    // Behind the reverse proxy DEPLOY.md recommends, every visitor arrives
+    // from 127.0.0.1, so one bucket held the whole internet.
+    const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'fyc-proxy-'));
+    let n = 0;
+    const signupAt = (at, xff) => fetch(at + '/api/signup', {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' },
+        xff ? { 'X-Forwarded-For': xff } : {}),
+      body: JSON.stringify({ username: 'proxy' + (++n), password: 'hunter2hunter', ageOk: true })
+    }).then((x) => x.status);
+
+    const behind = createApp({
+      file: path.join(tmp2, 'proxy.db'), trustProxy: 1,
+      limits: { signupsPerIpPerHour: 2 }, mailer: captureMailer
+    });
+    await new Promise((r) => behind.server.listen(0, r));
+    const at = 'http://127.0.0.1:' + behind.server.address().port;
+
+    eq(await signupAt(at, '203.0.113.7'), 201, 'one visitor signs up');
+    eq(await signupAt(at, '203.0.113.7'), 201, 'and again, up to the limit');
+    eq(await signupAt(at, '203.0.113.7'), 429, 'then they are held');
+    eq(await signupAt(at, '198.51.100.4'), 201, 'while a different visitor is not');
+
+    // A client that writes its own X-Forwarded-For only pads the left of the
+    // chain; the proxy appends what it actually saw. Reading from the right
+    // is what makes trusting the header safe at all.
+    eq(await signupAt(at, '198.51.100.4'), 201, 'the second visitor has one left');
+    eq(await signupAt(at, '10.9.9.9, 198.51.100.4'), 429,
+      'a forged entry in front of the real one wins nothing');
+    eq(await signupAt(at, '198.51.100.9'), 201, 'and the right-hand entry is what counts');
+    eq(await signupAt(at, ''), 201, 'no header at all falls back to the socket');
+
+    // Unset, the header is ignored: on a server nothing sits in front of, it
+    // is whatever the caller typed.
+    const exposed = createApp({
+      file: path.join(tmp2, 'exposed.db'), limits: { signupsPerIpPerHour: 1 }, mailer: captureMailer
+    });
+    await new Promise((r) => exposed.server.listen(0, r));
+    const at2 = 'http://127.0.0.1:' + exposed.server.address().port;
+    eq(await signupAt(at2, '1.1.1.1'), 201, 'with no proxies declared, one signup');
+    eq(await signupAt(at2, '2.2.2.2'), 429, 'and a new header does not buy another');
+
+    behind.server.close(); behind.store.db.close();
+    exposed.server.close(); exposed.store.db.close();
+    fs.rmSync(tmp2, { recursive: true, force: true });
+
+    const src = fs.readFileSync(path.join(__dirname, '..', 'server', 'app.js'), 'utf8');
+    ok(/Math\.max\(0, Math\.min\(8, Math\.floor\(Number\(hops\) \|\| 0\)\)\)/.test(src),
+      'a nonsense hop count cannot mean "trust the header"');
+    ok(/chain\[chain\.length - trustProxy\]/.test(src), 'and the chain is read from the right');
+    ok(/Buffer\.concat\(chunks\)\.toString\('utf8'\)/.test(src), 'the body is decoded once, at the end');
+    // Comments stripped first: the one above this change describes the old
+    // `buf += chunk` by name, and an unanchored search for it matched that.
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    ok(!/\bbuf \+=/.test(code), 'and never built up as a string');
+  });
+
+  await group('a failed send, and a start that cannot happen', async () => {
+    // A transport that fails says why in our words, not the caller's. This
+    // was `'Could not send the email: ' + e.message`, and the message names a
+    // file in this repository when no transport is configured — a host, a
+    // port and a provider's rejection text once one is.
+    const tmp3 = fs.mkdtempSync(path.join(os.tmpdir(), 'fyc-mail-'));
+    const logged = [];
+    const broken = createApp({
+      file: path.join(tmp3, 'mail.db'),
+      log: (line) => logged.push(line),
+      mailer: {
+        transport: 'smtp',
+        async sendVerification() {
+          throw new Error('535 auth failed for postmaster@mail.internal:587 (key AKIA…)');
+        }
+      }
+    });
+    await new Promise((r) => broken.server.listen(0, r));
+    const at = 'http://127.0.0.1:' + broken.server.address().port;
+    const made = await fetch(at + '/api/signup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'mailer', password: 'hunter2hunter', ageOk: true })
+    });
+    const jar = (made.headers.getSetCookie ? made.headers.getSetCookie() : [])[0].split(';')[0];
+    const r = await fetch(at + '/api/email', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: jar },
+      body: JSON.stringify({ email: 'someone@example.com' })
+    });
+    const body = await r.json();
+    eq(r.status, 502, 'a transport that fails is still our fault, not a 400');
+    ok(!/mail\.internal|AKIA|535/.test(JSON.stringify(body)),
+      'and the caller is told none of the host, the port or the key');
+    ok(/try again/i.test(body.error || ''), 'only what they can do about it');
+    ok(logged.some((l) => /MAIL smtp/.test(l) && /mail\.internal/.test(l)),
+      'while the operator gets the whole thing in the log');
+    broken.server.close(); broken.store.db.close();
+    fs.rmSync(tmp3, { recursive: true, force: true });
+
+    // A PORT that is not a port reached listen() as NaN and came out as a
+    // RangeError stack trace. The other two reasons the server cannot start
+    // each get a sentence.
+    const { execFileSync } = require('node:child_process');
+    const tryPort = (v) => {
+      try {
+        execFileSync(process.execPath, [path.join(__dirname, '..', 'server', 'app.js')],
+          { env: Object.assign({}, process.env, { PORT: v, DB: undefined }), timeout: 10000,
+            encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+        return { code: 0, out: '' };
+      } catch (e) {
+        return { code: e.status, out: String(e.stdout || '') + String(e.stderr || '') };
+      }
+    };
+    for (const bad of ['abc', '70000', '4000.5', '-1']) {
+      const got = tryPort(bad);
+      eq(got.code, 1, `PORT=${bad} stops the server with a failure`);
+      ok(/is not a port number/.test(got.out), `PORT=${bad}: and says so in a sentence`);
+      ok(!/RangeError|at Server\.listen/.test(got.out), `PORT=${bad}: with no stack trace`);
+    }
+  });
+
   server.close();
   fs.rmSync(tmp, { recursive: true, force: true });
 

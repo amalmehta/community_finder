@@ -7,8 +7,15 @@
      the static build carries its own. frame-ancestors is deliberately absent:
      it is ignored in a meta element, and a directive that does nothing but
      log an error on every load is worse than none. Framing is refused by the
-     server's header, which is the only place it can be. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'none'; base-uri 'none'">
+     server's header, which is the only place it can be.
+
+     object-src is here because the server has sent it from the start, and the
+     copy of this app on Pages was the weaker of the two for no reason. The
+     server's form-action was the other half of that mismatch, and it is now
+     'none' there too. The one <form> in the app cancels its own submit and
+     sends the request itself, which is why this page has said 'none' since it
+     was written — the served copy was simply never brought into line. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'none'; base-uri 'none'; object-src 'none'">
 <title>Community Finder</title>
 <meta name="description" content="Real local communities by city and interest, with the concrete first step, the cost and the commitment for each.">
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">

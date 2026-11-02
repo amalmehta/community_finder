@@ -1138,6 +1138,14 @@ function createStore(db) {
       return q('SELECT COUNT(*) AS n FROM actions WHERE who = ? AND kind = ? AND at > ?')
         .get(who, kind, now() - sinceMs).n;
     },
+    /** The cheapest question that proves the database is still answering.
+     *  Uptime checks ask it every few seconds, so it goes through the
+     *  statement cache like everything else instead of being prepared again
+     *  on each one. */
+    ping() {
+      return q('SELECT 1 AS ok').get().ok === 1;
+    },
+
     prune() {
       const t = now();
       q('DELETE FROM actions WHERE at < ?').run(t - 7 * 86400000);

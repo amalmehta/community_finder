@@ -43,6 +43,7 @@ npm run stop
 | Variable | Default | What it does |
 |---|---|---|
 | `PORT` | `4000` | Port to listen on |
+| `TRUST_PROXY` | `0` | Number of reverse proxies in front of this process. Leave at `0` when nothing is, or the rate limits can be sidestepped with a header |
 | `SECURE` | unset | Set to `1` **only** behind TLS. Marks the session cookie `Secure` and sends HSTS |
 | `MAIL_TRANSPORT` | `file` | `file` writes verification emails to `server/data/outbox/` and the log. Anything else needs a transport implemented in `server/mail.js` |
 | `DB` | `server/data/community.db` | Used by the backup and moderation tools |
@@ -62,9 +63,23 @@ community.example.com {
 }
 ```
 
+Set `TRUST_PROXY=1` along with it. Caddy and nginx both appear to this process
+as a connection from `127.0.0.1`, so without it every visitor shares one
+address — and the signup and login limits, which are the only thing standing
+between a new deployment and a scripted form, become limits for the whole
+internet at once. Five accounts an hour and ten login attempts in fifteen
+minutes is a lock-out, not a defence.
+
+Count the proxies, and set it to that many. One is the usual answer; two if a
+CDN sits in front of Caddy. It must stay `0` when the process is exposed
+directly, because then the only `X-Forwarded-For` header it could ever see is
+one the caller wrote themselves.
+
 ## Before you let anyone in
 
 - [ ] **TLS terminated** and `SECURE=1` set
+- [ ] **`TRUST_PROXY` set to the number of proxies in front.** Unset behind one,
+      the signup and login limits apply to everybody at once
 - [ ] **Email actually sends.** The default transport writes to a folder. Until
       a real transport is configured nobody can verify an address, and
       verification is what unlocks messaging — the social half of the app is

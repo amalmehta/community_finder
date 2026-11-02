@@ -7,6 +7,9 @@
     id: 'phl',
     name: 'Philadelphia',
     region: 'PA',
+    // A metro area is not a state: Camden is New Jersey and Wilmington is Delaware, and someone
+    // typing either should land here rather than nowhere.
+    states: ['PA', 'NJ', 'DE'],
     aliases: ['philadelphia', 'philly', 'phl', 'south philly', 'west philly', 'fishtown', 'germantown'],
     orgs: [
       {

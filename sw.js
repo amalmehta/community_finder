@@ -14,10 +14,8 @@
  */
 'use strict';
 
-// Bump this to retire every old cache on the next load. It is the only thing
-// that has to change when the shell below changes.
+// Bump this when the *behaviour* of this worker changes.
 var VERSION = 'v1';
-var CACHE = 'fyc-shell-' + VERSION;
 
 // Where the app lives, read off this file rather than assumed: it is served
 // from a subdirectory on GitHub Pages and from the root by the Node server,
@@ -61,6 +59,25 @@ var SHELL = [
   'src/social.js',
   'src/circles.js'
 ];
+
+// The cache is named after the list above as well as the version, so a file
+// added to the app cannot end up missing from a cache that still looks
+// current. Bumping a number by hand was the plan, and the very first time the
+// shell changed — src/dom.js, when the duplicated helpers were pulled out of
+// the three front-end files — it was forgotten. A device that had installed
+// the worker before that kept a cache named for a shell it no longer had.
+//
+// FNV-1a over the list: a worker has no synchronous hash, and all this has to
+// do is differ when the list differs.
+function fingerprint(s) {
+  var h = 2166136261;
+  for (var i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h + (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24)) >>> 0;
+  }
+  return h.toString(36);
+}
+var CACHE = 'fyc-shell-' + VERSION + '-' + fingerprint(SHELL.join('\n'));
 
 self.addEventListener('install', function (e) {
   e.waitUntil(

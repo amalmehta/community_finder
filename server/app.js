@@ -273,7 +273,10 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "connect-src 'self'",
-  "form-action 'self'",
+  // The one <form> in the app cancels its own submit and sends the request
+  // itself. index.html has said 'none' since it was written; this header was
+  // the looser of two policies over the same files.
+  "form-action 'none'",
   "frame-ancestors 'none'",
   "base-uri 'none'",
   "object-src 'none'"
@@ -308,18 +311,47 @@ const fail = (res, status, error) => send(res, status, { error });
 /** An error the caller caused, and can be told about. Anything else is ours. */
 class BadRequest extends Error {}
 
+// Two things here used to be wrong, and both of them only in the cases that
+// matter. The body was built with `buf += chunk`, which decodes each chunk as
+// UTF-8 on its own — so a character split across a chunk boundary arrived as
+// replacement characters. A bio with an accent in it, a message with an emoji
+// in it, a name in Japanese: 24 of the 57 places a 58-byte body could be cut
+// corrupted it, silently, and the corruption was then stored. TCP, TLS
+// records and proxies all cut wherever they like. And the size limit counted
+// the length of that string, which is UTF-16 units rather than bytes, so a
+// body of 30,000 emoji measured 30,000 against a limit of 65,536 while
+// actually being 70,000 bytes long.
+//
+// Collect the bytes, count the bytes, decode once at the end.
 function readJson(req, limit = 64 * 1024) {
   return new Promise((resolve, reject) => {
-    let buf = '';
+    const chunks = [];
+    let bytes = 0, settled = false;
+    const stop = (err, drain) => {
+      if (settled) return;
+      settled = true;
+      chunks.length = 0;
+      reject(err);
+      // Drain the rest to nowhere rather than destroying the socket. The
+      // handler is about to answer 400, and a destroyed socket turns that
+      // into a connection reset — the caller is left guessing at what was
+      // wrong with a request we knew exactly what was wrong with.
+      if (drain) req.resume(); else req.destroy();
+    };
     req.on('data', (c) => {
-      buf += c;
-      if (buf.length > limit) { reject(new BadRequest('body too large')); req.destroy(); }
+      if (settled) return;
+      bytes += c.length;
+      if (bytes > limit) return stop(new BadRequest('body too large'), true);
+      chunks.push(c);
     });
     req.on('end', () => {
-      if (!buf) return resolve({});
-      try { resolve(JSON.parse(buf)); } catch (e) { reject(new BadRequest('invalid JSON')); }
+      if (settled) return;
+      settled = true;
+      if (!bytes) return resolve({});
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); }
+      catch (e) { reject(new BadRequest('invalid JSON')); }
     });
-    req.on('error', reject);
+    req.on('error', (e) => stop(e));
   });
 }
 
@@ -388,8 +420,11 @@ const VERSION = require('../package.json').version;
 
 function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure = false,
                     limits = {}, mailer = null, baseUrl = null, log = null, ready = {},
-                    drift = {}, disclosure = {}, quiet = {} } = {}) {
+                    drift = {}, disclosure = {}, quiet = {}, trustProxy: hops = 0 } = {}) {
   const L = Object.assign({}, DEFAULT_LIMITS, limits);
+  // A whole number of proxies, or none. Eight is far more than anyone has,
+  // and a nonsense value must not quietly mean "trust the header".
+  const trustProxy = Math.max(0, Math.min(8, Math.floor(Number(hops) || 0)));
   // Tests run a circle's whole life in a few milliseconds, so the "separate
   // days" part of the gate has to be adjustable. Nothing else overrides it.
   const R = Object.assign({}, READY_RULE, ready);
@@ -420,8 +455,33 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     return u;
   }
 
+  // Two of the rate limits are the only defence a new deployment has against
+  // somebody scripting the signup and login forms, and both of them key on
+  // the address the connection came from. DEPLOY.md tells you to terminate
+  // TLS at a reverse proxy on the same host — at which point every visitor
+  // arrives from 127.0.0.1, all of them share one bucket, and five accounts
+  // an hour and ten login attempts in fifteen minutes become the limit for
+  // the whole internet at once. The first few real people lock everyone out.
+  //
+  // So the forwarded address is read, but only when the operator says how
+  // many proxies are in front of this process. Trusting the header by
+  // default would be worse than ignoring it: anyone could put whatever they
+  // liked in X-Forwarded-For and have a limit per made-up address.
+  //
+  // Counting from the right is what makes it safe. A proxy appends the
+  // address it saw to whatever was already there, so with one proxy in front
+  // the last entry is the only one that proxy wrote, and a client that sends
+  // its own X-Forwarded-For only pads the left-hand side.
   function clientIp(req) {
-    return (req.socket.remoteAddress || 'unknown').replace(/^::ffff:/, '');
+    const socket = String(req.socket.remoteAddress || 'unknown').replace(/^::ffff:/, '');
+    if (!trustProxy) return socket;
+    const chain = String(req.headers['x-forwarded-for'] || '')
+      .split(',').map((s) => s.trim()).filter(Boolean);
+    const hop = chain[chain.length - trustProxy];
+    if (!hop) return socket;
+    // "[::1]:51234" and "127.0.0.1:51234" both appear in the wild.
+    return hop.replace(/^\[(.+)\](?::\d+)?$/, '$1').replace(/^(\d+\.\d+\.\d+\.\d+):\d+$/, '$1')
+      .replace(/^::ffff:/, '');
   }
 
   /** Mutations must come from our own origin: the session cookie is SameSite,
@@ -537,7 +597,13 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     try {
       await mail.sendVerification({ to: email, link, display: u.display });
     } catch (e) {
-      return fail(res, 502, 'Could not send the email: ' + e.message);
+      // This was `'Could not send the email: ' + e.message`, which is the
+      // same mistake the 500 handler was fixed for: a transport's error text
+      // is ours, not the caller's. The unconfigured one names a file in this
+      // repository, and a real one would name a host, a port, and whatever
+      // the provider wrote in its rejection.
+      if (log) log(`${new Date().toISOString()} MAIL ${mail.transport} ${e && e.stack || e}`);
+      return fail(res, 502, 'Could not send the email just now. Try again in a few minutes.');
     }
     send(res, 202, { sent: true, transport: mail.transport });
   });
@@ -1505,7 +1571,7 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
   // Uptime checks need something cheap that also proves the database answers.
   route('GET', /^\/api\/health$/, async (req, res) => {
     let db = 'ok';
-    try { store.db.prepare('SELECT 1').get(); } catch (e) { db = 'error'; }
+    try { store.ping(); } catch (e) { db = 'error'; }
     send(res, db === 'ok' ? 200 : 503, {
       status: db === 'ok' ? 'ok' : 'degraded',
       db,
@@ -1573,9 +1639,21 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
 module.exports = { createApp, hashPassword, verifyPassword, DEFAULT_LIMITS };
 
 if (require.main === module) {
-  const port = Number(process.env.PORT || 4000);
+  // A PORT that is not a number reaches listen() as NaN, where it throws a
+  // RangeError — twelve lines of stack trace about `options.port`, from a
+  // process that will not start because of one environment variable. The
+  // other two reasons it cannot start each get a sentence; so does this one.
+  const port = process.env.PORT === undefined ? 4000 : Number(process.env.PORT);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    console.error(`\nPORT=${JSON.stringify(process.env.PORT)} is not a port number. ` +
+                  'Give it a whole number up to 65535, or leave it unset for 4000.\n');
+    process.exit(1);
+  }
   const { server, shutdown } = createApp({
     secure: process.env.SECURE === '1',
+    // How many reverse proxies sit in front of this process. 0 reads the
+    // socket address, which is right when nothing does.
+    trustProxy: Math.max(0, Math.min(8, Number(process.env.TRUST_PROXY) || 0)),
     log: (line) => console.log(line)
   });
   ['SIGTERM', 'SIGINT'].forEach((sig) => process.on(sig, () => shutdown(sig)));

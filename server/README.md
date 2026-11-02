@@ -16,7 +16,15 @@ Or in the foreground, where Ctrl-C stops it:
 npm start                     # http://localhost:4000
 PORT=8080 npm start           # somewhere else
 SECURE=1  npm start           # behind HTTPS: marks the session cookie Secure
+TRUST_PROXY=1 npm start       # behind one reverse proxy: count the limits
+                              # against the visitor, not the proxy
 ```
+
+`TRUST_PROXY` matters more than it looks. Every visitor behind a proxy on the
+same host arrives from `127.0.0.1`, so without it the five-signups-an-hour and
+ten-logins-in-fifteen-minutes limits are limits for everyone at once. Set it to
+the number of proxies in front, and leave it at `0` when the process is exposed
+directly — then the only `X-Forwarded-For` it could see is a forged one.
 
 Run it in a terminal tab and it dies when that tab is closed, reused or
 interrupted — which is easy to do by accident. `start:bg` detaches it, writes
@@ -280,7 +288,7 @@ auth decision in the main README.
 node tests/run-server-tests.js
 ```
 
-311 assertions covering signup and sign-in, session isolation, interest
+393 assertions covering signup and sign-in, session isolation, interest
 visibility, the request/accept/message flow, outsiders being kept out of other
 people's threads, blocking, reporting, rate limits, the full circle lifecycle
 (trust tiers, written applications, member seconding, the readiness gate,
@@ -293,8 +301,10 @@ visible to nobody else, the turn-taking check holding the gate shut on a circle
 where one person wrote most of it, a question being handed by name to the member
 who has never spoken (and never to whoever asked for it, or the same person
 twice running), what a circle says it is for staying inside it, the ceiling
-coming down to eight without removing anyone, and that the server will not serve
-its own source or escape the project directory.
+coming down to eight without removing anyone, a request body cut at any byte
+offset arriving intact, the signup and login limits counting against the
+visitor's address rather than the reverse proxy's, and that the server will not
+serve its own source or escape the project directory.
 
 Two things are relaxed, both because a circle's whole life happens in
 milliseconds there: the "two separate days" rung of the readiness gate, via

@@ -7,6 +7,9 @@
     id: 'nyc',
     name: 'New York City',
     region: 'NY',
+    // A metro area is not a state: the Hudson side of this metro is New Jersey, and someone
+    // typing either should land here rather than nowhere.
+    states: ['NY', 'NJ'],
     aliases: ['new york', 'nyc', 'new york city', 'brooklyn', 'manhattan', 'queens', 'the bronx', 'bronx', 'staten island', 'ny ny'],
     orgs: [
       {

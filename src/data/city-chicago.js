@@ -7,6 +7,9 @@
     id: 'chi',
     name: 'Chicago',
     region: 'IL',
+    // A metro area is not a state: the south-east edge of Chicagoland is Indiana, and someone
+    // typing either should land here rather than nowhere.
+    states: ['IL', 'IN'],
     aliases: ['chicago', 'chi', 'chicagoland'],
     orgs: [
       {

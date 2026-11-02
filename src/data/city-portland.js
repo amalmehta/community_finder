@@ -7,6 +7,9 @@
     id: 'pdx',
     name: 'Portland',
     region: 'OR',
+    // A metro area is not a state: Vancouver is across the river in Washington, and someone
+    // typing either should land here rather than nowhere.
+    states: ['OR', 'WA'],
     aliases: ['portland', 'pdx', 'portland or', 'portland oregon', 'beaverton', 'gresham', 'se portland', 'ne portland'],
     orgs: [
       {
