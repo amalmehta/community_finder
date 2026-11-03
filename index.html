@@ -32,8 +32,18 @@
 <meta property="og:title" content="Community Finder">
 <meta property="og:description" content="Real local groups near you, and small vetted circles that chat first and decide to meet up later.">
 <meta property="og:url" content="https://amalmehta.github.io/community_finder/">
-<meta property="og:image" content="https://amalmehta.github.io/community_finder/assets/social.svg">
+<!-- A PNG, not the SVG this is drawn from. No major platform renders an SVG
+     share card — Facebook, X, LinkedIn, Slack and iMessage all skip it — so
+     every link to this app was posted with no image at all. Same mistake as
+     the Home Screen icon, one meta tag over. Rastered by:
+       rsvg-convert -w 1200 -h 630 assets/social.svg -o assets/social.png -->
+<meta property="og:image" content="https://amalmehta.github.io/community_finder/assets/social.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Find your people. Real local groups, what they cost, and what actually happens when you turn up.">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://amalmehta.github.io/community_finder/assets/social.png">
 <link rel="manifest" href="site.webmanifest">
 <link rel="stylesheet" href="assets/styles.css">
 <script>

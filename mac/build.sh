@@ -21,7 +21,12 @@ swiftc -O -target "$(uname -m)-apple-macos13.0" \
 
 echo "→ bundling the site"
 mkdir -p "$APP/Contents/Resources/web"
-cp "$ROOT/index.html" "$APP/Contents/Resources/web/"
+# The footer of every screen links to Privacy and Terms, and only index.html
+# was copied in — so both links were a plain-text 404 from the bundled server,
+# in the one build of this app where there is no browser tab to escape to.
+# site.webmanifest is here because index.html asks for it on every load.
+cp "$ROOT/index.html" "$ROOT/privacy.html" "$ROOT/terms.html" \
+   "$ROOT/site.webmanifest" "$APP/Contents/Resources/web/"
 cp -R "$ROOT/assets" "$ROOT/src" "$APP/Contents/Resources/web/"
 
 echo "→ icon"

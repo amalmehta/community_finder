@@ -1518,7 +1518,10 @@ group('offline: the app when the network is not there', function () {
   // the "new HTML driving old JavaScript" deploy the ETag in server/app.js
   // exists to prevent. The live copy wins whenever there is one.
   ok(swSrc.indexOf('raceNetwork') !== -1, 'the network is asked first');
-  ok(swSrc.indexOf('caches.match(req)') !== -1 && /raceNetwork\(req\)\.catch/.test(swSrc),
+  // Asserted as "the cache is consulted in the network's catch", not as the
+  // exact call: the argument changed when the shell gained a canonical key,
+  // and an assertion on the spelling would have failed for the wrong reason.
+  ok(/raceNetwork\(req\)\.catch\(function \(\) \{(\s*\/\/[^\n]*)*\s*return caches\.match\(/.test(swSrc),
      'and the cache is what answers when it cannot');
   // Plain network-first makes a bad connection worse than no worker at all:
   // a request that will fail in thirty seconds blocks a file already on the
@@ -2100,6 +2103,292 @@ group('seven smaller things, each in its own place', function () {
   ok(moved !== name, 'and it changes when a file is added to the shell');
   eq(cacheName(swSrc), name, 'while the same list always gives the same name');
   ok(swSrc.indexOf('src/dom.js') !== -1, 'the file that was forgotten is in the shell');
+});
+
+group('a directory searched for what it is actually about', function () {
+  var url = function (id, ints) {
+    var hit = FYC.buildUniversal('Dallas, TX', ints).filter(function (o) { return o.id === id; })[0];
+    return hit ? decodeURIComponent(hit.url) : null;
+  };
+
+  // kw() took the person's top interest and handed it to every directory, so
+  // a volunteering site was searched for whatever they happened to rank first.
+  ['games', 'stillness', 'books', 'dance', 'tech'].forEach(function (first) {
+    var u = url('u-volunteermatch', [first, 'volunteering']);
+    ok(/[?&]k=volunteer/.test(u), 'VolunteerMatch is searched for volunteering, not ' + first);
+  });
+  ok(/k=volunteer/.test(url('u-volunteermatch', ['volunteering'])),
+     'and still is when volunteering is the only pick');
+  // Nothing of theirs is in its subject, and it shows for everyone, so it
+  // falls back to its own subject rather than to something it has nothing of.
+  ok(/k=volunteer/.test(url('u-volunteermatch', ['dance'])),
+     'and when none of their interests is one of its own');
+
+  // Eventbrite covers the things it lists, and nothing else.
+  eq(url('u-eventbrite', ['volunteering', 'books']), 'https://www.eventbrite.com/d/dallas-tx/book-club/',
+     'Eventbrite gets the interest of theirs it actually covers');
+  eq(url('u-eventbrite', ['games', 'books']), 'https://www.eventbrite.com/d/dallas-tx/board-games-tabletop/',
+     'and their ranking decides between two it covers');
+
+  // Meetup is a general index: the top interest is the right query for it.
+  ok(/keywords=hiking outdoors/.test(url('u-meetup', ['outdoors', 'volunteering'])),
+     'Meetup still gets whatever they ranked first');
+  ok(/keywords=book club/.test(url('u-meetup', ['books', 'outdoors'])),
+     'whichever that is');
+  ok(/keywords=community/.test(url('u-meetup', [])),
+     'and something sensible when they picked nothing');
+
+  // 'impact' was in a recipe's interest list. It is a goal, so it could never
+  // match an interest id — and nothing checked, because only the curated
+  // listings were validated against the taxonomy.
+  var bad = [];
+  FYC.RECIPES.forEach(function (r) {
+    (r.interests || []).forEach(function (i) { if (!FYC.INTERESTS[i]) bad.push(r.id + ' → ' + i); });
+    (r.goals || []).forEach(function (gl) { if (FYC.GOALS.indexOf(gl) === -1) bad.push(r.id + ' goal → ' + gl); });
+    if (FYC.STRUCTURE.indexOf(r.structure) === -1) bad.push(r.id + ' structure → ' + r.structure);
+    if (FYC.COMMITMENT.indexOf(r.commitment) === -1) bad.push(r.id + ' commitment → ' + r.commitment);
+    (r.when || []).forEach(function (w) { if (FYC.WHEN.indexOf(w) === -1) bad.push(r.id + ' when → ' + w); });
+  });
+  eq(bad.join(' | '), '', 'every fallback recipe speaks the same vocabulary as the listings');
+  ok(FYC.RECIPES.length >= 27, 'and there are as many of them as there were');
+});
+
+group('the view you are looking at is the last one you asked for', function () {
+  var fs = require('fs');
+  var vm = require('vm');
+  var dom = fs.readFileSync(path.join(root, 'src/dom.js'), 'utf8');
+  var social = fs.readFileSync(path.join(root, 'src/social.js'), 'utf8');
+  var circles = fs.readFileSync(path.join(root, 'src/circles.js'), 'utf8');
+
+  // The helper itself, exercised rather than grepped.
+  var sandbox = { window: {}, document: { addEventListener: function () {} } };
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(dom, sandbox, { filename: 'dom.js' });
+  var T = sandbox.FYC_DOM.turnstile();
+  var a = T.take();
+  ok(T.current(a), 'the only view is the current one');
+  var b = T.take();
+  ok(T.current(b) && !T.current(a), 'a second view supersedes the first');
+  ok(!T.current(0), 'and a ticket nobody took is never current');
+  var other = sandbox.FYC_DOM.turnstile();
+  ok(other.current(other.take()), 'each turnstile counts for itself');
+
+  // Both chat views open asynchronously, and both used to install a 5s poller
+  // after the wait with no check that they were still the view on screen.
+  [['social.js', social, 'openThread'], ['circles.js', circles, 'openCircle']].forEach(function (p) {
+    var src = p[1], where = p[0];
+    ok(/var views = D\.turnstile\(\);/.test(src), where + ' has a turnstile');
+    ok(/var mine = views\.take\(\);/.test(src), where + ': ' + p[2] + ' takes a ticket');
+    ok(/if \(!views\.current\((mine|ticket)\)\) return;\s*\n\s*(stop\(\);|stopPolling\(\);)\s*\n\s*S\.poll = D\.every/.test(src),
+       where + ': and checks it before installing the poller');
+    ok(/if \(pulling \|\| !views\.current\((mine|ticket)\)\) return;/.test(src),
+       where + ': a superseded poll does nothing');
+    ok(/if \(!views\.current\((mine|ticket)\)\) return;\s*\n\s*var added = 0;/.test(src),
+       where + ': and never paints what came back after it was replaced');
+  });
+  // The poller is cancelled before another is put in its place, in both.
+  ok(/stopPolling\(\);\s*\n\s*S\.poll = D\.every/.test(social), 'social.js replaces no live poller');
+  ok(/\n\s*stop\(\);\s*\n\s*S\.poll = D\.every/.test(circles), 'circles.js replaces no live poller');
+  ok(/async function openThread\(t\) \{\s*\n\s*var mine = views\.take\(\);\s*\n\s*stopPolling\(\);/.test(social),
+     'opening a conversation stops the one before it, which it never did');
+
+  // The ticket is passed down into the chat card, which is a different
+  // function with a different name for it. The first version of this change
+  // used the opener's name inside the card, where it does not exist — a
+  // ReferenceError on every circle opened, which the assertions above sailed
+  // straight past because they only read the file. So read the scope too:
+  // every views.current(x) must name something its own function declares.
+  function scopeCheck(src, where) {
+    // Every function in the file, with the span of its body and what it
+    // declares. A nested function legitimately closes over its parent, so a
+    // use is fine if ANY function containing it declares the name.
+    var fns = [], re = /function\s*(\w*)\s*\(([^)]*)\)\s*\{/g, m;
+    while ((m = re.exec(src)) !== null) {
+      var open = re.lastIndex - 1, depth = 0, end = src.length;
+      for (var i = open; i < src.length; i++) {
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}') { depth--; if (!depth) { end = i; break; } }
+      }
+      fns.push({
+        name: m[1] || '(anonymous)', from: m.index, to: end,
+        names: m[2].split(',').map(function (x) { return x.trim(); }).filter(Boolean)
+      });
+    }
+    // A function's OWN body: its text with every function nested inside it
+    // blanked out. Without this the module's wrapper counts as declaring
+    // everything any function in the file declares, which is how the first
+    // version of this check passed the very bug it was written for.
+    fns.forEach(function (f) {
+      var own = src.slice(f.from, f.to).split('');
+      fns.forEach(function (g) {
+        if (g === f || g.from <= f.from || g.to > f.to) return;
+        for (var k = g.from; k < g.to; k++) own[k - f.from] = ' ';
+      });
+      f.own = own.join('');
+    });
+    var out = [], use = /views\.current\((\w+)\)/g, u;
+    while ((u = use.exec(src)) !== null) {
+      var id = u[1], at = u.index, ok_ = false, innermost = '(top level)';
+      fns.forEach(function (f) {
+        if (at < f.from || at > f.to) return;
+        if (f.from > (innermost.from || -1)) innermost = f.name;
+        if (f.names.indexOf(id) !== -1 ||
+            new RegExp('var\\s+' + id + '\\s*=').test(f.own)) ok_ = true;
+      });
+      if (!ok_) out.push(where + ': ' + id + ' is not in scope at character ' + at);
+    }
+    return out;
+  }
+  var loose = scopeCheck(social, 'social.js').concat(scopeCheck(circles, 'circles.js'));
+  eq(loose.join(' | '), '', 'every ticket checked is one its own function has');
+});
+
+group('the shell cache holds the shell, and not a token', function () {
+  var fs = require('fs');
+  var vm = require('vm');
+  var swSrc = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+  var BASE = 'https://amalmehta.github.io/community_finder/';
+
+  // Enough of a worker to call into. caches.open returns a thenable that
+  // settles immediately, so what gets stored can be read back in line.
+  var put = [];
+  var cache = { put: function (k, v) { put.push(String(k)); }, match: function () {} };
+  var settled = function (v) {
+    return { then: function (f) { f(v); return { catch: function () { return this; } }; } };
+  };
+  var sandbox = {
+    self: { location: new URL(BASE + 'sw.js'), addEventListener: function () {} },
+    caches: { open: function () { return settled(cache); } },
+    URL: URL, Promise: Promise, Response: function () {}, Request: function () {},
+    fetch: function () {}, setTimeout: setTimeout, clearTimeout: clearTimeout, console: console
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(swSrc, sandbox, { filename: 'sw.js' });
+
+  var key = function (u) { return sandbox.shellKey(new URL(u, BASE)); };
+
+  // Everything the shell holds resolves to one entry, however it is reached.
+  eq(key(BASE), BASE, 'the app itself is a shell entry');
+  eq(key(BASE + '?tab=plan'), BASE, 'and so is the saved-tab shortcut, under the same key');
+  eq(key(BASE + '?org=sf-recology'), BASE, 'and a shared listing link');
+  eq(key(BASE + 'verify?token=deadbeef'), null, 'the verification page is not a shell entry');
+  eq(key(BASE + 'src/app.js'), BASE + 'src/app.js', 'a script is itself');
+  eq(key(BASE + 'src/app.js?v=3'), BASE + 'src/app.js', 'with any query dropped');
+  eq(key(BASE + 'src/nonexistent.js'), null, 'and a file not in the shell is not cached at all');
+  eq(key('https://example.com/evil.js'), null, 'nor anything from somewhere else');
+
+  // What actually gets written.
+  var res = { ok: true, type: 'basic', clone: function () { return 'body'; } };
+  var store = function (u) { put.length = 0; sandbox.putCopy({ url: u }, res); return put.slice(); };
+  eq(store(BASE + '?tab=plan').join(), BASE, 'opening ?tab=plan refreshes the page entry');
+  eq(store(BASE + '?org=sf-recology').join(), BASE, 'so does a shared link, rather than adding one');
+  eq(store(BASE + 'verify?token=deadbeef').join(), '',
+     'and a single-use verification token is never written to the device');
+  eq(store(BASE + 'src/app.js').join(), BASE + 'src/app.js', 'a shell file is stored under its own path');
+
+  // The cache cannot grow with use: every distinct URL under the app still
+  // maps into the same fixed set of entries, or into none.
+  var shell = (swSrc.match(/var SHELL = \[([\s\S]*?)\];/) || [])[1] || '';
+  var listed = (shell.match(/'([^']+)'/g) || []).map(function (q) { return q.slice(1, -1); });
+  var keys = {};
+  ['', '?tab=plan', '?tab=you', '?org=a', '?org=b', 'verify?token=1', 'verify?token=2',
+   'index.html', 'index.html?x=1', 'privacy.html', 'sw.js', 'assets/styles.css']
+    .forEach(function (u) { var k = key(BASE + u); if (k) keys[k] = true; });
+  ok(Object.keys(keys).length <= listed.length,
+     'twelve different ways in produce no more entries than the shell has');
+  ok(Object.keys(keys).length >= 4, 'while still caching the files that are in it');
+
+  // A 404 or an opaque response is still never kept.
+  put.length = 0;
+  sandbox.putCopy({ url: BASE + 'src/app.js' }, { ok: false, type: 'basic', clone: function () { return 1; } });
+  sandbox.putCopy({ url: BASE + 'src/app.js' }, { ok: true, type: 'opaque', clone: function () { return 1; } });
+  eq(put.length, 0, 'a 404 and an opaque response are both refused, as before');
+});
+
+group('eight more, and where each of them was', function () {
+  var fs = require('fs');
+  var read = function (p) { return fs.readFileSync(path.join(root, p), 'utf8'); };
+  var privacy = read('privacy.html'), terms = read('terms.html');
+
+  // 1. On Pages the app is at /community_finder/, so "/" left the site.
+  [['privacy.html', privacy], ['terms.html', terms]].forEach(function (pair) {
+    eq((pair[1].match(/href="\/"/g) || []).length, 0, pair[0] + ': no link to the domain root');
+    ok(/<a class="brand" href="\.\/">/.test(pair[1]), pair[0] + ': the brand goes back to the app');
+    ok(/<a href="\.\/">← Back to the app<\/a>/.test(pair[1]), pair[0] + ': and so does the footer link');
+    // Nothing else may be absolute either.
+    // [^"\n] and not [^"]: without the newline excluded this ran past the
+    // end of the attribute and reported half the next line as the match.
+    var abs = (pair[1].match(/(?:href|src)="\/[^\/"\n][^"\n]*"/g) || []);
+    eq(abs.join(), '', pair[0] + ': and nothing else is rooted at the domain');
+  });
+
+  // 2. index.html gained object-src last time; these two are the same app.
+  [['privacy.html', privacy], ['terms.html', terms]].forEach(function (pair) {
+    var pol = (pair[1].match(/Content-Security-Policy" content="([^"]+)"/) || [])[1] || '';
+    ok(pol.indexOf("object-src 'none'") !== -1, pair[0] + ': refuses plugins too');
+  });
+
+  // 3. The page is about what is kept on your device, and the app now keeps
+  //    a copy of itself there.
+  ok(/service worker/i.test(privacy), 'privacy.html says the app caches itself');
+  ok(/clear/i.test(privacy.slice(privacy.indexOf('Getting rid of it'))),
+     'and that clearing site data removes it');
+  ok(privacy.indexOf('no saved plan') !== -1 || /holds the app and nothing else/.test(privacy),
+     'and says what that cache does not hold');
+
+  // 4. The Mac bundle shipped the app without the pages its footer links to.
+  var build = read('mac/build.sh');
+  ['index.html', 'privacy.html', 'terms.html', 'site.webmanifest'].forEach(function (f) {
+    ok(build.indexOf('"$ROOT/' + f + '"') !== -1, 'the Mac bundle includes ' + f);
+  });
+
+  // 5. DEPLOY.md's checklist ends in two commands that were not in the image.
+  var docker = read('Dockerfile'), ignore = read('.dockerignore');
+  ok(/^COPY tools \.\/tools$/m.test(docker), 'the image carries the tools');
+  ok(!/^tools$/m.test(ignore), 'and nothing drops them on the way in');
+  var deploy = read('DEPLOY.md');
+  ['npm run backup', 'npm run moderate'].forEach(function (cmd) {
+    ok(deploy.indexOf(cmd) !== -1, 'DEPLOY.md still asks for `' + cmd + '`');
+  });
+  var pkg = JSON.parse(read('package.json'));
+  ['backup', 'moderate'].forEach(function (s) {
+    var file = pkg.scripts[s].split(' ').pop();
+    ok(fs.existsSync(path.join(root, file)), '`npm run ' + s + '` points at a file that exists');
+    ok(docker.indexOf('COPY tools') !== -1, 'and ' + file + ' is in the image');
+  });
+
+  // 6 and 7. The two most-used controls in the app, and the lists above them.
+  [['social.js', read('src/social.js')], ['circles.js', read('src/circles.js')]].forEach(function (pair) {
+    var src = pair[1];
+    ok(/class: 'msg-input'[\s\S]{0,200}?'aria-label'/.test(src),
+       pair[0] + ": the composer has a name, not just a placeholder");
+    ok(/class: 'msg-list[^']*'[\s\S]{0,160}?role: 'log'/.test(src),
+       pair[0] + ': and the conversation above it announces what arrives');
+    ok(/role: 'log', *\n? *'aria-label'/.test(src) || /role: 'log',[\s\S]{0,120}?'aria-label'/.test(src),
+       pair[0] + ': with something to tell them which conversation it is');
+  });
+
+  // 8. No major platform renders an SVG share card, so every link posted
+  //    anywhere showed no image.
+  var html = read('index.html');
+  var og = (html.match(/property="og:image" content="([^"]+)"/) || [])[1] || '';
+  ok(/\.png$/.test(og), 'og:image is a raster');
+  ok(og.indexOf('assets/social.png') !== -1, 'and it is the card');
+  ok(fs.existsSync(path.join(root, 'assets/social.png')), 'which is in the repository');
+  ok(/property="og:image:width" content="1200"/.test(html), 'declared 1200 wide');
+  ok(/property="og:image:height" content="630"/.test(html), 'and 630 high');
+  ok(/property="og:image:alt"/.test(html), 'with alternative text, like every other image here');
+  ok(/name="twitter:image"/.test(html), 'and named for the one platform that wants its own tag');
+  // The PNG is really a 1200x630 PNG, not an SVG with the wrong extension.
+  var png = fs.readFileSync(path.join(root, 'assets/social.png'));
+  eq(png.slice(1, 4).toString('latin1'), 'PNG', 'the file is a PNG');
+  eq(png.readUInt32BE(16), 1200, 'and its header says 1200 wide');
+  eq(png.readUInt32BE(20), 630, 'and 630 high');
+  ok(png.length > 8000, 'and it is not an empty canvas');
+  ok(fs.existsSync(path.join(root, 'assets/social.svg')), 'the drawing it came from is kept');
+  ok(read('README.md').indexOf('rsvg-convert -w 1200 -h 630') !== -1,
+     'and the README says how to make it again');
 });
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');

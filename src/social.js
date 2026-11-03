@@ -14,6 +14,8 @@
   // no other feature file. It still does not: dom.js is shared the way
   // core.js and art.js already are, and the copies had drifted apart.
   var D = window.FYC_DOM;
+  // Which view is current. See FYC_DOM.turnstile.
+  var views = D.turnstile();
   var el = D.el, svg = D.svg, $ = D.$, api = D.api, label = D.label, ago = D.ago;
 
   // ---------- the sign-in gate ----------
@@ -408,6 +410,7 @@
 
   // ---------- Messages ----------
   async function renderMessages() {
+    var mine = views.take();
     var host = $('#messages-body');
     function reset() { host.innerHTML = ''; host.appendChild(segBar('chats')); }
     reset();
@@ -419,10 +422,12 @@
       reqs = await api('GET', '/api/requests');
       threads = (await api('GET', '/api/threads')).threads;
     } catch (e) {
+      if (!views.current(mine)) return;
       reset();
       host.appendChild(el('p', { class: 'err', role: 'alert', text: e.message }));
       return;
     }
+    if (!views.current(mine)) return;
     reset();
     S.threads = threads;
 
@@ -503,13 +508,23 @@
   }
 
   async function openThread(t) {
+    var mine = views.take();
+    stopPolling();
     S.openThread = t;
     var host = $('#messages-body');
     host.innerHTML = '';
 
-    var list = el('div', { class: 'msg-list', id: 'msg-list' });
+    // role="log" carries aria-live="polite": a reply arriving on the 5s poll
+    // was appended silently, so the only way to find out somebody had written
+    // back was to go and read the page again.
+    var list = el('div', { class: 'msg-list', id: 'msg-list', role: 'log',
+      'aria-label': 'Messages with ' + t.other_name });
     // Matches the server's cap; the only two textareas in the app that had none.
+    // The placeholder is not a name — it is not read by every screen reader
+    // and it disappears the moment anything is typed. This is the control the
+    // whole screen is for.
     var input = el('textarea', { class: 'msg-input', maxlength: '2000',
+      'aria-label': 'Write a message to ' + t.other_name,
       placeholder: 'Write a message…', rows: '2' });
     var err = el('p', { class: 'err', role: 'alert', hidden: true });
     var lastId = 0;
@@ -520,10 +535,11 @@
     // the id check, two overlapping pulls share a cursor and render the same
     // message twice.
     async function pull() {
-      if (pulling) return;
+      if (pulling || !views.current(mine)) return;
       pulling = true;
       try {
         var r = await api('GET', '/api/threads/' + t.id + '/messages?since=' + lastId);
+        if (!views.current(mine)) return;
         var added = 0;
         r.messages.forEach(function (m) {
           if (seen[m.id]) return;
@@ -585,6 +601,10 @@
     });
 
     await pull();
+    // Backed out of while it was loading: the list this would paint into is
+    // already detached, and S.poll belongs to whatever is on screen now.
+    if (!views.current(mine)) return;
+    stopPolling();
     S.poll = D.every(5000, pull);
   }
 

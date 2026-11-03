@@ -16,6 +16,14 @@ COPY index.html privacy.html terms.html robots.txt site.webmanifest ./
 # quietly turns the install into an ordinary bookmark.
 COPY sitemap.xml sw.js ./
 
+# The go-live checklist in DEPLOY.md ends with "schedule npm run backup" and
+# "somebody reads npm run moderate reports". Neither existed in this image:
+# .dockerignore drops tools/, so both commands failed inside the container
+# that the same document recommends running. They are two small scripts with
+# no dependencies, and they are the whole of the backup and moderation
+# surface — `docker exec <name> npm run backup` has to work.
+COPY tools ./tools
+
 # The database lives on a volume, not in the image.
 RUN mkdir -p /app/server/data && chown -R node:node /app
 VOLUME ["/app/server/data"]

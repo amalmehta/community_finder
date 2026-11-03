@@ -16,7 +16,7 @@
      it is ignored in a meta element, and a directive that does nothing but
      log an error on every load is worse than none. Framing is refused by the
      server's header, which is the only place it can be. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'">
 <link rel="stylesheet" href="assets/styles.css">
 <script>
   // The same four lines the app runs, so arriving here from a dark app does
@@ -32,7 +32,10 @@
 
 <a class="skip" href="#main">Skip to content</a>
 <header class="appbar"><div class="appbar-in">
-  <a class="brand" href="/">Community Finder</a>
+  <!-- "./" and not "/": on Pages the app lives at /community_finder/, so an
+       absolute link here left the site entirely and landed on the domain
+       root. Relative, it is the app under the server and under Pages both. -->
+  <a class="brand" href="./">Community Finder</a>
   <span class="page-tag">terms</span>
 </div></header>
 
@@ -65,7 +68,7 @@
   <h2>Ending it</h2>
   <p>You can stop using it whenever you like and ask the operator to delete your account. The operator can suspend accounts that break these terms.</p>
 
-  <p class="legal-foot"><a href="/">← Back to the app</a> · <a href="privacy.html">Privacy</a></p>
+  <p class="legal-foot"><a href="./">← Back to the app</a> · <a href="privacy.html">Privacy</a></p>
 </div></main>
 </body>
 </html>

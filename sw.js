@@ -122,12 +122,39 @@ function ours(url, req) {
   return true;
 }
 
+/**
+ * The cache entry a URL belongs under, or null if it is not part of the shell.
+ *
+ * The query string is dropped deliberately. A cache is a key-value store and
+ * the key was the whole URL, so every distinct query string became an entry
+ * of its own that nothing ever removed: '?tab=plan' from the installed
+ * shortcut, a '?org=' link for each listing anyone opened, and — the one that
+ * actually matters — '/verify?token=…', which wrote a single-use email
+ * verification token into storage on the device and left it there. They are
+ * all the same two files underneath. Keyed by path, the shell is the shell:
+ * the same fourteen-odd entries however the app is entered, each one
+ * refreshed rather than joined by a near-duplicate.
+ */
+var SHELL_URLS = null;
+function shellKey(url) {
+  if (!SHELL_URLS) {
+    SHELL_URLS = Object.create(null);
+    SHELL.forEach(function (p) { SHELL_URLS[new URL(p, self.location).href] = true; });
+  }
+  var bare = url.origin + url.pathname;
+  return SHELL_URLS[bare] ? bare : null;
+}
+
 function putCopy(req, res) {
   // Opaque and error responses are not worth keeping, and caching a 404
   // would make a bad deploy permanent.
   if (!res || !res.ok || res.type === 'opaque') return res;
+  var url;
+  try { url = new URL(req.url); } catch (e) { return res; }
+  var key = shellKey(url);
+  if (!key) return res;
   var copy = res.clone();
-  caches.open(CACHE).then(function (c) { c.put(req, copy); }).catch(function () {});
+  caches.open(CACHE).then(function (c) { c.put(key, copy); }).catch(function () {});
   return res;
 }
 
@@ -179,7 +206,9 @@ self.addEventListener('fetch', function (e) {
 
   e.respondWith(
     raceNetwork(req).catch(function () {
-      return caches.match(req).then(function (hit) {
+      // Look it up under the same key it was stored under, so '?tab=plan'
+      // and a '?org=' link both find the page they are.
+      return caches.match(shellKey(url) || req).then(function (hit) {
         if (hit) return hit;
         // Any URL under the app opens the app: '?tab=plan' from the
         // installed shortcut has to work with the radio off, and it is not

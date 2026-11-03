@@ -213,10 +213,34 @@
     return Math.floor(h / 24) + 'd ago';
   }
 
+  /**
+   * Which view the person is actually looking at.
+   *
+   * Opening a conversation or a circle fetches before it paints, and the view
+   * on screen should be the last one asked for — not the last one to come
+   * back. Without this a thread opened and then backed out of while it was
+   * loading carried on: it painted into a host another view had already
+   * filled, and installed its five-second poller *over* the live one, so the
+   * replaced poller was never cancelled and ran for the rest of the session,
+   * fetching a conversation nobody was reading and appending it to a node
+   * that had been thrown away. Doing it twice left two.
+   *
+   * A view takes a ticket on the way in and checks it after every wait. If
+   * another view has taken one since, this load has been superseded: paint
+   * nothing, start nothing.
+   */
+  function turnstile() {
+    var n = 0;
+    return {
+      take: function () { return ++n; },
+      current: function (ticket) { return ticket === n; }
+    };
+  }
+
   g.FYC_DOM = {
     $: $, $$: $$, el: el, svg: svg,
     api: api, apiUrl: apiUrl, API_TIMEOUT: TIMEOUT,
-    wireTablist: wireTablist, every: every,
+    wireTablist: wireTablist, every: every, turnstile: turnstile,
     label: label, ago: ago
   };
 }(typeof window !== 'undefined' ? window : globalThis));

@@ -3,7 +3,6 @@
 .claude
 mac
 tests
-tools
 server/data
 node_modules
 *.md

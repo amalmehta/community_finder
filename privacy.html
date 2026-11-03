@@ -16,7 +16,7 @@
      it is ignored in a meta element, and a directive that does nothing but
      log an error on every load is worse than none. Framing is refused by the
      server's header, which is the only place it can be. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'">
 <link rel="stylesheet" href="assets/styles.css">
 <script>
   // The same four lines the app runs, so arriving here from a dark app does
@@ -32,7 +32,10 @@
 
 <a class="skip" href="#main">Skip to content</a>
 <header class="appbar"><div class="appbar-in">
-  <a class="brand" href="/">Community Finder</a>
+  <!-- "./" and not "/": on Pages the app lives at /community_finder/, so an
+       absolute link here left the site entirely and landed on the domain
+       root. Relative, it is the app under the server and under Pages both. -->
+  <a class="brand" href="./">Community Finder</a>
   <span class="page-tag">privacy</span>
 </div></header>
 
@@ -78,13 +81,16 @@
   <h2>Email</h2>
   <p>An address is optional and used for one thing: verifying that you can be contacted, which is what unlocks messaging. It is never shared, sold, or used for anything you did not ask for. There is no mailing list.</p>
 
+  <h2>A copy of the app, on your device</h2>
+  <p>The app installs a <em>service worker</em>, which keeps a copy of its own files — the page, the stylesheet, the scripts and the city data — in your browser's cache, so it opens with no signal. That cache holds the app and nothing else: no answers, no saved plan, nothing you typed, and nothing about anyone else. It is refreshed whenever you open the app online, and it is removed along with everything else when you clear site data.</p>
+
   <h2>Getting rid of it</h2>
-  <p>Ask whoever runs the server to delete your account and they can remove it and everything attached to it. On the published site with no account, clearing your browser data is complete and immediate — there is nothing held anywhere else.</p>
+  <p>Ask whoever runs the server to delete your account and they can remove it and everything attached to it. On the published site with no account, clearing your browser data — which covers both <code>localStorage</code> and the cached copy of the app above — is complete and immediate, and there is nothing held anywhere else.</p>
 
   <h2>Changes</h2>
   <p>This page is versioned with the code. Its history is in the repository, so you can see exactly what changed and when.</p>
 
-  <p class="legal-foot"><a href="/">← Back to the app</a> · <a href="terms.html">Terms</a></p>
+  <p class="legal-foot"><a href="./">← Back to the app</a> · <a href="terms.html">Terms</a></p>
 </div></main>
 </body>
 </html>

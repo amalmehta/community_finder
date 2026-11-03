@@ -341,8 +341,10 @@ npm test        # both suites
 node tests/run-tests.js
 ```
 
-8580+ assertions covering data integrity (every listing has a valid first step,
-a real URL, interests that exist in the taxonomy, ratings in range), city lookup
+8670+ assertions covering data integrity (every listing has a valid first step,
+a real URL, interests that exist in the taxonomy, ratings in range — the
+fallback recipes too, which were never checked and had a goal sitting in an
+interest list), city lookup
 and aliasing (whole words only, and a named state that contradicts the match
 throws it out — 'la' is inside Dallas), the universal fallback engine, matcher behaviour (a nervous person
 gets gentle options first, budget is respected, the comfort dial actually
@@ -428,6 +430,11 @@ assets/apple-touch-icon.png  180px raster of it, because iOS ignores an SVG
                       here. Regenerate with:
                         rsvg-convert -w 180 -h 180 assets/icon.svg \
                           -o assets/apple-touch-icon.png
+assets/social.svg     the share card, 1200x630; the source for the one below
+assets/social.png     the raster the og:image actually points at, because no
+                      major platform renders an SVG share card. Regenerate:
+                        rsvg-convert -w 1200 -h 630 assets/social.svg \
+                          -o assets/social.png
 src/
   data/core.js        interest taxonomy (32 interests in 6 groups), city registry
                       and the location matcher

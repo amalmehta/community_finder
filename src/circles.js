@@ -30,6 +30,8 @@
   // purpose — so this file depended on no other feature file — and it still
   // does not; the copies had simply drifted, ago() most visibly.
   var D = window.FYC_DOM;
+  // Which view is current. See FYC_DOM.turnstile.
+  var views = D.turnstile();
   var el = D.el, $ = D.$, api = D.api, label = D.label, ago = D.ago;
 
   function icon(id) { return (FYC.INTERESTS[id] || {}).icon || ''; }
@@ -511,6 +513,7 @@
 
   // ---------- the list ----------
   async function renderList() {
+    var mine = views.take();
     stop();
     S.openId = null;
     S.pane = 'chat';
@@ -524,10 +527,12 @@
       data = await api('GET', '/api/circles');
       unread = await api('GET', '/api/unread');
     } catch (e) {
+      if (!views.current(mine)) return;
       host.innerHTML = '';
       host.appendChild(el('p', { class: 'err', role: 'alert', text: e.message }));
       return;
     }
+    if (!views.current(mine)) return;
     host.innerHTML = '';
     S.trust = data.trust;
     S.rule = data.rule;
@@ -590,6 +595,7 @@
   }
 
   async function openCircle(id) {
+    var mine = views.take();
     stop();
     S.openId = id;
     var host = $('#circles-body');
@@ -599,10 +605,14 @@
     var d;
     try { d = await api('GET', '/api/circles/' + id); }
     catch (e) {
+      if (!views.current(mine)) return;
       host.innerHTML = '';
       host.appendChild(el('p', { class: 'err', role: 'alert', text: e.message }));
       return;
     }
+    // Another circle, or the list, was opened while this one was loading.
+    // Painting now would interleave two circles into one host.
+    if (!views.current(mine)) return;
     host.innerHTML = '';
     S.safety = d.safety || [];
     if (d.planAsk) S.planAsk = d.planAsk;
@@ -679,7 +689,7 @@
 
     // --- chat ---
     if (d.confirm && d.confirm.length) confirmCard(panes.chat, c, d.confirm);
-    chatCard(panes.chat, c);
+    chatCard(panes.chat, c, mine);
     // Which levels exist and what is left to unlock: worth one look, not a
     // standing fixture under every conversation.
     var ladder = disclosureBlock(c, d.promptSets);
@@ -727,11 +737,17 @@
   }
 
   // ---------- chat ----------
-  function chatCard(host, c) {
-    var list = el('div', { class: 'msg-list circle-chat' });
+  function chatCard(host, c, ticket) {
+    // role="log" carries aria-live="polite". Messages arrive on a 5s poll and
+    // were appended with nothing to announce them, which in a group chat is
+    // the whole conversation going past in silence.
+    var list = el('div', { class: 'msg-list circle-chat', role: 'log',
+      'aria-label': c.name + ' conversation' });
     // 2000 is the server's cap. Without it here the composer accepted a
     // message the server then refused, which reads as the app losing it.
+    // The placeholder is not an accessible name; this is.
     var input = el('textarea', { class: 'msg-input', rows: '2', maxlength: '2000',
+      'aria-label': 'Say something to ' + c.name,
       placeholder: 'Say something to the circle…' });
     var err = errLine();
     var lastId = 0;
@@ -762,7 +778,7 @@
     }
 
     async function pull() {
-      if (pulling) return;
+      if (pulling || !views.current(ticket)) return;
       pulling = true;
       // Measured before anything is appended, or the new messages are already
       // part of the height being measured against.
@@ -770,6 +786,7 @@
       var first = !lastId;
       try {
         var r = await api('GET', '/api/circles/' + c.id + '/messages?since=' + lastId);
+        if (!views.current(ticket)) return;
         var added = 0;
         r.messages.forEach(function (m) {
           if (seen[m.id]) return;
@@ -871,6 +888,10 @@
     ]));
 
     pull();
+    // S.poll belongs to whatever is on screen; stop() already ran for the view
+    // that built this card, and installing over a newer poller would orphan it.
+    if (!views.current(ticket)) return;
+    stop();
     S.poll = D.every(5000, pull);
   }
 
