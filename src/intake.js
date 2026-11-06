@@ -531,7 +531,6 @@
     });
     // Keep the dropped answer so going forward again can prefill it.
     fresh.answers = Object.assign({}, answers);
-    order.forEach(function () {});
     return fresh;
   }
 

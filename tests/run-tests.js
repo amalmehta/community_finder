@@ -2391,6 +2391,199 @@ group('eight more, and where each of them was', function () {
      'and the README says how to make it again');
 });
 
+group('the end of the form is not a room with no door', function () {
+  var fs = require('fs');
+  var I = FYC.intake;
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+
+  // Skipping is allowed on every question after the city, and skipping all of
+  // them used to end the form on a screen with no button or link on it.
+  // Reproduce the state the engine is left in.
+  function skipAllButCity() {
+    var s = I.blankState();
+    for (var i = 0; i < I.TOTAL + 10; i++) {
+      var q = I.nextQuestion(s);
+      if (!q) break;
+      if (q.id === 'city') { I.answer(s, q, 'Denver'); continue; }
+      s.asked.push(q.id);                       // what app.js does for a skip
+    }
+    return s;
+  }
+  var stuck = skipAllButCity();
+  var p = I.toProfile(stuck);
+  ok(I.done(stuck), 'the form really is finished');
+  eq(I.nextQuestion(stuck), null, 'with nothing left it would offer');
+  eq(p.location, 'Denver', 'a city, so the results screen is reached');
+  eq(p.interests.length, 0, 'and nothing to rank, which is the corner');
+
+  // The way out: one question is put back, and the count is not charged twice.
+  var before = stuck.asked.length;
+  var out = {
+    asked: stuck.asked.filter(function (x) { return x !== 'pull'; }),
+    answers: {}, interests: {}, group: {}, prefer: {},
+    dims: { comfort: null, commitment: null, budget: null, when: [], goals: [] },
+    city: stuck.city
+  };
+  eq(out.asked.length, before - 1, 're-asking drops it from what has been asked');
+  ok(!I.done(out), 'so the form is open again');
+  eq((I.nextQuestion(out) || {}).id, 'pull', 'and it is that question being offered');
+  // Answering it opens the questions under whichever group was picked, so one
+  // answer really is enough to reach a ranking.
+  var q = I.nextQuestion(out);
+  I.answer(out, q, [q.options[0].id]);
+  ok(I.toProfile(out).interests.length > 0, 'one answer is enough to rank something');
+
+  // The screen that was a dead end now offers both ways out.
+  ok(/function reask\(id\)/.test(app), 'app.js can put a question back');
+  ok(/session\.asked = session\.asked\.filter\(function \(x\) \{ return x !== id; \}\);/.test(app),
+     'by dropping it from asked, so the progress count stays honest');
+  ok(/delete session\.answers\[id\];/.test(app), 'and clearing what was there');
+  ok(/Pick what you are into/.test(app), 'the empty results screen offers the question');
+  ok(/onclick: function \(\) \{ reask\('pull'\); \}/.test(app), 'and that button is what opens it');
+  ok(/onclick: startOver/.test(app), 'with starting again beside it');
+  ok(app.indexOf('A few more answers and this fills in.') === -1,
+     'and no longer asks for answers it has taken away');
+  // startOver is one function now, not two copies of the same three lines.
+  eq((app.match(/function startOver\(\)/g) || []).length, 1, 'starting over is written once');
+  ok(/if \(!more\) return startOver\(\);/.test(app), 'and the browse bar calls it');
+
+  // submit() answers the question it was given, not whatever is next.
+  ok(/function submit\(q, value\) \{/.test(app), 'submit is told which question it is answering');
+  // Not just the signature: re-deriving q inside the body defeats the whole
+  // thing and leaves every assertion above it passing, which is what the
+  // first version of this test did.
+  var body = (function () {
+    var at = app.indexOf('function submit(q, value) {');
+    var depth = 0;
+    for (var i = app.indexOf('{', at); i < app.length; i++) {
+      if (app[i] === '{') depth++;
+      else if (app[i] === '}') { depth--; if (!depth) return app.slice(at, i); }
+    }
+    return '';
+  }());
+  ok(body.length > 100, 'submit has a body to read');
+  ok(body.indexOf('nextQuestion') === -1,
+     'and does not go looking for a different question inside it');
+  eq((app.match(/submit\(q, /g) || []).length - 1, 4,
+     'every call site passes it, and the definition is not one of them');
+  ok(/if \(!p\.location\) return reask\('city'\);/.test(app),
+     'and the no-city recovery goes through the same door');
+});
+
+group('a saved place keeps up with the data', function () {
+  var fs = require('fs');
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+
+  // A saved item is a snapshot: name, link, first step, taken on the day it
+  // was saved. tools/check-links.js runs every Monday and opens an issue when
+  // a listing's URL stops resolving; every fix that led to landed in the
+  // dataset and stopped there, while the list someone kept — and printed —
+  // still pointed at the dead one.
+  ok(/function refreshPlan\(\)/.test(app), 'saved items are reconciled against the data');
+  ok(/function liveOrg\(id\)/.test(app), 'by id, against the listings as they are now');
+  ok(/if \(refreshPlan\(\)\) save\(KEY\.plan, plan\);/.test(app),
+     'and what changed is written back, so the offline copy moves too');
+  ['name', 'cityName', 'url', 'stepLabel', 'when'].forEach(function (f) {
+    ok(new RegExp('\\b' + f + ':').test(app.slice(app.indexOf('function refreshPlan'))),
+       'it tracks ' + f);
+  });
+  // A universal listing is generated for one search and has nothing to look
+  // up; it must keep what it has rather than be blanked.
+  ok(/var live = liveOrg\(item\.id\);\s*\n\s*if \(!live\) return;/.test(app),
+     'a listing that is not in the data is left exactly as it was');
+
+  // Run the app's own two functions, rather than a copy of them written
+  // here — a test that reimplements the thing it is testing proves only that
+  // the copy works. app.js is a browser IIFE, so lift the pair out by source
+  // and give them the dataset and a plan to work on.
+  var from = app.indexOf('  var liveById = null;');
+  var to = app.indexOf('  function paintPlanCount()');
+  ok(from > 0 && to > from, 'the reconciliation is where the test expects it');
+  var realPlan;
+  var refresh = new Function('FYC', 'plan',
+    app.slice(from, to) + '\n    return refreshPlan;')(FYC, []);
+  // Rebuild with a plan that has drifted from the data.
+  var sample = FYC.allOrgs()[0];
+  var stale = {
+    id: sample.id, name: 'An old name', cityName: 'Nowhere',
+    url: 'https://example.invalid/gone', stepLabel: 'An old step', when: 'whenever',
+    done: [false, false, false, false], attrs: { id: sample.id }
+  };
+  var universal = {
+    id: 'u-meetup', name: 'Meetup — groups in Nowhere', cityName: 'Nowhere',
+    url: 'https://www.meetup.com/find/?keywords=x', stepLabel: 'Pick ONE group',
+    when: '', done: [false, false, false, false], attrs: { universal: true }
+  };
+  var gone = { id: 'den-this-listing-was-removed', name: 'Kept as it was',
+    cityName: 'Denver', url: 'https://example.invalid/removed', stepLabel: 'Still here',
+    when: '', done: [false, false, false, false] };
+  realPlan = [stale, universal, gone];
+  refresh = new Function('FYC', 'plan',
+    app.slice(from, to) + '\n    return refreshPlan;')(FYC, realPlan);
+
+  ok(refresh(), 'something had drifted, so it reports a change');
+  eq(stale.name, sample.name, 'the saved name is the name the listing has now');
+  eq(stale.cityName, sample.cityName, 'and its city');
+  eq(stale.url, (sample.firstStep && sample.firstStep.url) || sample.url,
+     'and the link points where the data points');
+  ok(/^https?:\/\//.test(stale.url), 'which is a real link');
+  eq(stale.done.length, 4, 'what was ticked off is untouched');
+  eq(universal.url, 'https://www.meetup.com/find/?keywords=x',
+     'a universal listing has nothing to look up and keeps what it has');
+  eq(gone.name, 'Kept as it was', 'and so does one that has left the dataset');
+  ok(!refresh(), 'running it again changes nothing, so it does not write on every paint');
+
+  // The progress bar counts the steps there are.
+  ok(/doneCount \/ item\.done\.length \* 100/.test(app), 'the bar is out of the steps, not out of four');
+});
+
+group('four more, where the data meets the interface', function () {
+  var fs = require('fs');
+  var read = function (p) { return fs.readFileSync(path.join(root, p), 'utf8'); };
+  var app = read('src/app.js'), social = read('src/social.js');
+  var db = read('server/db.js'), css = read('assets/styles.css');
+
+  // The header badge counted circles the list refuses to show.
+  ok(/WHERE cm\.user_id = \? AND c\.status = 'open'/.test(db),
+     'unread counts only circles that are open');
+  ok(/includeClosed \? '' : "WHERE c\.status = 'open'"/.test(db),
+     'which is the same rule the list uses');
+
+  // The read marker took a number from the client and only moved forward.
+  ok(/COALESCE\(MAX\(id\), 0\) AS id FROM circle_messages WHERE circle_id = \?/.test(db),
+     'the read marker is clamped to a message that exists');
+  ok(/Math\.min\(Math\.max\(0, Number\(lastId\) \|\| 0\), top\)/.test(db),
+     'between zero and the newest one');
+
+  // "Copied." was printed before anything had been.
+  ok(/copyText\(text\)\.then\(function \(how\) \{/.test(app),
+     'the feedback panel copies through the same path as Share');
+  ok(/how === 'copied' \? 'Copied\.' :/.test(app), 'and only says so when it worked');
+  ok(/Could not copy/.test(app), 'with something useful when it did not');
+
+  // Two classes set on every load that no rule has ever matched. Comments
+  // stripped first: the note explaining each removal names the class, and an
+  // unanchored search for it matched that — the same trap as last time.
+  var code = (app + social).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  ['is-offline', 'has-accounts'].forEach(function (c) {
+    ok(css.indexOf('.' + c) === -1, '.' + c + ' is in no stylesheet');
+    ok(!new RegExp("classList\\.(add|toggle)\\('" + c + "'").test(code),
+       'and is no longer set either');
+  });
+  ok(/\.offline-warn \{/.test(css), 'while the banner that does the work is still styled');
+
+  // A loop with an empty body, and a branch that could not be taken.
+  ok(!/order\.forEach\(function \(\) \{\}\);/.test(read('src/intake.js')),
+     'the no-op loop in back() is gone');
+  var match = read('src/match.js');
+  ok(/return clamp01\(Math\.pow\(got \/ max, 0\.65\)\);/.test(match),
+     'interestScore has no unreachable branch');
+  eq((match.match(/Commitment has a badge of its own/g) || []).length, 0,
+     'and the comment that was there twice is there once');
+  eq((match.match(/have badges\. Repeating them here/g) || []).length, 1,
+     'as the one that says it');
+});
+
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');
 if (fail) {
   failures.slice(0, 25).forEach(function (f) { console.log('   ✗ ' + f); });

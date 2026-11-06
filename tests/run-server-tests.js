@@ -34,6 +34,26 @@ const { server, store } = createApp({
   disclosure: { respondAfterHours: 0 }
 });
 
+// fetch() pools its sockets and keeps them alive between requests. Closing
+// the server at the end of the run then resets whichever ones are still idle,
+// and because no request is pending it arrives as an unhandled
+// `read ECONNRESET` with a bare TCP stack and no test attached — about one
+// run in five once this file had enough clients in it. Asking for the
+// connection to close after each response leaves nothing pooled to reset. A
+// suite talking to a server on loopback does not need keep-alive.
+//
+// Wrapped once here rather than in the client, because half the requests in
+// this file are bare fetch() calls and a socket left open by any of them is
+// enough to bring the flake back.
+const rawFetch = globalThis.fetch;
+globalThis.fetch = function (input, init) {
+  const o = Object.assign({}, init);
+  const h = new Headers(o.headers || {});
+  h.set('Connection', 'close');
+  o.headers = h;
+  return rawFetch(input, o);
+};
+
 /** Minimal cookie-aware client. */
 function client() {
   let jar = '';
@@ -1285,8 +1305,23 @@ async function verifyEmail(call, email) {
         let buf = '';
         sock.setEncoding('utf8');
         sock.on('data', (d) => { buf += d; });
-        sock.on('error', reject);
+        // A write error here can be the test working. The oversized body
+        // below is refused part-way through on purpose, and the server
+        // answers and hangs up while this end is still writing — so the last
+        // kilobytes land on a socket that has gone, as EPIPE or ECONNRESET.
+        // Once the whole response is in, that is nothing; before it, it is
+        // the request failing and has to be said out loud.
+        //
+        // The first attempt at this ignored every error once any byte had
+        // arrived, which swapped an unhandled rejection for something worse:
+        // a half-read response parsed to a NaN status, counted as a failed
+        // write, and two assertions failing about one run in thirty with
+        // nothing to say why.
+        const whole = () => buf.indexOf('\r\n\r\n') !== -1 &&
+          /^HTTP\/1\.\d \d+/.test(buf);
+        sock.on('error', (e) => { if (!whole()) reject(e); });
         sock.on('close', () => {
+          if (!whole()) return reject(new Error('no complete response: ' + JSON.stringify(buf.slice(0, 80))));
           const status = Number((buf.match(/^HTTP\/1\.\d (\d+)/) || [])[1]);
           let data = null;
           const body = buf.slice(buf.indexOf('\r\n\r\n') + 4);
@@ -1467,6 +1502,92 @@ async function verifyEmail(call, email) {
     }
   });
 
+  await group('a badge you can clear, and a marker you can trust', async () => {
+    // Two people and a circle with a conversation in it.
+    const host = client(), guest = client();
+    await host('POST', '/api/signup', { username: 'badgehost', password: 'hunter2hunter',
+      city: 'Denver', ageOk: true, bio: 'A long enough bio to count as a filled-in profile here.',
+      interests: [{ id: 'games' }, { id: 'books' }, { id: 'food' }] });
+    await verifyEmail(host, 'badgehost@example.com');
+    await guest('POST', '/api/signup', { username: 'badgeguest', password: 'hunter2hunter',
+      city: 'Denver', ageOk: true, bio: 'A long enough bio to count as a filled-in profile here.',
+      interests: [{ id: 'games' }, { id: 'books' }, { id: 'food' }] });
+    await verifyEmail(guest, 'badgeguest@example.com');
+
+    const made = await host('POST', '/api/circles', { name: 'Badge circle', city: 'Denver',
+      blurb: 'A circle that exists to be closed, which is the point of this test.',
+      question: 'What brings you here?', interests: ['games'], cap: 6, minTrust: 0 });
+    eq(made.status, 201, 'a circle to close');
+    const cid = made.data.circle.id;
+    const app = await guest('POST', `/api/circles/${cid}/apply`, { answer: 'Board games are how I meet people, and I am new enough here to need to.' });
+    eq(app.status, 201, 'the guest applies');
+    const seen = await host('GET', '/api/circles/' + cid);
+    ok(seen.data.applications && seen.data.applications.length,
+       'the host sees it (' + JSON.stringify(seen.data.applications) + ')');
+    const apps = seen.data.applications[0];
+    await host('POST', `/api/circles/${cid}/applications/${apps.id}/approve`);
+
+    await host('POST', `/api/circles/${cid}/messages`, { body: 'Something for the guest to not have read.' });
+    // Counted for this circle rather than as a total across every circle the
+    // guest is in, so another test joining them to something else later
+    // cannot quietly change what this one means.
+    const mine = async () => {
+      const r = await guest('GET', '/api/unread');
+      const row = r.data.byCircle.filter((x) => x.circle_id === cid)[0];
+      return { here: row ? row.unread : 0, listed: !!row, total: r.data.circles };
+    };
+    let unread = await mine();
+    ok(unread.here > 0, 'the guest has something unread in it');
+
+    // A moderator closes it. listCircles stops showing it, and nothing in the
+    // interface opens a circle except that list. (A circle you are in comes
+    // back under `mine`, not among the open ones.)
+    const seenIn = (r) => r.data.mine.concat(r.data.circles).some((c) => c.id === cid);
+    ok(seenIn(await guest('GET', '/api/circles')), 'and can see it while it is open');
+    store.closeCircle(cid);
+    ok(!seenIn(await guest('GET', '/api/circles')), 'a closed circle leaves the list');
+    unread = await mine();
+    eq(unread.here, 0, 'and takes its unread count with it');
+    ok(!unread.listed, 'it is not in the breakdown either');
+
+    // The read marker is clamped to a message that exists.
+    const open = await host('POST', '/api/circles', { name: 'Marker circle', city: 'Denver',
+      blurb: 'A circle for checking what happens to a read marker from a client.',
+      question: 'What brings you here?', interests: ['books'], cap: 6, minTrust: 0 });
+    const mid = open.data.circle.id;
+    const a2 = await guest('POST', `/api/circles/${mid}/apply`, { answer: 'Books, mostly, and I would like somewhere to talk about them out loud.' });
+    eq(a2.status, 201, 'the guest applies to the second circle');
+    const apps2 = (await host('GET', '/api/circles/' + mid)).data.applications[0];
+    await host('POST', `/api/circles/${mid}/applications/${apps2.id}/approve`);
+
+    // A number from nowhere. MAX() only moves forward, so before this was
+    // clamped it put the marker past every id the circle would have for a
+    // long time and the guest stopped being told about anything said in it.
+    await guest('POST', `/api/circles/${mid}/read`, { lastId: 9999999 });
+    await host('POST', `/api/circles/${mid}/messages`, { body: 'Said after the marker was thrown forward.' });
+    const u2 = await guest('GET', '/api/unread');
+    const row = u2.data.byCircle.filter((r) => r.circle_id === mid)[0];
+    ok(row && row.unread > 0, 'a message after a silly read marker is still unread');
+
+    // And an honest one still works.
+    const msgs = await guest('GET', `/api/circles/${mid}/messages?since=0`);
+    const top = msgs.data.messages[msgs.data.messages.length - 1].id;
+    await guest('POST', `/api/circles/${mid}/read`, { lastId: top });
+    const u3 = await guest('GET', '/api/unread');
+    const row3 = u3.data.byCircle.filter((r) => r.circle_id === mid)[0];
+    eq(row3 ? row3.unread : 0, 0, 'reading up to the newest message clears it');
+    await guest('POST', `/api/circles/${mid}/read`, { lastId: -5 });
+    const u4 = await guest('GET', '/api/unread');
+    const row4 = u4.data.byCircle.filter((r) => r.circle_id === mid)[0];
+    eq(row4 ? row4.unread : 0, 0, 'and a negative one moves nothing backwards');
+  });
+
+  // fetch() keeps its sockets alive between requests, and closing the server
+  // out from under an idle one surfaces as an unhandled `read ECONNRESET`
+  // with a bare TCP stack and no test attached — which is exactly as much
+  // help as it sounds. It showed up about one run in five once this file had
+  // enough clients in it. Hang them up first, then close.
+  server.closeAllConnections();
   server.close();
   fs.rmSync(tmp, { recursive: true, force: true });
 

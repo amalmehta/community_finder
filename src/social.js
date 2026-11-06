@@ -744,13 +744,14 @@
       return;
     }
 
-    document.body.classList.add('has-accounts');
-
     // This used to be printed in the footer, which put it under every screen
     // in the app. It is a fact about where your data lives, so it belongs on
     // the one screen that is about you. You reads it from here.
     window.FYC_STORAGE_NOTE = 'Your profile, messages and circles are stored on this server. Anything you say in a circle is visible to that circle.';
 
+    // Turning the social half on is these tabs appearing. There was also a
+    // body.has-accounts class set here, which no stylesheet has ever matched
+    // and nothing has ever read.
     document.getElementById('tab-messages').addEventListener('click', function () { show('messages'); });
 
     if (!S.user) renderGate('signup');

@@ -35,8 +35,10 @@
       max += w;
       if (org.interests.indexOf(id) !== -1) got += w;
     });
-    // Reward depth of overlap, but don't require a perfect match.
-    return max ? clamp01(Math.pow(got / max, 0.65)) : 0;
+    // `max` is a sum of rankWeight()s over a non-empty list, every one of
+    // them positive, so the zero branch this used to carry could not be
+    // reached. Reward depth of overlap, but do not require a perfect match.
+    return clamp01(Math.pow(got / max, 0.65));
   }
 
   // comfort: 1 = "this feels hard", 2 = "a bit nervous", 3 = "throw me in"
@@ -118,8 +120,6 @@
         .filter(Boolean);
       if (labels.length) reasons.push('Runs on ' + labels.slice(0, 2).join(' and '));
     }
-    // Commitment has a badge of its own; saying it twice buried the reason
-    // that actually differed between cards.
     return reasons.slice(0, 3);
   }
 

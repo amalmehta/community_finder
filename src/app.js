@@ -156,7 +156,7 @@
       if (typeof previous === 'string') input.value = previous;
       else if (q.id === 'city' && session.city) input.value = session.city;
       input.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') { e.preventDefault(); submit(input.value); }
+        if (e.key === 'Enter') { e.preventDefault(); submit(q, input.value); }
       });
       box.appendChild(input);
       answer = function () { return input.value; };
@@ -168,7 +168,7 @@
         choices.appendChild(el('button', {
           type: 'button', class: 'choice',
           'aria-pressed': previous === o.id ? 'true' : 'false',
-          onclick: function () { submit(o.id); }
+          onclick: function () { submit(q, o.id); }
         }, [
           el('span', { class: 'key', 'aria-hidden': 'true', text: String(idx + 1) }),
           el('b', { text: o.label }),
@@ -204,14 +204,14 @@
       box.appendChild(el('div', { class: 'actions' }, [
         el('button', {
           class: 'btn', type: 'button', 'data-continue': true,
-          onclick: function () { submit(answer()); }
+          onclick: function () { submit(q, answer()); }
         }, ['Continue'])
       ]));
     }
     box.appendChild(el('div', { class: 'q-outs' }, [
       el('button', {
         class: 'linkish', type: 'button',
-        onclick: function () { submit(q.kind === 'many' ? [] : null); }
+        onclick: function () { submit(q, q.kind === 'many' ? [] : null); }
       }, ['Skip']),
       // Only offered once it would actually produce something. It used to be
       // on every question, including the first, where it led to a card that
@@ -227,6 +227,35 @@
 
   function goBack() {
     session = I.back(session);
+    save(KEY.intake, session);
+    $('#results').hidden = true;
+    paintIntake();
+  }
+
+  /** Throw the answers away and begin the form again. */
+  function startOver() {
+    newSession();
+    $('#results').hidden = true;
+    paintIntake();
+  }
+
+  /**
+   * Put one question back on the table and show it.
+   *
+   * Every question after the city may be skipped, and skipping all of them
+   * is a corner with no way out: the form ends, and with no interest to rank
+   * the results screen says "a few more answers and this fills in" — asking
+   * for something it has just taken away. Fifteen presses of Skip and the
+   * screen has no button or link on it at all; another tab and back shows
+   * the same thing, and so does a reload, because the finished session is in
+   * localStorage. The only escape was clearing the browser.
+   *
+   * Dropping the id from `asked` is what makes it offerable again, and keeps
+   * the count honest: the question is not charged for twice.
+   */
+  function reask(id) {
+    session.asked = session.asked.filter(function (x) { return x !== id; });
+    delete session.answers[id];
     save(KEY.intake, session);
     $('#results').hidden = true;
     paintIntake();
@@ -263,8 +292,21 @@
     }
   }
 
-  function submit(value) {
-    var q = I.nextQuestion(session);
+  /**
+   * Record an answer to the question that is on screen.
+   *
+   * `q` is passed in rather than looked up again. This used to call
+   * nextQuestion() to decide what it was answering, which is the same
+   * question in every ordinary case and the wrong one in the only case where
+   * it differs: a card that finish() puts back on screen is not the next
+   * question, and once the form is full nextQuestion() is null, so the answer
+   * went to finish() instead of into the session. Nothing a person can do to
+   * the form reaches that today — the city question refuses to be skipped,
+   * which is what keeps the recovery path from ever running — but a recovery
+   * path that cannot record an answer is not a recovery path, and the
+   * question on screen is the one being answered either way.
+   */
+  function submit(q, value) {
     if (!q) return finish(false);
 
     if (q.id === 'city' && !String(value || '').trim()) {
@@ -340,11 +382,8 @@
   /** Build the profile and show results. `early` = they pressed the escape. */
   function finish(early) {
     var p = I.toProfile(session);
-    if (!p.location) {
-      $('#intake').innerHTML = '';
-      $('#intake').appendChild(questionCard(I.QUESTIONS[0]));
-      return;
-    }
+    // Nothing to search. Ask again, properly, so the answer is recorded.
+    if (!p.location) return reask('city');
     save(KEY.profile, p);
     if (FYC.prefs && FYC.prefs.isEnabled()) p.learned = FYC.prefs.profile();
 
@@ -361,8 +400,16 @@
       $('#results').innerHTML = '';
       $('#results').appendChild(el('div', { class: 'card empty' }, [
         sceneFor('search'),
-        el('h2', { text: 'Not enough to go on yet.' }),
-        el('p', { text: 'A few more answers and this fills in.' })
+        el('h2', { text: 'Nothing to go on yet.' }),
+        // This said "a few more answers and this fills in", which was a
+        // request for something the screen had just taken away: the form was
+        // finished and gone. Say what is missing, and open the question.
+        el('p', { text: 'Every question about what you are into was skipped, so there is nothing to rank. One answer is enough.' }),
+        el('div', { class: 'actions' }, [
+          el('button', { class: 'btn', type: 'button', onclick: function () { reask('pull'); } },
+            ['Pick what you are into']),
+          el('button', { class: 'btn ghost', type: 'button', onclick: startOver }, ['Start over'])
+        ])
       ]));
       $('#results').hidden = false;
       return;
@@ -661,7 +708,7 @@
         el('h2', { text: where }),
         el('span', { class: 'browse-n', text: String(items.length) }),
         el('button', { class: 'linkish', type: 'button', onclick: function () {
-          if (!more) newSession();
+          if (!more) return startOver();
           host.hidden = true;
           paintIntake();
         } }, [more ? 'Change answers' : 'Start over'])
@@ -731,6 +778,48 @@
     return plan.some(function (x) { return x.id === id; });
   }
 
+  // Saved items keep their own copy of the name, the link and the first step,
+  // because a universal fallback is generated for one search and has nothing
+  // to look up afterwards. For a hand-picked listing that copy is a
+  // photograph taken on the day it was saved, and it was never developed
+  // again. Links rot — that is the whole reason tools/check-links.js runs
+  // every Monday and opens an issue — and every fix it led to reached the
+  // dataset and stopped there. The one place a corrected link matters most is
+  // the list someone kept, and printed, and is about to act on.
+  var liveById = null;
+  function liveOrg(id) {
+    if (!liveById) {
+      liveById = Object.create(null);
+      FYC.allOrgs().forEach(function (o) { liveById[o.id] = o; });
+    }
+    return liveById[id] || null;
+  }
+
+  /**
+   * Bring saved items back in line with the data they came from. A universal
+   * listing, or one that has since left the dataset, keeps what it has.
+   * @returns {boolean} whether anything moved, so the caller can write it back
+   */
+  function refreshPlan() {
+    var changed = false;
+    plan.forEach(function (item) {
+      var live = liveOrg(item.id);
+      if (!live) return;
+      var step = live.firstStep || {};
+      var next = {
+        name: live.name,
+        cityName: live.cityName,
+        url: step.url || live.url,
+        stepLabel: step.label || item.stepLabel,
+        when: step.when || ''
+      };
+      Object.keys(next).forEach(function (k) {
+        if (item[k] !== next[k]) { item[k] = next[k]; changed = true; }
+      });
+    });
+    return changed;
+  }
+
   /** Save or unsave. Returns whether it is saved afterwards. */
   function togglePlan(org) {
     var at = -1;
@@ -791,6 +880,7 @@
   function renderPlan() {
     var host = $('#plan-body');
     if (!host) return;
+    if (refreshPlan()) save(KEY.plan, plan);
     host.innerHTML = '';
     if (!plan.length) {
       host.appendChild(el('div', { class: 'screen-head' }, [el('h2', { text: 'Saved' })]));
@@ -812,7 +902,9 @@
       var doneCount = item.done.filter(Boolean).length;
       var finished = doneCount === item.done.length;
       var bar = el('i');
-      bar.style.width = (doneCount / 4 * 100) + '%';
+      // Out of the steps there are, not out of a literal four sitting beside
+      // item.done.length two lines up.
+      bar.style.width = (doneCount / item.done.length * 100) + '%';
 
       var list = el('ul', { class: 'steps' }, steps.map(function (label, i) {
         var cbId = 'plan-' + idx + '-' + i;
@@ -1267,10 +1359,15 @@
     $('#fb-copy').addEventListener('click', function () {
       var p = payload();
       var text = 'community_finder feedback\nRating: ' + (p.rating || '-') + '/5\n' + p.text;
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(function () {});
-      thanks.textContent = 'Copied.';
-      thanks.hidden = false;
-      setTimeout(function () { thanks.hidden = true; thanks.textContent = 'Thank you.'; }, 1600);
+      // This said "Copied." before asking whether anything had been, and did
+      // nothing at all where navigator.clipboard is absent — the panel told
+      // the person their words were on the clipboard and they were not.
+      // copyText() is the same path the Share button uses, fallback and all.
+      copyText(text).then(function (how) {
+        thanks.textContent = how === 'copied' ? 'Copied.' : 'Could not copy — select the text and copy it.';
+        thanks.hidden = false;
+        setTimeout(function () { thanks.hidden = true; thanks.textContent = 'Thank you.'; }, 1600);
+      });
     });
   }
 
@@ -1290,7 +1387,9 @@
   function wireOffline() {
     function paint() {
       var off = navigator.onLine === false;
-      document.documentElement.classList.toggle('is-offline', off);
+      // There used to be a documentElement.classList.toggle('is-offline')
+      // here. Nothing in the stylesheet has ever matched it, and nothing
+      // read it: the banner below is the whole of what offline looks like.
       var bar = $('#offline-warn');
       if (!off) {
         if (bar && bar.parentNode) bar.parentNode.removeChild(bar);

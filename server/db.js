@@ -906,17 +906,31 @@ function createStore(db) {
       return r.at || 0;
     },
     markCircleRead(circleId, userId, lastId) {
+      // Clamped to a message that exists. The id arrives from the client, and
+      // MAX() only ever moves the marker forward — so one wrong number put it
+      // past every id the circle will have for a long time, and the person
+      // stopped being told about anything said in it. Nothing malicious is
+      // needed for that; a stale tab posting an id from a different circle
+      // would do.
+      const top = q('SELECT COALESCE(MAX(id), 0) AS id FROM circle_messages WHERE circle_id = ?')
+        .get(circleId).id;
+      const at = Math.min(Math.max(0, Number(lastId) || 0), top);
       q(`UPDATE circle_members SET last_read_id = MAX(last_read_id, ?)
-         WHERE circle_id = ? AND user_id = ?`).run(Number(lastId) || 0, circleId, userId);
+         WHERE circle_id = ? AND user_id = ?`).run(at, circleId, userId);
     },
     /** Unread per circle, for the tab badge. Membership rows only. */
     circleUnread(userId) {
+      // Only circles the person can actually open. listCircles() hides a
+      // closed one, and nothing in the interface opens a circle except that
+      // list — so a circle closed by a moderator left every member with a
+      // number in the header for a conversation they could no longer reach,
+      // and no way to clear it.
       return q(`SELECT cm.circle_id, c.name,
                        (SELECT COUNT(*) FROM circle_messages m
                          WHERE m.circle_id = cm.circle_id AND m.id > cm.last_read_id
                            AND m.sender_id IS NOT ?) AS unread
                 FROM circle_members cm JOIN circles c ON c.id = cm.circle_id
-                WHERE cm.user_id = ?`).all(userId, userId);
+                WHERE cm.user_id = ? AND c.status = 'open'`).all(userId, userId);
     },
 
     // ---- vouches ----

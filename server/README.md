@@ -288,7 +288,7 @@ auth decision in the main README.
 node tests/run-server-tests.js
 ```
 
-393 assertions covering signup and sign-in, session isolation, interest
+405 assertions covering signup and sign-in, session isolation, interest
 visibility, the request/accept/message flow, outsiders being kept out of other
 people's threads, blocking, reporting, rate limits, the full circle lifecycle
 (trust tiers, written applications, member seconding, the readiness gate,
@@ -301,7 +301,9 @@ visible to nobody else, the turn-taking check holding the gate shut on a circle
 where one person wrote most of it, a question being handed by name to the member
 who has never spoken (and never to whoever asked for it, or the same person
 twice running), what a circle says it is for staying inside it, the ceiling
-coming down to eight without removing anyone, a request body cut at any byte
+coming down to eight without removing anyone, an unread badge that counts only
+circles the list will show and a read marker clamped to a message that exists,
+a request body cut at any byte
 offset arriving intact, the signup and login limits counting against the
 visitor's address rather than the reverse proxy's, and that the server will not
 serve its own source or escape the project directory.

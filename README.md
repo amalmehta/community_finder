@@ -341,19 +341,21 @@ npm test        # both suites
 node tests/run-tests.js
 ```
 
-8670+ assertions covering data integrity (every listing has a valid first step,
-a real URL, interests that exist in the taxonomy, ratings in range — the
-fallback recipes too, which were never checked and had a goal sitting in an
-interest list), city lookup
-and aliasing (whole words only, and a named state that contradicts the match
-throws it out — 'la' is inside Dallas), the universal fallback engine, matcher behaviour (a nervous person
-gets gentle options first, budget is respected, the comfort dial actually
-re-ranks, no duplicate results), that `index.html` loads every file it needs,
-and that every number the circles argument rests on is still the number the
-research says — the five rungs of the gate, 50% for one voice, 14 and 28 days,
-50/90/200 hours, three escalating question sets, two answers to climb one, eight
-people at most. Change one of those
-and this suite fails, which is the point of pinning them.
+8720+ assertions covering data integrity (every listing has a valid first
+step, a real URL, interests that exist in the taxonomy, ratings in range —
+the fallback recipes too, which were never checked and had a goal sitting in
+an interest list), city lookup and aliasing (whole words only, and a named
+state that contradicts the match throws it out — 'la' is inside Dallas), the
+universal fallback engine, matcher behaviour (a nervous person gets gentle
+options first, budget is respected, the comfort dial actually re-ranks, no
+duplicate results), that a saved place follows the listing it came from
+rather than the copy taken the day it was saved, that no question can be
+skipped into a screen with nothing on it, that `index.html` loads every file
+it needs, and that every number the circles argument rests on is still the
+number the research says — the five rungs of the gate, 50% for one voice, 14
+and 28 days, 50/90/200 hours, three escalating question sets, two answers to
+climb one, eight people at most. Change one of those and this suite fails,
+which is the point of pinning them.
 
 It also computes contrast. Every text token is checked against every surface it
 sits on, in both palettes, and anything under 4.5:1 fails the suite — the ratio
@@ -385,10 +387,12 @@ each week. You can also run it on demand from the Actions tab.
 node tests/run-server-tests.js
 ```
 
-393 assertions against a real HTTP server on a throwaway database: signup and
+405 assertions against a real HTTP server on a throwaway database: signup and
 sign-in, session isolation, that a hidden interest cannot be used to find you,
 the request/accept/message flow, outsiders being locked out of other people's
-threads, blocking, reporting, rate limits, the whole life of a circle — vetting,
+threads, blocking, reporting, rate limits, a header badge that can be cleared
+and a read marker that cannot be thrown past the end of a conversation, the
+whole life of a circle — vetting,
 the gate, the drift clock, the hours ledger, meetups rolling forward, the
 question sets refusing to escalate on an unanswered question, one-to-one threads
 being closed to anyone who has not spoken, if-then plans being required on a yes
