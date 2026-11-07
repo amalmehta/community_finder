@@ -349,7 +349,7 @@ npm test        # both suites
 node tests/run-tests.js
 ```
 
-8720+ assertions covering data integrity (every listing has a valid first
+8780+ assertions covering data integrity (every listing has a valid first
 step, a real URL, interests that exist in the taxonomy, ratings in range —
 the fallback recipes too, which were never checked and had a goal sitting in
 an interest list), city lookup and aliasing (whole words only, and a named
@@ -553,6 +553,43 @@ Nothing on screen explains why the product is built the way it is. The rule is
 conversational turn-taking and collective intelligence. The reasoning is in the
 source comments and in this file, where it belongs — it was roughly 1,200
 characters of commentary on the circles screen alone.
+
+### The look
+
+One typeface, one accent, a ground that asks for nothing.
+
+Headings used to be set in a serif. Its stems are thin, so a 22px heading in it
+read *lighter* than the 14px bold sans in the list below it — the page's
+hierarchy was upside down while both were at full-strength ink, which is a
+thing no colour change can fix. Size and weight in one family say it without
+the argument, and the city heading now out-weighs the listing names under it
+rather than losing to them.
+
+The page was cream. A tinted ground makes every surface on it a decision: white
+cards had to be lifted off it with a 26px shadow, the sunk tone had to be
+browner still, and the accent had to shout over all of it. The ground is within
+a few points of neutral now, a hairline border does what the shadow did, and
+the corners came in from 18px to 10px — rounder read as something to pick up
+against cream and as a toy against grey.
+
+Two colours were acting as accents. They have one job each now:
+
+| | means | where |
+|---|---|---|
+| **Accent** (terracotta) | *here*, or *do this* | progress through the form, the open listing, the rung you are on, links, focus |
+| **Moss** | *earned*, *confirmed*, *done* | ticks, met conditions, a finished plan, a confirmed meetup |
+
+The filled button is ink rather than the accent. When the loudest colour on the
+page appears on every screen several times, it marks nothing; ink is
+unmistakably the thing to press, and it frees the accent to mean *here*. It
+also deleted a dark-mode rule: the filled button needed its text flipped
+because its fill was the accent and the accent goes light in dark mode, and ink
+on raised inverts with the palette on its own.
+
+The suite pins all of this — that nothing asks for the serif, that the ground
+is within four points of neutral, that the accent is the one saturated token,
+and that progress, the open listing and the current rung are the accent while
+ticks and finished plans are moss.
 
 ### Theme
 

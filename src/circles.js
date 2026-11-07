@@ -521,7 +521,10 @@
    */
   function invitation(host) {
     host.innerHTML = '';
-    host.appendChild(el('div', { class: 'screen-head' }, [
+    // Not .screen-head: that is a flex row for a title and the one action a
+    // screen is for, so a sentence dropped into it sat beside the title and
+    // squeezed it into a column on a phone.
+    host.appendChild(el('div', { class: 'intro-head' }, [
       el('h2', { text: 'Circles' }),
       el('p', { class: 'hint', text: 'Small local groups — four to eight people — that talk '
         + 'first and only decide to meet once the conversation is real.' })

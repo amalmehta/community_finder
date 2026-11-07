@@ -198,29 +198,35 @@
       answer = function () { return picked; };
     }
 
-    // A single-choice question needs no Next — picking is answering. The rest
-    // of the row is quiet: skipping and leaving early are ways out, not offers.
-    if (q.kind !== 'one') {
-      box.appendChild(el('div', { class: 'actions' }, [
+    // A single-choice question needs no Continue — picking is answering.
+    //
+    // Skip sits in this row rather than under it. It and Continue are the two
+    // answers to the same question, and stacking them made one the subject
+    // and the other a footnote. It is a button now, too: it was bare 14px
+    // text with no padding, which is no affordance and a tap target well
+    // under the 44px a thumb needs.
+    box.appendChild(el('div', { class: 'actions' }, [
+      q.kind !== 'one' ? el('button', {
+        class: 'btn', type: 'button', 'data-continue': true,
+        onclick: function () { submit(q, answer()); }
+      }, ['Continue']) : null,
+      el('button', {
+        class: 'btn ghost q-skip', type: 'button',
+        onclick: function () { submit(q, q.kind === 'many' ? [] : null); }
+      }, ['Skip'])
+    ]));
+    // Leaving early is not one of the two answers, so it stays a quiet link
+    // on its own line. Only offered once it would actually produce something:
+    // it used to be on every question, including the first, where it led to a
+    // card that said "Not enough to go on." — a button that promises results
+    // and delivers a wall is worse than no button.
+    if (enough) {
+      box.appendChild(el('div', { class: 'q-outs' }, [
         el('button', {
-          class: 'btn', type: 'button', 'data-continue': true,
-          onclick: function () { submit(q, answer()); }
-        }, ['Continue'])
+          class: 'linkish', type: 'button', onclick: function () { finish(true); }
+        }, ['See results now'])
       ]));
     }
-    box.appendChild(el('div', { class: 'q-outs' }, [
-      el('button', {
-        class: 'linkish', type: 'button',
-        onclick: function () { submit(q, q.kind === 'many' ? [] : null); }
-      }, ['Skip']),
-      // Only offered once it would actually produce something. It used to be
-      // on every question, including the first, where it led to a card that
-      // said "Not enough to go on." — a button that promises results and
-      // delivers a wall is worse than no button.
-      enough ? el('button', {
-        class: 'linkish', type: 'button', onclick: function () { finish(true); }
-      }, ['See results now']) : null
-    ]));
     box.appendChild(el('p', { class: 'err', role: 'alert', id: 'q-error', hidden: true }));
     return box;
   }

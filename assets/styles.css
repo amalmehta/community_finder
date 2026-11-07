@@ -5,33 +5,48 @@
      the textarea in the feedback panel. The palette below only reaches what
      the stylesheet paints. */
   color-scheme: light;
-  --bg: #fbf8f4;
+  /* Quiet: the ground went from a cream (#fbf8f4) to something barely warm.
+     A tinted page makes every surface on it a decision — white cards had to
+     be lifted off it with a shadow, the sunk tone had to be browner still,
+     and the accent had to shout over all of it. Near-neutral asks for none
+     of that, and gives the one accent somewhere quiet to be loud. */
+  --bg: #fafaf9;
   --bg-raised: #ffffff;
-  --bg-sunk: #f3ede4;
-  --ink: #221f1b;
-  --ink-soft: #5c554b;
+  --bg-sunk: #f2f1ee;
+  --ink: #1a1a18;
+  --ink-soft: #55534d;
   /* The faint tier carries real text — timestamps, counts, the line under the
      readiness gate — at 13px, so it has to clear 4.5:1 on every surface it
      lands on. The old #8a8176 measured 3.83:1 on a white card and 3.24:1 on
      the moss panel. Faintness is carried by size and weight as well as this. */
-  --ink-faint: #6e6659;
-  --line: #e3dbcf;
-  --line-strong: #cfc4b3;
+  --ink-faint: #6b6760;
+  --line: #e7e5e1;
+  --line-strong: #d4d1cb;
+  /* The one accent. It marks what you are doing and where you are — the
+     progress through the form, the listing you have open, a link, the focus
+     ring. It is no longer the fill on every button: a page where the only
+     saturated thing is the primary action does not need the primary action
+     to be saturated. */
   --accent: #b1502a;
-  --accent-soft: #f6e7df;
+  --accent-soft: #f7e9e2;
   --accent-ink: #8c3d1f;
+  /* Moss is not a second accent. It means one thing — earned, confirmed,
+     done — and appears only on ticks, met conditions and completed steps.
+     It used to also colour the selected listing and the progress bar, which
+     are neither. */
   --moss: #2f6b56;
   --moss-soft: #e2efe9;
-  --focus: #2f6b56;
-  /* Warmth pass: the corners were 14/9, which read as panels. Rounder reads
-     as something you can pick up. Everything that uses them softens at once,
-     which is the point of their being tokens. */
-  --radius: 18px;
-  --radius-sm: 12px;
+  --focus: #b1502a;
+  /* 18/12 read as something soft to pick up, which suited the cream. On a
+     near-neutral ground the same corners read as a toy. These are tight
+     enough to be a surface and round enough not to be a box. */
+  --radius: 10px;
+  --radius-sm: 8px;
   --radius-pill: 999px;
-  /* Softer and warmer than the old flat grey: the shadow now has the page's
-     own brown in it, so a raised card looks lit rather than cut out. */
-  --shadow: 0 1px 2px rgba(92, 61, 34, .05), 0 10px 26px -14px rgba(92, 61, 34, .30);
+  /* A line does the work a shadow used to. The 26px brown bloom existed to
+     lift white off cream; against #fafaf9 a border is enough, and the page
+     stops looking like cards floating over a table. */
+  --shadow: 0 1px 2px rgba(26, 26, 24, .04);
   --maxw: 880px;
   /* Find is two panes, so it gets more room than a column of prose needs. */
   --maxw-wide: 1120px;
@@ -50,8 +65,12 @@
   /* Spacing rhythm. Everything vertical should land on one of these. */
   --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
   --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+  /* One typeface. The serif that used to set every heading had thin stems,
+     so a 22px heading in it read lighter than the 14px bold sans in the list
+     below it — the page's hierarchy was upside down, and no colour change
+     could fix it because both were already full-strength ink. Size and
+     weight in one family say it without the argument. */
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
-  --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
 }
 
 /* Dark theme. Applied when the system asks for it, unless the person has
@@ -59,41 +78,41 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
   color-scheme: dark;
-  --bg: #171512;
-  --bg-raised: #201d19;
-  --bg-sunk: #131110;
-  --ink: #f0ebe4;
-  --ink-soft: #b8afa3;
-  --ink-faint: #9a9185;    /* was #8a8176: 3.86:1 on the moss panel */
-  --line: #322d27;
-  --line-strong: #453e35;
+  --bg: #161615;
+  --bg-raised: #1f1f1d;
+  --bg-sunk: #121211;
+  --ink: #ededea;
+  --ink-soft: #b2b0aa;
+  --ink-faint: #9a9892;
+  --line: #2e2e2b;
+  --line-strong: #434340;
   --accent: #e08155;
-  --accent-soft: #35231a;
+  --accent-soft: #33231c;
   --accent-ink: #f0a582;
   --moss: #79b79c;
   --moss-soft: #1c2b25;
-  --focus: #79b79c;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px -14px rgba(0, 0, 0, .8);
+  --focus: #e08155;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .35);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #171512;
-  --bg-raised: #201d19;
-  --bg-sunk: #131110;
-  --ink: #f0ebe4;
-  --ink-soft: #b8afa3;
-  --ink-faint: #9a9185;    /* was #8a8176: 3.86:1 on the moss panel */
-  --line: #322d27;
-  --line-strong: #453e35;
+  --bg: #161615;
+  --bg-raised: #1f1f1d;
+  --bg-sunk: #121211;
+  --ink: #ededea;
+  --ink-soft: #b2b0aa;
+  --ink-faint: #9a9892;
+  --line: #2e2e2b;
+  --line-strong: #434340;
   --accent: #e08155;
-  --accent-soft: #35231a;
+  --accent-soft: #33231c;
   --accent-ink: #f0a582;
   --moss: #79b79c;
   --moss-soft: #1c2b25;
-  --focus: #79b79c;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px -14px rgba(0, 0, 0, .8);
+  --focus: #e08155;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .35);
 }
 
 * { box-sizing: border-box; }
@@ -239,20 +258,23 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 .choice span { font-size: 13.5px; color: var(--ink-soft); }
 .choice[aria-pressed="true"] span { color: var(--accent-ink); }
 
+/* The filled button is ink. It was the accent, which meant the loudest
+   colour on the page appeared on every screen, several times, next to
+   itself — and so marked nothing. Ink is unmistakably the thing to press
+   and leaves the accent free to mean "here" rather than "press". */
 .btn {
-  font: inherit; font-size: 16px; font-weight: 600; cursor: pointer;
-  background: var(--accent); color: #fff; border: 1px solid var(--accent);
-  padding: 12px 22px; border-radius: 999px;
+  font: inherit; font-size: var(--t-body); font-weight: 600; cursor: pointer;
+  background: var(--ink); color: var(--bg-raised); border: 1px solid var(--ink);
+  padding: 12px 20px; border-radius: var(--radius-sm);
 }
-.btn:hover { filter: brightness(1.06); }
-/* Only the filled button flips to dark text. Scoping this to .btn alone
-   out-specifies .btn.ghost and makes ghost text invisible on dark cards. */
+.btn:hover { filter: brightness(1.35); }
+/* The filled button used to need its text flipped to dark in dark mode,
+   because its fill was the accent and the accent goes light there. It is
+   ink on raised now, which inverts with the palette on its own. */
 :root[data-theme="light"] { color-scheme: light; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn:not(.ghost) { color: #171512; } }
-:root[data-theme="dark"] .btn:not(.ghost) { color: #171512; }
 .btn.ghost { background: none; color: var(--ink-soft); border-color: var(--line-strong); font-weight: 500; }
-.btn.ghost:hover { border-color: var(--accent); color: var(--accent-ink); filter: none; }
-.btn.sm { font-size: 14px; padding: 7px 14px; }
+.btn.ghost:hover { border-color: var(--ink); color: var(--ink); filter: none; }
+.btn.sm { font-size: var(--t-meta); padding: 7px 14px; }
 .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
 
 .err { color: var(--accent-ink); font-size: 14px; margin: 10px 0 0; }
@@ -264,19 +286,22 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
   display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
 }
 .results-head h2 {
-  font-family: var(--serif); font-size: var(--t-h2); margin: 0;
-  font-weight: 600; letter-spacing: -.02em; line-height: 1.15;
+  font-size: var(--t-h2); font-weight: 650; letter-spacing: -.025em;
+  margin: 0; line-height: 1.15;
 }
 .results-head p {
   margin: 0; color: var(--ink-faint); font-size: var(--t-small);
   letter-spacing: .02em;
 }
 
+/* A notice tells you something — which interests this city has nothing
+   hand-picked for, that a link was followed. It is not an achievement, so it
+   is no longer green. */
 .notice {
-  background: var(--moss-soft); border: 1px solid transparent; border-left: 3px solid var(--moss);
+  background: var(--bg-sunk); border: 1px solid var(--line);
   border-radius: var(--radius-sm); color: var(--ink);
 }
-.notice b { color: var(--moss); }
+.notice b { color: var(--ink); }
 
 .badges { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s4); }
 .badge {
@@ -296,10 +321,12 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 .steps input[type="checkbox"] { margin-top: 3px; width: 17px; height: 17px; accent-color: var(--moss); }
 .steps .done { color: var(--ink-faint); text-decoration: line-through; }
 .progress { height: 5px; background: var(--bg-sunk); border-radius: 999px; overflow: hidden; margin: 12px 0 14px; }
-.progress i { display: block; height: 100%; background: var(--moss); border-radius: 999px; transition: width .25s; }
+/* The accent, not moss: this is where you are, which is the accent's job.
+   Moss means earned, and being on question four is not an achievement. */
+.progress i { display: block; height: 100%; background: var(--accent); border-radius: 999px; transition: width .25s; }
 
 .empty { text-align: center; padding: 50px 20px; color: var(--ink-soft); }
-.empty h2 { font-family: var(--serif); font-size: 22px; margin: 0 0 8px; color: var(--ink); font-weight: 600; }
+.empty h2 { font-size: var(--t-h3); margin: 0 0 8px; color: var(--ink); font-weight: 650; letter-spacing: -.015em; }
 .empty p { margin: 0 auto; max-width: 44ch; }
 
 /* ---------- feedback ---------- */
@@ -463,8 +490,7 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 .q-head { display: flex; align-items: center; gap: 14px; }
 .q-head .progress { flex: 1; margin: 0; }
 .q-prompt {
-  font-family: var(--serif);
-  margin: 0 0 6px; font-weight: 600; letter-spacing: -.01em; text-wrap: balance;
+  margin: 0 0 6px; font-weight: 650; letter-spacing: -.02em; text-wrap: balance;
 }
 .question .hint { margin: 0 0 16px; }
 .question input[type="text"] { margin-bottom: 4px; }
@@ -508,7 +534,7 @@ body { font-size: var(--t-body); }
 .q-prompt { font-size: var(--t-h2); line-height: 1.18; margin-bottom: var(--s2); max-width: 24ch; }
 .question .choices {}
 .question .choice {}
-.question .actions { margin-top: var(--s5); }
+.question .actions { margin-top: var(--s5); gap: var(--s2); }
 
 /* Motion: results arrive rather than appear. Short, staggered, and only for
    the first few so a long list never feels slow. */
@@ -621,9 +647,9 @@ main:focus { outline: none; }
 
 
 .legal { max-width: 62ch; padding-bottom: var(--s8); }
-.legal h1 { font-family: var(--serif); font-size: var(--t-h1); margin: var(--s7) 0 var(--s3); letter-spacing: -.025em; }
+.legal h1 { font-size: var(--t-h1); font-weight: 650; margin: var(--s7) 0 var(--s3); letter-spacing: -.025em; }
 .legal .lede { font-size: var(--t-lead); color: var(--ink-soft); margin: 0 0 var(--s6); }
-.legal h2 { font-family: var(--serif); font-size: var(--t-h3); margin: var(--s6) 0 var(--s2); font-weight: 600; }
+.legal h2 { font-size: var(--t-h3); margin: var(--s6) 0 var(--s2); font-weight: 600; }
 .legal p, .legal li { color: var(--ink-soft); line-height: 1.6; }
 .legal ul { padding-left: var(--s5); display: grid; gap: var(--s1); }
 .legal code { font-size: .92em; background: var(--bg-sunk); padding: 1px 5px; border-radius: 4px; }
@@ -683,7 +709,7 @@ main:focus { outline: none; }
    this rule was reaching the whole twenty-question form and rendering its
    labels, inputs and buttons in the serif meant for one quoted line. */
 .quoted {
-  font-family: var(--serif); font-size: var(--t-lead); line-height: 1.4;
+  font-size: var(--t-lead); font-style: italic; line-height: 1.4;
   margin: var(--s3) 0 var(--s2); padding-left: var(--s3);
   border-left: 3px solid var(--line-strong); color: var(--ink);
 }
@@ -743,7 +769,7 @@ main:focus { outline: none; }
   justify-self: stretch; max-width: 100%; background: var(--bg-sunk);
   border-left: 3px solid var(--moss); border-radius: var(--radius-sm);
 }
-.msg.prompt p { font-family: var(--serif); font-size: var(--t-lead); }
+.msg.prompt p { font-size: var(--t-lead); font-style: italic; }
 .prompt-tag {
   display: block; font-size: var(--t-micro); text-transform: uppercase;
   letter-spacing: .06em; color: var(--moss); font-weight: 700; margin-bottom: 3px;
@@ -771,9 +797,11 @@ main:focus { outline: none; }
 .ladder-box .hint { margin: 0; color: var(--ink-faint); font-size: var(--t-small); }
 /* "personal · 2 of 3" breaking across two lines on a phone looks broken. */
 .ladder-box .ready-head .badge { white-space: nowrap; }
-.ladder li.now::before { content: "◉"; color: var(--moss); }
+/* Where you are on the ladder, which is the accent's job. Done rungs above
+   it stay moss; this one has not been earned yet. */
+.ladder li.now::before { content: "◉"; color: var(--accent); }
 .ladder li.now { color: var(--ink); }
-.ladder li.now b { color: var(--moss); }
+.ladder li.now b { color: var(--accent); }
 
 .planbox { margin-top: var(--s3); }
 .planbox .field { margin: var(--s2) 0; }
@@ -790,8 +818,7 @@ main:focus { outline: none; }
 .wants { list-style: none; margin: var(--s2) 0; padding: 0; }
 .wants li {
   padding: var(--s2) 0 var(--s2) var(--s3); margin: 0;
-  border-left: 3px solid var(--moss-soft); font-family: var(--serif);
-  font-size: var(--t-lead); line-height: 1.5;
+  border-left: 3px solid var(--line); font-size: var(--t-lead); line-height: 1.5;
 }
 .wants li + li { margin-top: var(--s1); }
 .wants li b { font-family: var(--font); font-size: var(--t-small); color: var(--moss); }
@@ -847,8 +874,8 @@ main:focus { outline: none; }
 
 /* The gate is a screen of its own, so it carries the name. */
 .gate-title {
-  font-family: var(--serif); font-size: var(--t-h1); font-weight: 600;
-  letter-spacing: -.025em; margin: var(--s7) 0 var(--s4); max-width: 16ch;
+  font-size: var(--t-h1); font-weight: 700;
+  letter-spacing: -.03em; margin: var(--s7) 0 var(--s4); max-width: 16ch;
 }
 .gate-head { margin: 0 0 var(--s4); font-size: var(--t-h3); }
 
@@ -866,7 +893,7 @@ main:focus { outline: none; }
 .q-back:hover { border-color: var(--accent); color: var(--accent-ink); }
 
 /* Ways out of a question. Quiet on purpose: they are escapes, not offers. */
-.q-outs { display: flex; gap: var(--s4); }
+.q-outs { display: flex; gap: var(--s3); align-items: center; }
 .linkish {
   border: 0; background: none; padding: 0; font: inherit;
   font-size: var(--t-meta); color: var(--ink-faint); cursor: pointer;
@@ -893,9 +920,16 @@ main { padding: var(--s6) 0 var(--s7); }
   display: flex; align-items: center; gap: var(--s4);
   margin: 0 0 var(--s4);
 }
+/* A title with a sentence under it, rather than an action beside it. */
+.intro-head { margin: 0 0 var(--s4); }
+.intro-head h2 {
+  font-size: var(--t-h2); margin: 0 0 var(--s1);
+  font-weight: 650; letter-spacing: -.025em; line-height: 1.15;
+}
+.intro-head .hint { margin: 0; max-width: 56ch; }
 .screen-head h2 {
-  font-family: var(--serif); font-size: var(--t-h2); margin: 0; flex: 1 1 auto;
-  font-weight: 600; letter-spacing: -.02em; line-height: 1.15;
+  font-size: var(--t-h2); margin: 0; flex: 1 1 auto;
+  font-weight: 650; letter-spacing: -.025em; line-height: 1.15;
 }
 
 /* A detail screen: back, then what you opened. */
@@ -913,8 +947,8 @@ main { padding: var(--s6) 0 var(--s7); }
 .back-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
 .detail-title { min-width: 0; flex: 1 1 auto; }
 .detail-title h2 {
-  font-family: var(--serif); font-size: var(--t-h2); margin: 0 0 2px;
-  font-weight: 600; letter-spacing: -.02em; line-height: 1.15;
+  font-size: var(--t-h2); margin: 0 0 2px;
+  font-weight: 650; letter-spacing: -.025em; line-height: 1.15;
 }
 .detail-title p { margin: 0; color: var(--ink-faint); font-size: var(--t-small); }
 
@@ -951,8 +985,11 @@ main { padding: var(--s6) 0 var(--s7); }
   border-bottom: 1px solid var(--line);
 }
 .browse-bar h2 {
-  flex: 1 1 auto; margin: 0; font-family: var(--serif);
-  font-size: var(--t-h2); font-weight: 600; letter-spacing: -.02em; line-height: 1.1;
+  /* 700 and a step up, because this is the only heading on the screen that
+     sits directly above bold text at a smaller size. In the serif it lost
+     that contest at the same colour. */
+  flex: 1 1 auto; margin: 0;
+  font-size: var(--t-h2); font-weight: 700; letter-spacing: -.03em; line-height: 1.1;
 }
 .browse-bar .linkish { flex: none; }
 
@@ -974,16 +1011,19 @@ main { padding: var(--s6) 0 var(--s7); }
 }
 .row-text { min-width: 0; flex: 1 1 auto; }
 .row-pic { color: var(--ink-faint); }
-.row[aria-current="true"] .row-pic { color: var(--moss); }
+.row[aria-current="true"] .row-pic { color: var(--accent); }
 .row:hover { background: var(--bg-sunk); }
 .row-name { display: block; font-weight: 600; font-size: var(--t-meta); line-height: 1.35; }
 .row-sub {
   display: block; margin-top: 1px; color: var(--ink-faint); font-size: var(--t-small);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.row[aria-current="true"] { background: var(--moss-soft); }
-.row[aria-current="true"] .row-name,
-.row[aria-current="true"] .row-sub { color: var(--moss); }
+/* The open listing. A tinted panel plus recoloured text made the selected
+   row the loudest thing in the column and, in moss, implied it was finished
+   rather than open. A quiet ground and one accent rule say "this one" and
+   leave the name reading like every other name. */
+.row[aria-current="true"] { background: var(--bg-sunk); }
+.row[aria-current="true"] .row-name { color: var(--ink); }
 
 .browse-detail { min-width: 0; }
 .detail { animation: fyc-fade .2s ease both; }
@@ -995,9 +1035,13 @@ main { padding: var(--s6) 0 var(--s7); }
 .facts { margin: 0 0 var(--s5); color: var(--ink-faint); font-size: var(--t-small); }
 .detail .caveat-line { margin: calc(-1 * var(--s4)) 0 var(--s5); }
 
+/* The first step into a place: the one thing on the screen to actually go
+   and do. It was a green panel, which under the one-accent rule read as
+   something already completed. A quiet panel with the ink button in it says
+   "do this" without a colour having to. */
 .step-box {
   margin: 0 0 var(--s5); padding: var(--s5);
-  background: var(--moss-soft); border-radius: var(--radius);
+  background: var(--bg-sunk); border: 1px solid var(--line); border-radius: var(--radius);
 }
 .step-box h3 {
   margin: 0 0 var(--s1); font-size: var(--t-lead); font-weight: 600;
@@ -1082,7 +1126,8 @@ main { padding: var(--s6) 0 var(--s7); }
 }
 .question .choice b { font-size: var(--t-lead); }
 .question input[type="text"] { font-size: var(--t-lead); padding: var(--s3) var(--s4); }
-.q-outs { margin-top: var(--s4); }
+/* Continue and Skip share one row; leaving early sits quietly under it. */
+.q-outs { margin-top: var(--s3); }
 
 
 /* ===================================================================
@@ -1210,7 +1255,7 @@ main { padding: var(--s6) 0 var(--s7); }
 .row { position: relative; }
 .row[aria-current="true"]::before {
   content: ""; position: absolute; left: 0; top: 6px; bottom: 6px;
-  width: 3px; border-radius: 3px; background: var(--moss);
+  width: 3px; border-radius: 3px; background: var(--accent);
 }
 
 /* The subject of the listing, at the top of the thing you do about it. */

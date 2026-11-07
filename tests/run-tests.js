@@ -511,10 +511,18 @@ group('front-end wiring', function () {
   var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
   ok(css.indexOf(':root[data-theme="dark"]') !== -1, 'an explicit dark theme exists');
 
-  // Regression: the dark-theme rule for .btn out-specified .btn.ghost, leaving
-  // ghost buttons with near-black text on a near-black card (1.09:1).
-  ok(css.indexOf(':root[data-theme="dark"] .btn:not(.ghost)') !== -1,
-     'the dark button colour is scoped away from ghost buttons');
+  // Regression: a dark-theme rule for .btn once out-specified .btn.ghost,
+  // leaving ghost buttons with near-black text on a near-black card (1.09:1).
+  // The fix was to scope it; the filled button now takes its text from
+  // --bg-raised, which inverts with the palette, so there is no such rule to
+  // scope. What has to stay true is that nothing recolours every .btn.
+  ok(/\.btn \{[^}]*color: var\(--bg-raised\)/.test(css),
+     'the filled button takes its text colour from the ground');
+  var btnColourRules = (css.match(/\.btn(?!\.ghost|:not)[^{,]*\{[^}]*\bcolor:/g) || [])
+    .filter(function (r) { return !/^\.btn \{/.test(r.trim()); });
+  eq(btnColourRules.length, 0, 'and no other rule recolours every button at once');
+  ok(/\.btn\.ghost \{[^}]*color: var\(--ink-soft\)/.test(css),
+     'while the ghost one keeps its own');
   ok(css.indexOf('--t-body') !== -1 && css.indexOf('--s4') !== -1,
      'type and spacing scales are defined as tokens');
   ok(css.indexOf(':root:not([data-theme="light"])') !== -1,
@@ -806,7 +814,7 @@ group('polish: the type, the colour and the motion', function () {
      'and started with a reflow, not requestAnimationFrame, which a background tab throttles');
 
   // 7. It used to offer results from the first question, where there were none.
-  ok(/enough \? el\('button'/.test(app), 'the escape hatch is conditional');
+  ok(/if \(enough\) \{[\s\S]{0,200}See results now/.test(app), 'the escape hatch is conditional');
   ok(app.indexOf('var enough = !!(sofar.location && sofar.interests.length)') !== -1,
      'on there being something to show');
 
@@ -2665,6 +2673,65 @@ group('the front door: no wall, and three fields behind it', function () {
   // Nothing of this reaches the static build, where there is no server at all.
   ok(/S\.online = false;\s*\n\s*return;/.test(social),
      'no backend and social.js bows out before any of it');
+});
+
+group('quiet: one typeface, one accent, a ground that asks for nothing', function () {
+  var fs = require('fs');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  // One typeface. The serif set every heading, and its thin stems meant a
+  // 22px heading read lighter than the 14px bold sans in the list below it —
+  // the hierarchy was upside down at identical full-strength ink, so no
+  // colour could fix it.
+  eq((bare.match(/var\(--serif\)/g) || []).length, 0, 'nothing asks for the serif');
+  ok(bare.indexOf('--serif:') === -1, 'and the token is gone rather than left dangling');
+  ok(/--font: ui-sans-serif/.test(bare), 'one family is declared');
+  ok(/\.browse-bar h2 \{[^}]*font-weight: 700/.test(bare),
+     'the city out-weighs the listing names under it');
+  ok(/\.row-name \{[^}]*font-weight: 600/.test(bare), 'which are 600');
+
+  // One accent. It means "here" and "do this"; moss means "earned". The two
+  // used to share the selected row, the progress bar and every filled button.
+  ok(/\.btn \{[^}]*background: var\(--ink\)/.test(bare), 'the filled button is ink, not the accent');
+  ok(/\.progress i \{[^}]*background: var\(--accent\)/.test(bare), 'progress is the accent');
+  ok(/\.row\[aria-current="true"\]::before \{[^}]*background: var\(--accent\)/.test(bare),
+     'so is the open listing');
+  ok(!/\.row\[aria-current="true"\] \{[^}]*moss/.test(bare), 'which is no longer tinted green');
+  ok(/\.notice \{[^}]*background: var\(--bg-sunk\)/.test(bare), 'a notice is not an achievement');
+  ok(/\.step-box \{[^}]*background: var\(--bg-sunk\)/.test(bare), 'nor is the step you have yet to take');
+  ok(/\.ladder li\.now::before \{[^}]*var\(--accent\)/.test(bare), 'nor the rung you are on');
+  // Moss is still there, doing its one job.
+  ok(/\.ready-list li\.done \.tick \{[^}]*var\(--moss\)/.test(bare), 'a met condition is still moss');
+  ok(/\.plan-item\.done \{[^}]*var\(--moss\)/.test(bare), 'and so is a finished plan');
+
+  // The ground stopped being a colour with opinions.
+  var light = bare.slice(bare.indexOf(':root {'), bare.indexOf(':root[data-theme="dark"]'));
+  function tone(hex) {
+    var r = parseInt(hex.substr(1, 2), 16), g = parseInt(hex.substr(3, 2), 16), b = parseInt(hex.substr(5, 2), 16);
+    return Math.max(r, g, b) - Math.min(r, g, b);          // how far from neutral
+  }
+  var bg = (light.match(/--bg:\s*(#[0-9a-f]{6})/) || [])[1];
+  var raised = (light.match(/--bg-raised:\s*(#[0-9a-f]{6})/) || [])[1];
+  var sunk = (light.match(/--bg-sunk:\s*(#[0-9a-f]{6})/) || [])[1];
+  ok(bg && tone(bg) <= 4, 'the page ground is within four points of neutral (' + bg + ', ' + tone(bg) + ')');
+  ok(sunk && tone(sunk) <= 6, 'and so is the sunk one (' + sunk + ', ' + tone(sunk) + ')');
+  eq(raised, '#ffffff', 'raised surfaces are white');
+  // The accent is the one saturated thing, so it has to stay saturated.
+  var accent = (light.match(/--accent:\s*(#[0-9a-f]{6})/) || [])[1];
+  ok(accent && tone(accent) > 80, 'the accent is the one colour with an opinion (' + accent + ')');
+
+  // Corners and shadow: a line does the lifting now.
+  ok(/--radius: 10px/.test(bare) && /--radius-sm: 8px/.test(bare), 'corners are tight');
+  ok(!/--shadow:[^;]*26px/.test(bare), 'the 26px bloom that lifted white off cream is gone');
+  ok(/--shadow: 0 1px 2px/.test(bare), 'one hairline of a shadow is left');
+
+  // Skipping is a control, not a word.
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+  ok(/class: 'btn ghost q-skip'/.test(app), 'Skip is a button');
+  ok(!/class: 'linkish', type: 'button',\s*\n\s*onclick: function \(\) \{ submit\(q, q\.kind/.test(app),
+     'and not bare text with no padding');
+  ok(/\.question \.actions \{[^}]*gap: var\(--s2\)/.test(bare), 'it sits in the row with Continue');
 });
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');
