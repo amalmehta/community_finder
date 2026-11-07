@@ -22,11 +22,37 @@ const captureMailer = {
 
 // Signup-per-IP is the one limit that gets in the test's way (every request
 // here comes from one address); the limits under test keep their real values.
-const { server } = createApp({
+const { server, store } = createApp({
   file: path.join(tmp, 'test.db'),
   limits: { signupsPerIpPerHour: 100 },
-  mailer: captureMailer
+  mailer: captureMailer,
+  // A circle's whole life happens in milliseconds here, so the "separate days
+  // of conversation" rung is the one thing relaxed. The other three are real.
+  ready: { minDays: 1 },
+  // Likewise the grace period before anyone is told that somebody answered a
+  // question and got nothing back: four hours of real time, none here.
+  disclosure: { respondAfterHours: 0 }
 });
+
+// fetch() pools its sockets and keeps them alive between requests. Closing
+// the server at the end of the run then resets whichever ones are still idle,
+// and because no request is pending it arrives as an unhandled
+// `read ECONNRESET` with a bare TCP stack and no test attached — about one
+// run in five once this file had enough clients in it. Asking for the
+// connection to close after each response leaves nothing pooled to reset. A
+// suite talking to a server on loopback does not need keep-alive.
+//
+// Wrapped once here rather than in the client, because half the requests in
+// this file are bare fetch() calls and a socket left open by any of them is
+// enough to bring the flake back.
+const rawFetch = globalThis.fetch;
+globalThis.fetch = function (input, init) {
+  const o = Object.assign({}, init);
+  const h = new Headers(o.headers || {});
+  h.set('Connection', 'close');
+  o.headers = h;
+  return rawFetch(input, o);
+};
 
 /** Minimal cookie-aware client. */
 function client() {
@@ -184,6 +210,12 @@ async function verifyEmail(call, email) {
     eq((await ava('POST', `/api/threads/${tid}/messages`, { body: 'Hello!' })).status, 201, 'a message can be sent');
     eq((await ben('GET', `/api/threads/${tid}/messages`)).data.messages.length, 1, 'and the other side sees it');
     eq((await ava('POST', `/api/threads/${tid}/messages`, { body: '   ' })).status, 400, 'empty messages are refused');
+    // Capped at the same length as a circle message, and for the same
+    // reason: this was the other body the server stored without a limit.
+    eq((await ava('POST', `/api/threads/${tid}/messages`, { body: 'x'.repeat(2001) })).status, 400,
+       'and so is one past the length cap');
+    eq((await ava('POST', `/api/threads/${tid}/messages`, { body: 'x'.repeat(2000) })).status, 201,
+       'while one exactly at it is sent');
 
     // A third party must not be able to read or write the conversation.
     await mal('POST', '/api/signup', { username: 'mal', password: 'hunter2hunter', display: 'Mal', city: 'Boston', ageOk: true, interests: [{ id: 'outdoors' }] });
@@ -260,7 +292,7 @@ async function verifyEmail(call, email) {
     // Every leg of the rule has to hold.
     const far = client();
     await far('POST', '/api/signup', { username: 'far', password: 'hunter2hunter', display: 'Far', city: 'Seattle', ageOk: true, interests: shared });
-    await verifyEmail(far, 'far@example.com');
+    await verifyEmail(far, 'faraway@example.com');
     const farSees = (await far('GET', '/api/people')).data.people.filter((p) => p.display === 'Dana')[0];
     eq(farSees.canDirect, false, 'a different city blocks direct messaging');
     eq((await far('POST', '/api/direct', { toUserId: farSees.id, body: 'Hello from another city entirely' })).status, 403,
@@ -312,6 +344,771 @@ async function verifyEmail(call, email) {
     eq((await client()('GET', '/api/graph')).status, 401, 'the graph requires a session');
   });
 
+  await group('circles: vetting and the chat-first gate', async () => {
+    const BIO = 'Moved here in the spring and would rather know a few people properly than meet forty once.';
+    const INT = [{ id: 'books' }, { id: 'games' }, { id: 'food' }];
+    const people = {};
+    const CREW = { fay: 'fayc', gus: 'gusc', hal: 'halc', ivy: 'ivyc', jo: 'joec' };
+    for (const [short, username] of Object.entries(CREW)) {
+      const c = client();
+      await c('POST', '/api/signup', {
+        username, password: 'hunter2hunter', display: short[0].toUpperCase() + short.slice(1),
+        city: 'Denver', bio: BIO, ageOk: true, interests: INT
+      });
+      await verifyEmail(c, username + '@example.com');
+      people[short] = c;
+    }
+    const { fay, gus, hal, ivy, jo } = people;
+
+    // ---- trust tiers ----
+    let r = await fay('GET', '/api/circles');
+    eq(r.data.trust.tier, 2, 'a verified, filled-in profile reaches the "Introduced" tier');
+    ok(r.data.trust.missing.some((m) => /vouched/i.test(m)), 'and is told that vouches are what is left');
+
+    const blank = client();
+    await blank('POST', '/api/signup', { username: 'blankslate', password: 'hunter2hunter', city: 'Denver', ageOk: true });
+    eq((await blank('GET', '/api/circles')).data.trust.tier, 0, 'a bare account is tier 0');
+    eq((await blank('POST', '/api/circles', { name: 'Anything', city: 'Denver', blurb: BIO, question: 'Why are you here, in a sentence?', interests: ['books'] })).status,
+       403, 'tier 0 cannot start a circle');
+
+    // ---- starting one, and the vetting question being mandatory ----
+    eq((await fay('POST', '/api/circles', { name: 'Books and dice', city: 'Denver', blurb: 'Too short', question: 'Why are you here, in a sentence?', interests: ['books'] })).status,
+       400, 'a circle needs a real description');
+    eq((await fay('POST', '/api/circles', { name: 'Books and dice', city: 'Denver', blurb: BIO, question: 'hi', interests: ['books'] })).status,
+       400, 'and a real joining question — that is the vetting');
+
+    r = await fay('POST', '/api/circles', {
+      name: 'Books and dice', city: 'Denver', blurb: BIO,
+      question: 'What are you reading or playing at the moment, and what are you after here?',
+      interests: ['books', 'games'], cap: 4
+    });
+    eq(r.status, 201, 'a filled-in host can start a circle');
+    const cid = r.data.circle.id;
+    eq(r.data.circle.myRole, 'host', 'the founder is the host');
+    eq(r.data.circle.cap, 4, 'the cap is kept small');
+
+    // ---- the shopfront: a non-member sees the circle, never the conversation ----
+    r = await gus('GET', '/api/circles/' + cid);
+    eq(r.data.members, null, 'a non-member cannot see who is in a circle');
+    eq((await gus('GET', '/api/circles/' + cid + '/messages')).status, 403,
+       'nor read a word of the conversation');
+
+    // ---- applying is a written answer, not a click ----
+    eq((await gus('POST', '/api/circles/' + cid + '/apply', { answer: 'sounds fun' })).status, 400,
+       'a one-liner is not an application');
+    eq((await gus('POST', '/api/circles/' + cid + '/apply', { answer: 'Reading Piranesi, playing too much Wingspan, and I would like three or four people I can text about either.' })).status,
+       201, 'a real answer applies');
+    eq((await gus('POST', '/api/circles/' + cid + '/apply', { answer: 'Reading Piranesi, playing too much Wingspan, and I would like three or four people I can text about either.' })).status,
+       409, 'and cannot be sent twice');
+
+    // ---- circles are local ----
+    const far = client();
+    await far('POST', '/api/signup', { username: 'faraway', password: 'hunter2hunter', display: 'Faraway', city: 'Miami', bio: BIO, ageOk: true, interests: INT });
+    await verifyEmail(far, 'far@example.com');
+    const seenFar = (await far('GET', '/api/circles')).data.circles.filter((c) => c.id === cid)[0];
+    eq(seenFar.apply.ok, false, 'someone in another city cannot apply');
+    ok(/Denver/.test(seenFar.apply.why), 'and is told which city it is in');
+
+    // ---- the host decides, and the answer is what they read ----
+    r = await fay('GET', '/api/circles/' + cid);
+    eq(r.data.applications.length, 1, 'the host sees the application');
+    ok(/Piranesi/.test(r.data.applications[0].answer), 'with the answer attached');
+    const gusApp = r.data.applications[0].id;
+    eq((await gus('POST', `/api/circles/${cid}/applications/${gusApp}/approve`)).status, 403,
+       'an applicant cannot approve themselves');
+    eq((await fay('POST', `/api/circles/${cid}/applications/${gusApp}/approve`)).status, 201,
+       'the host can let them in');
+    eq((await gus('GET', '/api/circles/' + cid + '/messages')).status, 200,
+       'and then the conversation opens up');
+
+    // Every other stored field is cut to a length — a display name to 30, a
+    // city to 60 — and the two message bodies were the exception, taking
+    // whatever fitted inside the 64KB body limit. Not a way in to anything,
+    // but a 60,000-character message is one nobody in the circle can scroll
+    // past, kept forever, and the composer gave no sign it would be taken.
+    const huge = 'x'.repeat(2001);
+    eq((await gus('POST', '/api/circles/' + cid + '/messages', { body: huge })).status, 400,
+       'a message past the cap is refused');
+    eq((await gus('POST', '/api/circles/' + cid + '/messages', { body: 'y'.repeat(2000) })).status, 201,
+       'and one exactly at it is not');
+
+    await hal('POST', '/api/circles/' + cid + '/apply', { answer: 'Mostly non-fiction and a long-running D&D game. Looking for people to actually talk to rather than a weekly event.' });
+    const halApp = (await fay('GET', '/api/circles/' + cid)).data.applications[0].id;
+    await fay('POST', `/api/circles/${cid}/applications/${halApp}/approve`);
+    eq(store.memberCount(cid), 3, 'three in the circle');
+
+    // ---- two members carry an application without the host ----
+    await ivy('POST', '/api/circles/' + cid + '/apply', { answer: 'I run a tiny book swap at work and want something less work-shaped. Happy to be the one who organises.' });
+    const ivyApp = (await gus('GET', '/api/circles/' + cid)).data.applications.filter((a) => a.display === 'Ivy')[0].id;
+    eq((await fay('POST', `/api/circles/${cid}/applications/${ivyApp}/second`)).status, 400,
+       'the host approves outright rather than seconding');
+    r = await gus('POST', `/api/circles/${cid}/applications/${ivyApp}/second`);
+    eq(r.status, 200, 'a member can second an application');
+    eq(r.data.seconds, 1, 'one second so far');
+    eq((await gus('POST', `/api/circles/${cid}/applications/${ivyApp}/second`)).status, 409,
+       'and cannot second twice');
+    eq((await hal('POST', `/api/circles/${cid}/applications/${ivyApp}/second`)).status, 201,
+       'two seconds let someone in without the host');
+    eq(store.memberCount(cid), 4, 'four in the circle');
+
+    // ---- the cap holds, and overflow waits ----
+    r = await jo('POST', '/api/circles/' + cid + '/apply', { answer: 'Would happily be the fifth. I am around most evenings and I bring the snacks nobody asked for.' });
+    eq(r.data.status, 'waitlisted', 'past the cap, an application joins the waiting list');
+
+    // ---- meetups are locked until the circle has actually talked ----
+    r = await fay('POST', '/api/circles/' + cid + '/meetups', { title: 'Coffee on Sunday', place: 'Union Station' });
+    eq(r.status, 409, 'nobody can propose a meetup before the circle has talked');
+    ok(/Talk first/.test(r.data.error), 'and is told why, in those words');
+
+    // Twenty messages, three different people, which is the gate.
+    for (let i = 0; i < 7; i++) {
+      await fay('POST', '/api/circles/' + cid + '/messages', { body: 'Fay message ' + i });
+      await gus('POST', '/api/circles/' + cid + '/messages', { body: 'Gus message ' + i });
+      await hal('POST', '/api/circles/' + cid + '/messages', { body: 'Hal message ' + i });
+    }
+    r = await fay('GET', '/api/circles/' + cid);
+    eq(r.data.circle.readiness.ready, true, 'twenty messages from three people opens the gate');
+    eq(r.data.circle.live.speakers, 3, 'and the liveliness line counts the speakers');
+
+    // ---- a proposal is a proposal until enough people say yes ----
+    r = await gus('POST', '/api/circles/' + cid + '/meetups', {
+      title: 'Sunday morning coffee and a game', place: 'Union Station, main hall',
+      startsAt: Date.now() + 5 * 86400000, orgId: 'den-x', orgName: 'Tattered Cover', orgUrl: 'https://www.tatteredcover.com/',
+      plan: 'Light rail from Alameda at half nine'
+    });
+    eq(r.status, 201, 'once ready, any member can propose something');
+    const mid = (await fay('GET', '/api/circles/' + cid)).data.meetups[0].id;
+    let k = (await fay('GET', '/api/circles/' + cid)).data.meetups[0];
+    eq(k.status, 'proposed', 'it starts as a proposal');
+    eq(k.yes, 1, 'with the proposer already in');
+    eq(k.org.name, 'Tattered Cover', 'anchored to a real local listing');
+
+    eq((await far('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes', plan: 'Flying in specially' })).status, 403,
+       'a non-member cannot vote on it');
+    r = await fay('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes', plan: 'Walking down from Curtis Park at nine' });
+    eq(r.status, 200, 'a member can say yes');
+    eq(r.data.status, 'on', `and at quorum (${k.quorum}) it becomes a plan`);
+
+    // ---- vouching has to mean "we have talked" ----
+    eq((await fay('POST', '/api/circles/' + cid + '/vouch', { userId: r.data.id || 0 })).status, 404,
+       'you cannot vouch for a stranger');
+    const ivyId = (await fay('GET', '/api/circles/' + cid)).data.members.filter((m) => m.display === 'Ivy')[0].id;
+    eq((await fay('POST', '/api/circles/' + cid + '/vouch', { userId: ivyId })).status, 400,
+       'nor for someone who has not said anything yet');
+    const gusId = (await fay('GET', '/api/circles/' + cid)).data.members.filter((m) => m.display === 'Gus')[0].id;
+    r = await fay('POST', '/api/circles/' + cid + '/vouch', { userId: gusId });
+    eq(r.status, 201, 'you can vouch for someone you have talked to');
+    await hal('POST', '/api/circles/' + cid + '/vouch', { userId: gusId });
+    eq((await gus('GET', '/api/circles')).data.trust.tier, 3, 'two vouches reach the "Vouched for" tier');
+
+    // ---- icebreakers, and not too many of them ----
+    r = await fay('POST', '/api/circles/' + cid + '/prompt');
+    eq(r.status, 201, 'a member can post a question for the whole circle');
+    ok(globalThis.FYC.PROMPTS.indexOf(r.data.body) !== -1, 'drawn from the shared list, never invented');
+    eq((await gus('POST', '/api/circles/' + cid + '/prompt')).status, 429, 'one prompt at a time');
+
+    // ---- unread, and the host's queue ----
+    r = await fay('GET', '/api/unread');
+    ok(r.data.circles > 0, 'unread counts what other people said');
+    eq(r.data.pending, 1, 'and the host sees the application still waiting');
+
+    // ---- the host cannot walk out on people ----
+    eq((await fay('POST', '/api/circles/' + cid + '/leave')).status, 409,
+       'the host cannot leave a circle with people in it');
+    eq((await hal('POST', '/api/circles/' + cid + '/leave')).status, 200, 'a member can leave');
+    eq(store.memberCount(cid), 3, 'and is gone');
+
+    // ---- host tools ----
+    eq((await gus('DELETE', `/api/circles/${cid}/members/${ivyId}`)).status, 403,
+       'only the host removes someone');
+    eq((await fay('DELETE', `/api/circles/${cid}/members/${ivyId}`)).status, 200, 'the host can');
+    eq((await fay('POST', '/api/circles/' + cid + '/close')).status, 200, 'and can close it to new people');
+    const closed = (await jo('GET', '/api/circles')).data.circles.filter((c) => c.id === cid)[0];
+    eq(closed, undefined, 'a closed circle leaves discovery');
+  });
+
+  await group('circles: the ceiling, the hours and repeating', async () => {
+    const BIO = 'Here for a handful of people I actually know rather than a long list of ones I have met once.';
+    const INT = [{ id: 'outdoors' }, { id: 'food' }, { id: 'music' }];
+    const crew = {};
+    for (const [short, username] of Object.entries({ kit: 'kitc', lou: 'louc', max: 'maxc' })) {
+      const c = client();
+      await c('POST', '/api/signup', {
+        username, password: 'hunter2hunter', display: short[0].toUpperCase() + short.slice(1),
+        city: 'Austin', bio: BIO, ageOk: true, interests: INT
+      });
+      await verifyEmail(c, username + '@example.com');
+      crew[short] = c;
+    }
+    const { kit, lou, max } = crew;
+
+    let r = await kit('POST', '/api/circles', {
+      name: 'Walks and a coffee', city: 'Austin', blurb: BIO,
+      question: 'What does a good Sunday morning look like for you?',
+      interests: ['outdoors', 'food'], cap: 6
+    });
+    const cid = r.data.circle.id;
+    eq(r.data.circle.readyAt, null, 'a new circle has no clock running yet');
+    eq(r.data.circle.drift.stage, 'none', 'and is not drifting, because it could not meet anyway');
+
+    for (const [who, answer] of [[lou, 'Long walks and then sitting down somewhere with a coffee for an hour. That is the whole ambition.'],
+                                 [max, 'I walk most weekends alone and would rather not. Also I know every coffee place in this city.']]) {
+      await who('POST', '/api/circles/' + cid + '/apply', { answer });
+      const app = (await kit('GET', '/api/circles/' + cid)).data.applications[0];
+      await kit('POST', `/api/circles/${cid}/applications/${app.id}/approve`);
+    }
+    for (let i = 0; i < 7; i++) {
+      await kit('POST', '/api/circles/' + cid + '/messages', { body: 'Kit ' + i });
+      await lou('POST', '/api/circles/' + cid + '/messages', { body: 'Lou ' + i });
+      await max('POST', '/api/circles/' + cid + '/messages', { body: 'Max ' + i });
+    }
+
+    // ---- the clock starts the moment the circle could have met ----
+    r = await kit('GET', '/api/circles/' + cid);
+    ok(r.data.circle.readyAt > 0, 'becoming ready stamps the clock');
+    eq(r.data.circle.drift.stage, 'ok', 'and a circle that just became ready is not drifting');
+    eq(r.data.circle.hours.mine.hours, 0, 'no hours yet — messages do not count as hours');
+    eq(r.data.circle.hours.mine.next.hours, 50, 'the next rung is Hall’s fifty hours');
+    eq(r.data.circle.hours.mine.next.label, 'casual friends', 'which is where casual friendship starts');
+
+    const back = (d) => store.db.prepare('UPDATE circles SET ready_at = ? WHERE id = ?')
+      .run(Date.now() - d * 86400000, cid);
+
+    // ---- the ceiling: Ramirez & Zhang, late switches go worse ----
+    back(15);
+    r = await kit('GET', '/api/circles/' + cid);
+    eq(r.data.circle.drift.stage, 'nudge', 'a fortnight ready and unmet is a nudge');
+    eq(r.data.circle.drift.days, 15, 'and it says how long it has been');
+    eq(r.data.circle.drift.metBefore, false, 'this circle has never met');
+
+    back(30);
+    r = await kit('GET', '/api/circles/' + cid);
+    eq(r.data.circle.drift.stage, 'drifting', 'a month ready and unmet is drifting');
+
+    // The one place the app refuses to help you keep talking.
+    r = await kit('POST', '/api/circles/' + cid + '/prompt');
+    eq(r.status, 409, 'a drifting circle cannot post another icebreaker');
+    ok(/propose something/.test(r.data.error), 'it says what to do instead');
+
+    // ---- a date in the diary stops the clock ----
+    eq((await kit('POST', '/api/circles/' + cid + '/meetups',
+      { title: 'Sunday walk', place: 'Barton Springs gate' })).status, 400,
+      'a plan without a time is refused');
+
+    r = await kit('POST', '/api/circles/' + cid + '/meetups', {
+      title: 'Sunday walk and a coffee', place: 'Barton Springs gate',
+      startsAt: Date.now() + 3 * 86400000, cadence: 'weekly', hours: 2,
+      plan: 'Cycling from home at half eight'
+    });
+    eq(r.status, 201, 'a dated proposal is accepted');
+    eq(r.data.cadence, 'weekly', 'and can repeat');
+    const mid = (await kit('GET', '/api/circles/' + cid)).data.meetups[0].id;
+    await lou('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes', plan: 'Bus down South Lamar at nine' });
+
+    r = await kit('GET', '/api/circles/' + cid);
+    eq(r.data.meetups[0].status, 'on', 'quorum confirms it');
+    eq(r.data.circle.drift.stage, 'planned', 'and the clock stops while something is in the diary');
+    eq((await lou('POST', '/api/circles/' + cid + '/prompt')).status, 201,
+       'with a plan booked, prompts are fine again');
+
+    // ---- a recurring meetup rolls itself forward ----
+    const was = store.meetupById(mid).starts_at;
+    store.db.prepare('UPDATE meetups SET starts_at = ? WHERE id = ?')
+      .run(Date.now() - 2 * 86400000, mid);
+    r = await kit('GET', '/api/circles/' + cid);
+    eq(r.data.occurrences.length, 1, 'once its time passes it is filed in the ledger');
+    eq(r.data.meetups.length, 1, 'and the series is still live');
+    ok(r.data.meetups[0].startsAt > Date.now(), 'rolled on to its next date');
+    eq(r.data.meetups[0].yes, 0, 'with the RSVPs cleared — you say yes to each one');
+    eq(r.data.circle.met, 1, 'the circle has met once');
+    ok(r.data.circle.drift.metBefore, 'which the clock now measures from');
+    ok(was > 0, 'the original date was real');
+
+    // ---- hours are banked by turning up, not by saying you would ----
+    eq(r.data.circle.hours.mine.hours, 0, 'an RSVP alone banks nothing');
+    eq(r.data.confirm.length, 1, 'everyone is asked whether they were actually there');
+    const occ = r.data.confirm[0].id;
+
+    eq((await client()('POST', '/api/occurrences/' + occ + '/attended', { attended: true })).status, 401,
+       'a stranger cannot log attendance');
+    r = await kit('POST', '/api/occurrences/' + occ + '/attended', { attended: true });
+    eq(r.status, 200, 'a member can say they were there');
+    eq(r.data.hours.hours, 2, 'which banks the hours');
+    eq(r.data.circleHours, 0, 'but one person turning up is not the circle meeting');
+
+    await lou('POST', '/api/occurrences/' + occ + '/attended', { attended: true });
+    await max('POST', '/api/occurrences/' + occ + '/attended', { attended: false });
+    r = await kit('GET', '/api/circles/' + cid);
+    eq(r.data.circle.hours.circle, 2, 'two people confirming makes it the circle’s hours');
+    eq(r.data.confirm.length, 0, 'and the question stops being asked');
+    eq(r.data.members.filter((m) => m.display === 'Max')[0].hours, 0,
+       'someone who missed it banks nothing');
+    eq(r.data.circle.hours.mine.next.hours, 50, 'two hours of fifty');
+
+    // ---- a one-off finishes rather than repeating ----
+    r = await lou('POST', '/api/circles/' + cid + '/meetups', {
+      title: 'One-off gallery thing', place: 'Blanton steps',
+      startsAt: Date.now() + 86400000, cadence: '', hours: 1,
+      plan: 'Straight there after work'
+    });
+    const oneOff = r.data.id;
+    await kit('POST', '/api/meetups/' + oneOff + '/rsvp', { answer: 'yes', plan: 'Walking over from campus' });
+    store.db.prepare('UPDATE meetups SET starts_at = ? WHERE id = ?')
+      .run(Date.now() - 86400000, oneOff);
+    r = await kit('GET', '/api/circles/' + cid);
+    eq(store.meetupById(oneOff).status, 'done', 'a one-off is done once it has happened');
+    ok(!r.data.meetups.some((k) => k.id === oneOff), 'and drops out of the live list');
+    eq(r.data.occurrences.length, 2, 'while staying in the history');
+  });
+
+  await group('circles: bonds, escalating questions and if-then plans', async () => {
+    const BIO = 'I have lived in four cities and learned that the second year is the one where you either know people or do not.';
+    const INT = [{ id: 'books' }, { id: 'music' }, { id: 'tech' }];
+    const crew = {};
+    for (const [short, username] of Object.entries({ nia: 'niac', oli: 'olic', pip: 'pipc', qui: 'quic' })) {
+      const c = client();
+      await c('POST', '/api/signup', {
+        username, password: 'hunter2hunter', display: short[0].toUpperCase() + short.slice(1),
+        city: 'Seattle', bio: BIO, ageOk: true, interests: INT
+      });
+      await verifyEmail(c, username + '@example.com');
+      crew[short] = c;
+    }
+    const { nia, oli, pip, qui } = crew;
+
+    // Somebody in another city, to check the doors from outside.
+    const outsider = client();
+    await outsider('POST', '/api/signup', {
+      username: 'outsidr', password: 'hunter2hunter', display: 'Outsidr',
+      city: 'Tucson', bio: BIO, ageOk: true, interests: INT
+    });
+    await verifyEmail(outsider, 'outsidr@example.com');
+
+    let r = await nia('POST', '/api/circles', {
+      name: 'Records and reading', city: 'Seattle', blurb: BIO,
+      question: 'What is on your turntable or your bedside table at the moment?',
+      interests: ['books', 'music'], cap: 6
+    });
+    const cid = r.data.circle.id;
+
+    for (const [who, answer] of [[oli, 'Mostly secondhand jazz records and a pile of library books I renew instead of reading. Would like people to go rummaging with.'],
+                                 [pip, 'I run out of things to say at parties but could talk about a record sleeve for an hour. Looking for the second kind of evening.'],
+                                 [qui, 'New to the city in August, know precisely two people, and both of them are colleagues. That is the whole situation.']]) {
+      await who('POST', '/api/circles/' + cid + '/apply', { answer });
+      const app = (await nia('GET', '/api/circles/' + cid)).data.applications[0];
+      await nia('POST', `/api/circles/${cid}/applications/${app.id}/approve`);
+    }
+    // Three of the four talk. Qui joins and says nothing, which is what makes
+    // them the test case for the side-thread gate.
+    for (let i = 0; i < 7; i++) {
+      await nia('POST', '/api/circles/' + cid + '/messages', { body: 'Nia ' + i });
+      await oli('POST', '/api/circles/' + cid + '/messages', { body: 'Oli ' + i });
+      await pip('POST', '/api/circles/' + cid + '/messages', { body: 'Pip ' + i });
+    }
+
+    // ---- questions that get harder as the circle earns them ----
+    // Aron et al. (1997): the escalation is the mechanism. Reis & Shaver: an
+    // unanswered question is not disclosure, so it buys nothing.
+    const SETS = globalThis.FYC.PROMPT_SETS;
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.circle.disclosure.depth, 1, 'a circle starts on the easy questions');
+    eq(r.data.circle.disclosure.label, 'Easy', 'and is told which set that is');
+    eq(r.data.circle.disclosure.needed, 2, 'two answered questions open the next one');
+    eq(r.data.circle.disclosure.answeredBy, 2, 'answered meaning two or more people replied');
+
+    // Twelve hours between prompts is real, so the clock is wound back rather
+    // than switched off.
+    const agePrompts = () => store.db.prepare(
+      `UPDATE circle_messages SET created_at = created_at - ? WHERE circle_id = ? AND kind = 'prompt'`
+    ).run(13 * 3600000, cid);
+
+    async function ask(repliers) {
+      const p = await nia('POST', '/api/circles/' + cid + '/prompt');
+      agePrompts();
+      for (const who of repliers) {
+        await who('POST', '/api/circles/' + cid + '/messages', { body: 'My answer to that one, at some length.' });
+      }
+      return p;
+    }
+
+    let p = await ask([oli, pip]);
+    eq(p.status, 201, 'anyone can put a question to the circle');
+    ok(SETS[0].prompts.indexOf(p.data.body) !== -1, 'drawn from the set the circle is on');
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.circle.disclosure.answered, 1, 'an answered question counts towards the next set');
+    eq(r.data.circle.disclosure.depth, 1, 'but one is not two');
+
+    p = await ask([oli]);
+    ok(SETS[0].prompts.indexOf(p.data.body) !== -1, 'still the easy set');
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.circle.disclosure.answered, 1, 'a question only one person answered does not count');
+
+    p = await ask([oli, pip]);
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.circle.disclosure.depth, 2, 'two answered questions open the personal set');
+    eq(r.data.circle.disclosure.label, 'Personal', 'which is what it is called');
+
+    p = await nia('POST', '/api/circles/' + cid + '/prompt');
+    agePrompts();
+    ok(SETS[1].prompts.indexOf(p.data.body) !== -1, 'and the next question comes from it');
+    eq(p.data.disclosure.depth, 2, 'the answer says which set it came from');
+    eq((await outsider('GET', '/api/circles/' + cid)).data.circle.disclosure, null,
+       'a stranger is not shown how far in the circle has got');
+
+    // ---- somebody answered and nobody replied ----
+    await pip('POST', '/api/circles/' + cid + '/messages', { body: 'Honestly? The thing I am worst at is asking people twice.' });
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.circle.respond.display, 'Pip', 'the rest of the circle is told that somebody is hanging');
+    eq((await pip('GET', '/api/circles/' + cid)).data.circle.respond, null,
+       'and the person who answered is never told that nobody replied');
+    await oli('POST', '/api/circles/' + cid + '/messages', { body: 'Same, and it is the only thing that has ever worked for me.' });
+    eq((await nia('GET', '/api/circles/' + cid)).data.circle.respond, null, 'a reply clears it');
+
+    // ---- what any two of you have in common, and a door to one person ----
+    // Ren, Kraut & Kiesler (2007): bond-based attachment needs individuals,
+    // not just a shared subject.
+    r = await nia('GET', '/api/circles/' + cid);
+    const row = (name) => r.data.members.filter((p2) => p2.display === name)[0];
+    eq(row('Oli').shared.length, 3, 'the member list says what the two of you both picked');
+    eq(row('Nia').shared.length, 0, 'and does not do it for you and yourself');
+    eq(row('Oli').canMessage, true, 'two people who have both spoken here can talk one to one');
+    eq(row('Qui').canMessage, false, 'not with someone who has said nothing yet');
+    ok(/said something/.test(row('Qui').whyNot), 'and it says why');
+
+    const oliId = row('Oli').id, quiId = row('Qui').id, niaId = row('Nia').id;
+    eq((await nia('POST', '/api/circles/' + cid + '/threads',
+      { userId: quiId, body: 'You have not said anything but hello, so this is a cold approach.' })).status, 403,
+      'the server enforces that, not just the UI');
+    eq((await outsider('POST', '/api/circles/' + cid + '/threads',
+      { userId: oliId, body: 'Butting in from another city entirely, hello there.' })).status, 403,
+      'and an outsider cannot use the door at all');
+    eq((await nia('POST', '/api/circles/' + cid + '/threads', { userId: oliId, body: 'hi' })).status, 400,
+       'a one-word opener is refused, same as everywhere else');
+
+    r = await nia('POST', '/api/circles/' + cid + '/threads',
+      { userId: oliId, body: 'That record shop you mentioned — which one was it? I am out that way on Saturday.' });
+    eq(r.status, 201, 'you can start a thread with someone you have actually talked to here');
+    const inbox = (await oli('GET', '/api/threads')).data.threads;
+    ok(inbox.some((t) => t.other_name === 'Nia'), 'it lands in Messages like any other conversation');
+    eq((await oli('GET', '/api/requests')).data.incoming.length, 0,
+       'with nothing to accept — you are already in a circle together');
+
+    // A hidden interest stays hidden, even from people in your own circle.
+    await pip('PATCH', '/api/me', {
+      city: 'Seattle', bio: BIO,
+      interests: [{ id: 'books' }, { id: 'music', visible: false }, { id: 'tech' }]
+    });
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.members.filter((p2) => p2.display === 'Pip')[0].shared.length, 2,
+       'a hidden interest is not exposed by the overlap line');
+
+    // Blocking closes the door again, as it does everywhere.
+    await oli('POST', '/api/blocks', { userId: niaId });
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.members.filter((p2) => p2.display === 'Oli')[0].canMessage, false,
+       'a block beats being in the same circle');
+    await oli('DELETE', '/api/blocks/' + niaId);
+
+    // ---- the plan behind a yes ----
+    // Gollwitzer & Sheeran (2006): naming when, where and how is most of the
+    // difference between intending and doing.
+    const proposal = {
+      title: 'Record shop crawl and a coffee', place: 'Easy Street Records, Queen Anne',
+      startsAt: Date.now() + 4 * 86400000, cadence: 'fortnightly', hours: 3
+    };
+    r = await nia('POST', '/api/circles/' + cid + '/meetups', proposal);
+    eq(r.status, 400, 'a proposal with no plan for getting there is refused');
+    ok(/setting off from/.test(r.data.error), 'and is told what is wanted');
+
+    r = await nia('POST', '/api/circles/' + cid + '/meetups',
+      Object.assign({ plan: 'Walking down from Capitol Hill at eleven' }, proposal));
+    eq(r.status, 201, 'with a plan it goes up — proposing is a yes, and a yes carries one');
+    const mid = r.data.id;
+
+    eq((await oli('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes' })).status, 400,
+       'a yes with no plan is refused too');
+    eq((await oli('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'yes', plan: 'soon' })).status, 400,
+       'and so is a one-word one');
+    eq((await oli('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'maybe' })).status, 200,
+       'a maybe promises nothing, so it is asked for nothing');
+    eq((await oli('POST', '/api/meetups/' + mid + '/rsvp', { answer: 'no' })).status, 200,
+       'nor is a no');
+    r = await oli('POST', '/api/meetups/' + mid + '/rsvp',
+      { answer: 'yes', plan: 'The 13 bus from Broadway, quarter to eleven' });
+    eq(r.status, 200, 'a yes with a real plan counts');
+    eq(r.data.status, 'on', 'and at quorum it becomes a plan for everyone');
+
+    r = await oli('GET', '/api/circles/' + cid);
+    eq(r.data.meetups[0].myPlan, 'The 13 bus from Broadway, quarter to eleven',
+       'your own plan is shown back to you, which is the half that makes it work');
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.meetups[0].myPlan, 'Walking down from Capitol Hill at eleven',
+       'everyone sees their own');
+    ok(JSON.stringify(r.data.meetups[0]).indexOf('13 bus') === -1, 'and nobody else\'s');
+
+    // Each occasion needs its own cue, so a roll takes the plan with the RSVP.
+    store.db.prepare('UPDATE meetups SET starts_at = ? WHERE id = ?')
+      .run(Date.now() - 4 * 3600000, mid);
+    r = await nia('GET', '/api/circles/' + cid);
+    eq(r.data.meetups[0].myPlan, '', 'when the series rolls on, the plan rolls off with the RSVP');
+    eq(r.data.meetups[0].yes, 0, 'so the next date is planned for on its own terms');
+  });
+
+  await group('circles: turn-taking, the quiet, and what a circle is for', async () => {
+    const BIO = 'Moved here for a job and stayed for the hills. Good at starting things, historically bad at keeping them going.';
+    const INT = [{ id: 'outdoors' }, { id: 'food' }, { id: 'games' }];
+    const crew = {};
+    for (const [short, username] of Object.entries({
+      ada: 'adad', ben: 'bend', cal: 'cald', dee: 'deed', eve: 'eved', fay: 'fayd'
+    })) {
+      const c = client();
+      await c('POST', '/api/signup', {
+        username, password: 'hunter2hunter', display: short[0].toUpperCase() + short.slice(1),
+        city: 'Portland', bio: BIO, ageOk: true, interests: INT
+      });
+      await verifyEmail(c, username + '@example.com');
+      crew[short] = c;
+    }
+    const { ada, ben, cal, dee, eve, fay } = crew;
+
+    // ---- the cap came down ----
+    // Fay, Garrod & Carletta (2000): a discussion in a group of five stays a
+    // dialogue; the same discussion in a group of ten becomes serial
+    // monologue. Eight is the ceiling now, and asking for twelve gets eight.
+    let r = await ada('POST', '/api/circles', {
+      name: 'Hills and dinner, Southeast', city: 'Portland', blurb: BIO,
+      question: 'What is the last walk you did that you would do again?',
+      interests: ['outdoors', 'food'], cap: 12
+    });
+    const cid = r.data.circle.id;
+    eq(r.data.circle.cap, 8, 'a circle cannot be built for twelve people any more');
+    eq((await ada('GET', '/api/circles')).data.capRange.max, 8, 'and the ceiling is published');
+    eq((await ada('GET', '/api/circles')).data.capRange.default, 6, 'with six the default');
+
+    for (const who of [ben, cal, dee, eve, fay]) {
+      await who('POST', '/api/circles/' + cid + '/apply', {
+        answer: 'The Wildwood from the zoo end, in the rain, which is the only way I have ever done it. Would like company next time.'
+      });
+      const app = (await ada('GET', '/api/circles/' + cid)).data.applications[0];
+      await ada('POST', `/api/circles/${cid}/applications/${app.id}/approve`);
+    }
+    eq((await ada('GET', '/api/circles/' + cid)).data.circle.members, 6, 'six people in it');
+
+    // ---- turn-taking equality ----
+    // Woolley et al. (2010): collective intelligence tracked the equality of
+    // conversational turn-taking, not the brilliance of the members. One
+    // person writing the whole thing is a broadcast, and the old gate let it
+    // through.
+    const gate = async (who) => (await who('GET', '/api/circles/' + cid)).data.circle.readiness;
+    const check = (rd, id) => rd.checks.filter((c) => c.id === id)[0];
+
+    for (let i = 0; i < 22; i++) {
+      await ada('POST', '/api/circles/' + cid + '/messages', { body: 'Ada again, message ' + i });
+    }
+    let rd = await gate(ada);
+    eq(rd.of, 5, 'the gate has five parts now');
+    eq(check(rd, 'messages').have >= 20, true, 'twenty messages are there');
+    eq(check(rd, 'speakers').need, 4, 'and four of six people have to be talking');
+    eq(check(rd, 'balance').have, 100, 'one voice is all of it');
+    eq(check(rd, 'balance').max, 50, 'where half is the most anyone may be');
+    eq(rd.ready, false, 'so twenty-two messages from one person is not a conversation');
+
+    // Three people talking is still not four of six.
+    for (const who of [ben, cal]) {
+      await who('POST', '/api/circles/' + cid + '/messages', { body: 'Agreed, broadly.' });
+    }
+    rd = await gate(ada);
+    eq(check(rd, 'speakers').have, 3, 'three of them have spoken');
+    eq(rd.ready, false, 'which in a circle of six is still an audience');
+
+    await dee('POST', '/api/circles/' + cid + '/messages', { body: 'Me too, for what it is worth.' });
+    rd = await gate(ada);
+    ok(check(rd, 'speakers').have >= check(rd, 'speakers').need, 'four of six are talking');
+    eq(rd.ready, false, 'and it is the share, on its own, still holding the gate shut');
+    eq(rd.done, 4, 'four of the five parts met');
+    eq(check(rd, 'balance').have > 50, true, 'because one person is still most of it');
+
+    // Now everyone else talks enough that nobody is more than half.
+    for (let i = 0; i < 6; i++) {
+      for (const who of [ben, cal, dee, eve]) {
+        await who('POST', '/api/circles/' + cid + '/messages', { body: 'Something of my own to add, number ' + i });
+      }
+    }
+    rd = await gate(ada);
+    ok(check(rd, 'balance').have <= 50, 'nobody is more than half the conversation');
+    eq(rd.ready, true, 'and now the circle can plan something');
+
+    // ---- the question gets handed to whoever has gone quiet ----
+    // Preece, Nonnecke & Andrews (2004): people who read without posting
+    // mostly have not been asked anything. Fay is in this circle and has
+    // never said a word, which is exactly the case.
+    const backdate = (hours) => {
+      store.db.prepare('UPDATE circle_members SET joined_at = joined_at - ? WHERE circle_id = ?')
+        .run(hours * 3600000, cid);
+      store.db.prepare(`UPDATE circle_messages SET created_at = created_at - ? WHERE circle_id = ?`)
+        .run(hours * 3600000, cid);
+    };
+    const agePrompts = () => store.db.prepare(
+      `UPDATE circle_messages SET created_at = created_at - ? WHERE circle_id = ? AND kind = 'prompt'`
+    ).run(13 * 3600000, cid);
+
+    backdate(72);
+    // Eve speaks now, so she is not quiet; Fay has still never spoken.
+    await eve('POST', '/api/circles/' + cid + '/messages', { body: 'Still here, still reading.' });
+
+    let p = await ada('POST', '/api/circles/' + cid + '/prompt');
+    eq(p.status, 201, 'a question goes up');
+    ok(p.data.invited.indexOf('Fay') !== -1, 'and it is handed to the person who has never spoken');
+    eq(p.data.invited.indexOf('Eve'), -1, 'not to someone who spoke a minute ago');
+    eq(p.data.invited.indexOf('Ada'), -1, 'and never to whoever pressed the button');
+    ok(p.data.invited.length <= 2, 'two at the most: a spotlight on everyone is a roll call');
+    const firstInvited = p.data.invited.slice();
+
+    r = await fay('GET', '/api/circles/' + cid + '/messages');
+    const asked = r.data.messages.filter((m) => m.kind === 'prompt').slice(-1)[0];
+    ok(Array.isArray(asked.invited), 'the question carries who it was for');
+    ok(asked.invited.some((x) => x.display === 'Fay'), 'by name, so the UI never has to guess');
+    ok(asked.invites === undefined, 'and the raw id list does not leave the server');
+
+    agePrompts();
+    p = await ada('POST', '/api/circles/' + cid + '/prompt');
+    firstInvited.forEach((name) => {
+      eq(p.data.invited.indexOf(name), -1, name + ' is not asked twice running');
+    });
+
+    // ---- what the circle says it is ----
+    // Lickel et al. (2000): shared goals are part of what makes a set of
+    // people read as a group. Postmes et al. (2005): the members have to have
+    // written it themselves.
+    const LINE = 'Somebody to walk with on a Sunday who does not mind the rain.';
+    eq((await ada('POST', '/api/circles/' + cid + '/wants', { wants: 'eh' })).status, 400,
+       'a line has to be a line');
+    eq((await ada('POST', '/api/circles/' + cid + '/wants', { wants: LINE })).status, 200,
+       'and then it is yours');
+    r = await ben('GET', '/api/circles/' + cid);
+    eq(r.data.members.filter((m) => m.display === 'Ada')[0].wants, LINE,
+       'the rest of the circle can read it');
+    eq(r.data.wants.maxChars, 140, 'one line, and the limit says so');
+
+    await ben('POST', '/api/circles/' + cid + '/wants', { wants: 'x'.repeat(300) });
+    eq((await ben('GET', '/api/circles/' + cid)).data.members
+      .filter((m) => m.display === 'Ben')[0].wants.length, 140, 'anything longer is cut to length');
+    await ben('POST', '/api/circles/' + cid + '/wants', { wants: '' });
+    eq((await ben('GET', '/api/circles/' + cid)).data.members
+      .filter((m) => m.display === 'Ben')[0].wants, '', 'and taking it down needs no explanation');
+
+    const outsider = client();
+    await outsider('POST', '/api/signup', {
+      username: 'nonmembr', password: 'hunter2hunter', display: 'Nonmembr',
+      city: 'Portland', bio: BIO, ageOk: true, interests: INT
+    });
+    await verifyEmail(outsider, 'nonmembr@example.com');
+    eq((await outsider('POST', '/api/circles/' + cid + '/wants', { wants: LINE })).status, 403,
+       'somebody outside the circle cannot write what it is for');
+    eq((await outsider('GET', '/api/circles/' + cid)).data.circle.story, null,
+       'and cannot read it either');
+
+    r = await ada('GET', '/api/circles/' + cid);
+    ok(r.data.circle.story.since > 0, 'the circle knows how long it has been going');
+    ok(r.data.circle.story.days >= 1, 'and across how many days it has talked');
+    eq(r.data.circle.story.occurrences, 0, 'nothing has happened in person yet');
+    eq(r.data.circle.story.regulars.length, 0, 'so nobody is a regular');
+    const listed = await ada('GET', '/api/circles');
+    eq(listed.data.mine.concat(listed.data.circles).filter((x) => x.id === cid)[0].story, null,
+       'and a list of sixty circles does not pay for any of it');
+
+    // Who has been at every single one, which is the half of a shared history
+    // that cannot be faced out of.
+    const ids = {};
+    r.data.members.forEach((m) => { ids[m.display] = m.id; });
+    const prop = await ada('POST', '/api/circles/' + cid + '/meetups', {
+      title: 'Wildwood from the zoo end', place: 'Washington Park, by the station',
+      startsAt: Date.now() + 5 * 86400000, details: 'Three hours, out and back, rain regardless.',
+      hours: 3, plan: 'Taking the MAX to Washington Park for half nine'
+    });
+    eq(prop.status, 201, 'a ready circle can propose something');
+    const occ = store.db.prepare(`INSERT INTO meetup_occurrences
+      (meetup_id, circle_id, title, starts_at, hours, created_at) VALUES (?, ?, ?, ?, 2, ?)`);
+    const bind = (title, at) => occ.run(prop.data.id, cid, title, at, Date.now());
+    const o1 = Number(bind('A walk', Date.now() - 86400000).lastInsertRowid);
+    eq(store.regulars(cid).names.length, 0, 'one occasion is not a habit');
+    const o2 = Number(bind('Another walk', Date.now() - 3600000).lastInsertRowid);
+    [o1, o2].forEach((o) => {
+      store.setAttendance(o, ids.Ada, true);
+      store.setAttendance(o, ids.Ben, true);
+    });
+    store.setAttendance(o2, ids.Cal, true);
+    const reg = store.regulars(cid);
+    eq(reg.total, 2, 'two occasions on the record');
+    eq(reg.names.join(','), 'Ada,Ben', 'and the two who were at both of them');
+    ok(reg.names.indexOf('Cal') === -1, 'turning up once is not turning up every time');
+
+    // ---- the old ceiling comes down without throwing anyone out ----
+    store.db.prepare('UPDATE circles SET cap = 12 WHERE id = ?').run(cid);
+    store.lowerCaps(8);
+    eq(store.circleById(cid).cap, 8, 'a circle built for twelve comes down to eight');
+    store.lowerCaps(4);
+    eq(store.circleById(cid).cap, 6, 'but never below the people already in it');
+    store.db.prepare('UPDATE circles SET cap = 8 WHERE id = ?').run(cid);
+  });
+
+  await group('production readiness', async () => {
+    const r = await fetch(base + '/api/health');
+    eq(r.status, 200, 'health check answers');
+    const h = await r.json();
+    eq(h.status, 'ok', 'and reports healthy');
+    eq(h.db, 'ok', 'having actually queried the database');
+    ok(typeof h.uptime === 'number', 'with an uptime');
+
+    // Security headers on every response, page and API alike.
+    for (const p of ['/', '/api/health']) {
+      const res = await fetch(base + p);
+      eq(res.headers.get('x-content-type-options'), 'nosniff', `nosniff on ${p}`);
+      eq(res.headers.get('x-frame-options'), 'DENY', `framing denied on ${p}`);
+      ok((res.headers.get('content-security-policy') || '').includes("default-src 'self'"),
+         `content security policy on ${p}`);
+      ok((res.headers.get('content-security-policy') || '').includes("frame-ancestors 'none'"),
+         `frame-ancestors on ${p}`);
+    }
+    // HSTS only over TLS; sending it on plain http would be wrong.
+    eq((await fetch(base + '/')).headers.get('strict-transport-security'), null,
+       'no HSTS when not running behind TLS');
+
+    // Caching: the page must revalidate or a deploy never lands; assets may cache.
+    eq((await fetch(base + '/')).headers.get('cache-control'), 'no-cache', 'the page revalidates');
+    ok((await fetch(base + '/assets/styles.css')).headers.get('cache-control').includes('max-age'),
+       'assets are cacheable');
+    eq((await fetch(base + '/api/me')).headers.get('cache-control'), 'no-store', 'API responses are never cached');
+
+    // The public, non-app files a deployment needs.
+    for (const p of ['/privacy.html', '/terms.html', '/robots.txt', '/site.webmanifest',
+                     '/sitemap.xml', '/sw.js']) {
+      eq((await fetch(base + p)).status, 200, `serves ${p}`);
+    }
+    ok((await (await fetch(base + '/robots.txt')).text()).includes('Disallow: /api/'),
+       'robots keeps crawlers out of the API');
+
+    // The worker decides where every other file comes from, so a stale copy
+    // of it outlives a deploy by whatever it had cached. It is the one asset
+    // that must be revalidated every time, like the page itself.
+    const sw = await fetch(base + '/sw.js');
+    eq(sw.headers.get('cache-control'), 'no-cache', 'the worker is never held');
+    ok(sw.headers.get('content-type').includes('javascript'), 'and is served as a script');
+    ok((await sw.text()).includes('fyc-shell-'), 'and is the worker, not a stray file');
+
+    // Suspension has to end access, not just hide the profile.
+    const victim = client();
+    await victim('POST', '/api/signup', { username: 'badactor', password: 'hunter2hunter', city: 'Boston', ageOk: true, interests: [{ id: 'outdoors' }] });
+    eq((await victim('GET', '/api/me')).data.user.username, 'badactor', 'signed in before suspension');
+    const row = store.userByName('badactor');
+    store.setSuspended(row.id, true);
+    eq((await victim('GET', '/api/me')).data.user, null, 'a suspended account is signed out immediately');
+    eq((await victim('GET', '/api/people')).status, 401, 'and cannot use the API');
+    const seenBy = (await ava('GET', '/api/people')).data.people.map((p) => p.display);
+    ok(seenBy.indexOf('badactor') === -1, 'and disappears from discovery');
+    store.setSuspended(row.id, false);
+  });
+
   await group('static files and safety of the server itself', async () => {
     const r = await fetch(base + '/');
     eq(r.status, 200, 'the app itself is served');
@@ -319,6 +1116,18 @@ async function verifyEmail(call, email) {
 
     eq((await fetch(base + '/assets/styles.css')).status, 200, 'the stylesheet is served');
     eq((await fetch(base + '/src/match.js')).status, 200, 'front-end scripts are served');
+
+    // Assets are cached for five minutes with must-revalidate, which needs a
+    // validator to revalidate against. Without one a deploy handed people the
+    // new page driving the old scripts.
+    const asset = await fetch(base + '/src/match.js');
+    const tag = asset.headers.get('etag');
+    ok(!!tag, 'a static asset carries an ETag (' + tag + ')');
+    const again = await fetch(base + '/src/match.js', { headers: { 'If-None-Match': tag } });
+    eq(again.status, 304, 'and a conditional GET is answered with a 304');
+    eq(again.headers.get('etag'), tag, 'the 304 repeats the tag');
+    const changed = await fetch(base + '/src/match.js', { headers: { 'If-None-Match': '"nonsense"' } });
+    eq(changed.status, 200, 'a stale tag gets the file');
 
     // Only the front end is public. Everything else in the repo stays private,
     // whether or not it exists today.
@@ -350,6 +1159,435 @@ async function verifyEmail(call, email) {
     eq(cross.status, 403, 'cross-origin writes are refused');
   });
 
+  await group('the data layer: atomic writes, real indexes, and what gets kept', async () => {
+    const { DatabaseSync } = require('node:sqlite');
+    const { open, createStore, SCHEMA } = require(path.join(__dirname, '..', 'server', 'db.js'));
+
+    // --- the pragmas every connection gets ---------------------------------
+    // WAL lets a reader and a writer work at once, but tools/backup.js runs
+    // VACUUM INTO against the live file: without a busy timeout a write in
+    // that window failed outright rather than waiting it out.
+    eq(store.db.prepare('PRAGMA busy_timeout').get().timeout, 5000, 'a writer waits for the lock');
+    eq(store.db.prepare('PRAGMA journal_mode').get().journal_mode, 'wal', 'still WAL');
+    eq(store.db.prepare('PRAGMA foreign_keys').get().foreign_keys, 1, 'with foreign keys on');
+    // FULL costs an fsync per write (measured 346µs an insert against 105µs).
+    // NORMAL is what SQLite recommends with WAL and is still safe against the
+    // application crashing; the exposure is a power cut, not a bug.
+    eq(store.db.prepare('PRAGMA synchronous').get().synchronous, 1, 'and NORMAL, as WAL wants');
+
+    // --- writes that touch more than one table -----------------------------
+    // setInterests clears every row then inserts the replacements. Without a
+    // transaction a failure between the two does not leave the old value, it
+    // leaves nothing — and a duplicate in the list is enough to cause one.
+    const solo = createStore(open(':memory:'));
+    const uid = Number(solo.createUser({ username: 'tess', display: 'Tess', pass: 'x', salt: 'y', city: 'Denver', ageOk: 1 }));
+    solo.setInterests(uid, [{ id: 'outdoors' }, { id: 'books' }]);
+    const before = solo.interestsOf(uid).map((r) => r.interest).sort().join(',');
+    eq(before, 'books,outdoors', 'interests are set');
+    let threw = false;
+    try { solo.setInterests(uid, [{ id: 'music' }, { id: 'music' }]); } catch (e) { threw = true; }
+    ok(threw, 'a duplicate in the replacement list fails the write');
+    eq(solo.interestsOf(uid).map((r) => r.interest).sort().join(','), before,
+       'and the interests that were there are still there');
+
+    // createCircle writes the circle, its interests and its host separately.
+    const host = Number(solo.createUser({ username: 'hugo', display: 'Hugo', pass: 'x', salt: 'y', city: 'Denver', ageOk: 1 }));
+    const cid = solo.createCircle({ name: 'Walks', city: 'Denver', blurb: 'b', question: 'q',
+                                    hostId: host, cap: 6, minTrust: 'introduced', interests: ['outdoors'] });
+    eq(solo.circleMembers(cid).length, 1, 'a new circle has its host in it');
+    eq(solo.circleInterests(cid).join(','), 'outdoors', 'and what it is about');
+
+    // --- the indexes ------------------------------------------------------
+    // Asking "who has written to me" is what every signed-in client asks
+    // every thirty seconds, and the UNIQUE(from_id, to_id) covers from_id
+    // only, so that one scanned the whole table.
+    const probe = new DatabaseSync(':memory:');
+    probe.exec(SCHEMA);
+    const plan = (sql) => probe.prepare('EXPLAIN QUERY PLAN ' + sql).all().map((r) => r.detail).join(' ; ');
+    const indexed = (sql, name) => ok(!/SCAN (?!.*USING (COVERING )?INDEX)/.test(plan(sql)) && /USING .*INDEX/.test(plan(sql)), name);
+    indexed("SELECT * FROM connections WHERE to_id = ? AND status = 'pending'", 'incoming requests use an index');
+    indexed('SELECT * FROM circle_applications WHERE user_id = ?', 'and a member’s own applications');
+    indexed('SELECT COUNT(*) FROM vouches WHERE to_id = ?', 'and the vouches counted per member');
+    // prune() runs hourly and scanned every table it cleaned; actions is the
+    // largest of them, one row per rate-limited action.
+    indexed('DELETE FROM actions WHERE at < ?', 'pruning actions uses an index');
+    indexed('DELETE FROM sessions WHERE expires_at < ?', 'and expired sessions');
+    indexed('DELETE FROM verifications WHERE expires_at < ?', 'and expired verifications');
+    indexed('DELETE FROM verifications WHERE used_at IS NOT NULL', 'and spent ones, split out of the OR');
+    probe.close();
+
+    // --- what prune() clears ----------------------------------------------
+    // One verification row per address confirmed, single-use, short-lived,
+    // and holding the email. They were never deleted.
+    const keeper = createStore(open(':memory:'));
+    const vu = Number(keeper.createUser({ username: 'vera', display: 'Vera', pass: 'x', salt: 'y', city: 'Denver', ageOk: 1 }));
+    const tok = 'tok-' + vu;
+    keeper.createVerification(tok, vu, 'vera@example.com', 24 * 3600 * 1000);
+    eq(keeper.db.prepare('SELECT COUNT(*) AS n FROM verifications').get().n, 1, 'and stored with the address');
+    keeper.useVerification(tok);
+    keeper.prune();
+    eq(keeper.db.prepare('SELECT COUNT(*) AS n FROM verifications').get().n, 0,
+       'a spent token, and the address with it, does not outlive its use');
+
+    // --- a conversation opens at its end ----------------------------------
+    // The 300 cap was always here, but `id > 0 ORDER BY id ASC` meant the
+    // first load of a long thread returned the three hundred oldest, and the
+    // five-second poll then walked forwards to today.
+    const chat = createStore(open(':memory:'));
+    const a = Number(chat.createUser({ username: 'ann', display: 'Ann', pass: 'x', salt: 'y', city: 'X', ageOk: 1 }));
+    const b = Number(chat.createUser({ username: 'bo', display: 'Bo', pass: 'x', salt: 'y', city: 'X', ageOk: 1 }));
+    const conn = chat.createRequest(a, b, 'hello there, this is an introduction');
+    chat.decideRequest(conn, b, 'accepted');
+    for (let i = 1; i <= 350; i++) chat.addMessage(conn, a, 'message ' + i);
+    const first = chat.messages(conn, 0);
+    eq(first.length, 300, 'a long thread still answers with at most 300');
+    eq(first[first.length - 1].body, 'message 350', 'and the last of them is the newest');
+    eq(first[0].body, 'message 51', 'so the window sits at the end, not the start');
+    ok(first[0].id < first[1].id, 'still oldest-first within the page');
+    const rest = chat.messages(conn, first[first.length - 1].id);
+    eq(rest.length, 0, 'and catching up from there has nothing to add');
+  });
+
+  await group('an error at our end is not the caller’s fault', async () => {
+    // This used to be fail(res, 400, err.message) for everything thrown,
+    // which got two things wrong: a fault here is not a bad request, and
+    // err.message on an internal error is our own text — a column name, a
+    // path, the SQL that failed.
+    // Signed in, so the request reaches the handler rather than stopping at
+    // the auth check.
+    const who = client();
+    await who('POST', '/api/signup', { username: 'erra', password: 'hunter2hunter', city: 'Denver',
+                                       ageOk: true, interests: [{ id: 'outdoors' }] });
+    const real = store.circleById;
+    store.circleById = () => { throw new Error('SQLITE_ERROR: no such column: secret_internal_detail'); };
+    const r = await who('GET', '/api/circles/1');
+    store.circleById = real;
+
+    eq(r.status, 500, 'an internal fault answers 500, not 400');
+    ok(!/secret_internal_detail/.test(JSON.stringify(r.data)), 'and does not hand the caller our error text');
+    ok(/wrong at our end/i.test((r.data && r.data.error) || ''), 'it says whose fault it is');
+
+    // The ones we raise deliberately still say what is wrong.
+    const bad = await fetch(base + '/api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{not json'
+    });
+    eq(bad.status, 400, 'malformed JSON is still the caller’s problem');
+    ok(/invalid JSON/.test((await bad.json()).error || ''), 'and still says so');
+  });
+
+  await group('the body on the wire, and who sent it', async () => {
+    const net = require('node:net');
+
+    /** Send a request as raw bytes, cut wherever asked — the way TCP, a TLS
+     *  record boundary or a proxy cuts one.
+     *
+     *  The pause between the pieces is the whole point. Written back to back
+     *  they go out in one segment and arrive as one chunk, which is how the
+     *  first version of this test passed against the bug it was written for. */
+    function raw(method, url, bytes, cuts, cookie) {
+      return new Promise((resolve, reject) => {
+        const port = server.address().port;
+        const sock = net.connect(port, '127.0.0.1', async () => {
+          sock.write(
+            `${method} ${url} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n` +
+            (cookie ? `Cookie: ${cookie}\r\n` : '') +
+            `Content-Type: application/json\r\nContent-Length: ${bytes.length}\r\n` +
+            'Connection: close\r\n\r\n'
+          );
+          let at = 0;
+          for (const cut of cuts.concat([bytes.length])) {
+            if (cut <= at) continue;
+            await new Promise((r) => setTimeout(r, 2));
+            sock.write(bytes.subarray(at, cut));
+            at = cut;
+          }
+        });
+        let buf = '';
+        sock.setEncoding('utf8');
+        sock.on('data', (d) => { buf += d; });
+        // A write error here can be the test working. The oversized body
+        // below is refused part-way through on purpose, and the server
+        // answers and hangs up while this end is still writing — so the last
+        // kilobytes land on a socket that has gone, as EPIPE or ECONNRESET.
+        // Once the whole response is in, that is nothing; before it, it is
+        // the request failing and has to be said out loud.
+        //
+        // The first attempt at this ignored every error once any byte had
+        // arrived, which swapped an unhandled rejection for something worse:
+        // a half-read response parsed to a NaN status, counted as a failed
+        // write, and two assertions failing about one run in thirty with
+        // nothing to say why.
+        const whole = () => buf.indexOf('\r\n\r\n') !== -1 &&
+          /^HTTP\/1\.\d \d+/.test(buf);
+        sock.on('error', (e) => { if (!whole()) reject(e); });
+        sock.on('close', () => {
+          if (!whole()) return reject(new Error('no complete response: ' + JSON.stringify(buf.slice(0, 80))));
+          const status = Number((buf.match(/^HTTP\/1\.\d (\d+)/) || [])[1]);
+          let data = null;
+          const body = buf.slice(buf.indexOf('\r\n\r\n') + 4);
+          try { data = JSON.parse(body.slice(body.indexOf('{'), body.lastIndexOf('}') + 1)); } catch (e) {}
+          resolve({ status, data });
+        });
+      });
+    }
+
+    // One account, written to over and over, so nothing here is near a limit.
+    const wire = client();
+    const made = await wire('POST', '/api/signup', {
+      username: 'onthewire', password: 'hunter2hunter', city: 'Denver', ageOk: true
+    });
+    eq(made.status, 201, 'an account to write to');
+    const jar = (await (async () => {
+      const r = await fetch(base + '/api/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'onthewire', password: 'hunter2hunter' })
+      });
+      return (r.headers.getSetCookie ? r.headers.getSetCookie() : [])[0].split(';')[0];
+    })());
+
+    // A bio whose characters are mostly multi-byte. Cut one byte into the
+    // first of them and `buf += chunk` decoded each half on its own, which
+    // turned the character into replacement characters — and then stored it.
+    const bio = 'José runs a café ☕, 田中 comes too 🏳️‍🌈 — every week without fail.';
+    const bytes = Buffer.from(JSON.stringify({ bio, city: 'Denver' }), 'utf8');
+    const firstMulti = bytes.indexOf(Buffer.from('é', 'utf8'));
+    ok(firstMulti > 0, 'the test body really does contain a multi-byte character');
+
+    const one = await raw('PATCH', '/api/me', bytes, [firstMulti + 1], jar);
+    eq(one.status, 200, 'a body cut mid-character is still accepted');
+    eq(one.data && one.data.user && one.data.user.bio, bio,
+      'and arrives exactly as it was sent');
+    ok(!/�/.test(JSON.stringify(one.data)), 'with nothing replaced');
+
+    // Then every other place it could have been cut.
+    let broke = 0;
+    for (let i = 1; i < bytes.length; i++) {
+      const got = await raw('PATCH', '/api/me', bytes, [i], jar);
+      if (got.status !== 200 || !got.data || !got.data.user || got.data.user.bio !== bio) broke++;
+    }
+    eq(broke, 0, 'as is a body cut at each of its other ' + (bytes.length - 2) + ' byte offsets');
+
+    // And in more than two pieces, one byte at a time.
+    const slow = await raw('PATCH', '/api/me', bytes,
+      Array.from({ length: bytes.length }, (_, i) => i + 1), jar);
+    eq(slow.data && slow.data.user && slow.data.user.bio, bio, 'or a byte at a time');
+
+    // The size limit is in bytes. A flag emoji is six UTF-16 units and
+    // fourteen bytes, so counting the string's length let a body through at
+    // more than twice the limit.
+    const flag = '🏳️‍🌈'.repeat(8000);
+    ok(JSON.stringify({ bio: flag }).length < 64 * 1024, 'this body is under the limit as a string');
+    const fat = Buffer.from(JSON.stringify({ bio: flag }), 'utf8');
+    ok(fat.length > 64 * 1024, 'and over it in bytes, which is how it used to get in');
+    const big = await raw('PATCH', '/api/me', fat, [1 << 14, 1 << 15], jar);
+    eq(big.status, 400, 'measured in bytes, it is refused');
+    const after = await wire('GET', '/api/me');
+    eq(after.data && after.data.user && after.data.user.bio, bio, 'and the refusal changed nothing');
+
+    // ---- which address the limits count against ----
+    // Behind the reverse proxy DEPLOY.md recommends, every visitor arrives
+    // from 127.0.0.1, so one bucket held the whole internet.
+    const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'fyc-proxy-'));
+    let n = 0;
+    const signupAt = (at, xff) => fetch(at + '/api/signup', {
+      method: 'POST',
+      headers: Object.assign({ 'Content-Type': 'application/json' },
+        xff ? { 'X-Forwarded-For': xff } : {}),
+      body: JSON.stringify({ username: 'proxy' + (++n), password: 'hunter2hunter', ageOk: true })
+    }).then((x) => x.status);
+
+    const behind = createApp({
+      file: path.join(tmp2, 'proxy.db'), trustProxy: 1,
+      limits: { signupsPerIpPerHour: 2 }, mailer: captureMailer
+    });
+    await new Promise((r) => behind.server.listen(0, r));
+    const at = 'http://127.0.0.1:' + behind.server.address().port;
+
+    eq(await signupAt(at, '203.0.113.7'), 201, 'one visitor signs up');
+    eq(await signupAt(at, '203.0.113.7'), 201, 'and again, up to the limit');
+    eq(await signupAt(at, '203.0.113.7'), 429, 'then they are held');
+    eq(await signupAt(at, '198.51.100.4'), 201, 'while a different visitor is not');
+
+    // A client that writes its own X-Forwarded-For only pads the left of the
+    // chain; the proxy appends what it actually saw. Reading from the right
+    // is what makes trusting the header safe at all.
+    eq(await signupAt(at, '198.51.100.4'), 201, 'the second visitor has one left');
+    eq(await signupAt(at, '10.9.9.9, 198.51.100.4'), 429,
+      'a forged entry in front of the real one wins nothing');
+    eq(await signupAt(at, '198.51.100.9'), 201, 'and the right-hand entry is what counts');
+    eq(await signupAt(at, ''), 201, 'no header at all falls back to the socket');
+
+    // Unset, the header is ignored: on a server nothing sits in front of, it
+    // is whatever the caller typed.
+    const exposed = createApp({
+      file: path.join(tmp2, 'exposed.db'), limits: { signupsPerIpPerHour: 1 }, mailer: captureMailer
+    });
+    await new Promise((r) => exposed.server.listen(0, r));
+    const at2 = 'http://127.0.0.1:' + exposed.server.address().port;
+    eq(await signupAt(at2, '1.1.1.1'), 201, 'with no proxies declared, one signup');
+    eq(await signupAt(at2, '2.2.2.2'), 429, 'and a new header does not buy another');
+
+    behind.server.close(); behind.store.db.close();
+    exposed.server.close(); exposed.store.db.close();
+    fs.rmSync(tmp2, { recursive: true, force: true });
+
+    const src = fs.readFileSync(path.join(__dirname, '..', 'server', 'app.js'), 'utf8');
+    ok(/Math\.max\(0, Math\.min\(8, Math\.floor\(Number\(hops\) \|\| 0\)\)\)/.test(src),
+      'a nonsense hop count cannot mean "trust the header"');
+    ok(/chain\[chain\.length - trustProxy\]/.test(src), 'and the chain is read from the right');
+    ok(/Buffer\.concat\(chunks\)\.toString\('utf8'\)/.test(src), 'the body is decoded once, at the end');
+    // Comments stripped first: the one above this change describes the old
+    // `buf += chunk` by name, and an unanchored search for it matched that.
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    ok(!/\bbuf \+=/.test(code), 'and never built up as a string');
+  });
+
+  await group('a failed send, and a start that cannot happen', async () => {
+    // A transport that fails says why in our words, not the caller's. This
+    // was `'Could not send the email: ' + e.message`, and the message names a
+    // file in this repository when no transport is configured — a host, a
+    // port and a provider's rejection text once one is.
+    const tmp3 = fs.mkdtempSync(path.join(os.tmpdir(), 'fyc-mail-'));
+    const logged = [];
+    const broken = createApp({
+      file: path.join(tmp3, 'mail.db'),
+      log: (line) => logged.push(line),
+      mailer: {
+        transport: 'smtp',
+        async sendVerification() {
+          throw new Error('535 auth failed for postmaster@mail.internal:587 (key AKIA…)');
+        }
+      }
+    });
+    await new Promise((r) => broken.server.listen(0, r));
+    const at = 'http://127.0.0.1:' + broken.server.address().port;
+    const made = await fetch(at + '/api/signup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'mailer', password: 'hunter2hunter', ageOk: true })
+    });
+    const jar = (made.headers.getSetCookie ? made.headers.getSetCookie() : [])[0].split(';')[0];
+    const r = await fetch(at + '/api/email', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: jar },
+      body: JSON.stringify({ email: 'someone@example.com' })
+    });
+    const body = await r.json();
+    eq(r.status, 502, 'a transport that fails is still our fault, not a 400');
+    ok(!/mail\.internal|AKIA|535/.test(JSON.stringify(body)),
+      'and the caller is told none of the host, the port or the key');
+    ok(/try again/i.test(body.error || ''), 'only what they can do about it');
+    ok(logged.some((l) => /MAIL smtp/.test(l) && /mail\.internal/.test(l)),
+      'while the operator gets the whole thing in the log');
+    broken.server.close(); broken.store.db.close();
+    fs.rmSync(tmp3, { recursive: true, force: true });
+
+    // A PORT that is not a port reached listen() as NaN and came out as a
+    // RangeError stack trace. The other two reasons the server cannot start
+    // each get a sentence.
+    const { execFileSync } = require('node:child_process');
+    const tryPort = (v) => {
+      try {
+        execFileSync(process.execPath, [path.join(__dirname, '..', 'server', 'app.js')],
+          { env: Object.assign({}, process.env, { PORT: v, DB: undefined }), timeout: 10000,
+            encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+        return { code: 0, out: '' };
+      } catch (e) {
+        return { code: e.status, out: String(e.stdout || '') + String(e.stderr || '') };
+      }
+    };
+    for (const bad of ['abc', '70000', '4000.5', '-1']) {
+      const got = tryPort(bad);
+      eq(got.code, 1, `PORT=${bad} stops the server with a failure`);
+      ok(/is not a port number/.test(got.out), `PORT=${bad}: and says so in a sentence`);
+      ok(!/RangeError|at Server\.listen/.test(got.out), `PORT=${bad}: with no stack trace`);
+    }
+  });
+
+  await group('a badge you can clear, and a marker you can trust', async () => {
+    // Two people and a circle with a conversation in it.
+    const host = client(), guest = client();
+    await host('POST', '/api/signup', { username: 'badgehost', password: 'hunter2hunter',
+      city: 'Denver', ageOk: true, bio: 'A long enough bio to count as a filled-in profile here.',
+      interests: [{ id: 'games' }, { id: 'books' }, { id: 'food' }] });
+    await verifyEmail(host, 'badgehost@example.com');
+    await guest('POST', '/api/signup', { username: 'badgeguest', password: 'hunter2hunter',
+      city: 'Denver', ageOk: true, bio: 'A long enough bio to count as a filled-in profile here.',
+      interests: [{ id: 'games' }, { id: 'books' }, { id: 'food' }] });
+    await verifyEmail(guest, 'badgeguest@example.com');
+
+    const made = await host('POST', '/api/circles', { name: 'Badge circle', city: 'Denver',
+      blurb: 'A circle that exists to be closed, which is the point of this test.',
+      question: 'What brings you here?', interests: ['games'], cap: 6, minTrust: 0 });
+    eq(made.status, 201, 'a circle to close');
+    const cid = made.data.circle.id;
+    const app = await guest('POST', `/api/circles/${cid}/apply`, { answer: 'Board games are how I meet people, and I am new enough here to need to.' });
+    eq(app.status, 201, 'the guest applies');
+    const seen = await host('GET', '/api/circles/' + cid);
+    ok(seen.data.applications && seen.data.applications.length,
+       'the host sees it (' + JSON.stringify(seen.data.applications) + ')');
+    const apps = seen.data.applications[0];
+    await host('POST', `/api/circles/${cid}/applications/${apps.id}/approve`);
+
+    await host('POST', `/api/circles/${cid}/messages`, { body: 'Something for the guest to not have read.' });
+    // Counted for this circle rather than as a total across every circle the
+    // guest is in, so another test joining them to something else later
+    // cannot quietly change what this one means.
+    const mine = async () => {
+      const r = await guest('GET', '/api/unread');
+      const row = r.data.byCircle.filter((x) => x.circle_id === cid)[0];
+      return { here: row ? row.unread : 0, listed: !!row, total: r.data.circles };
+    };
+    let unread = await mine();
+    ok(unread.here > 0, 'the guest has something unread in it');
+
+    // A moderator closes it. listCircles stops showing it, and nothing in the
+    // interface opens a circle except that list. (A circle you are in comes
+    // back under `mine`, not among the open ones.)
+    const seenIn = (r) => r.data.mine.concat(r.data.circles).some((c) => c.id === cid);
+    ok(seenIn(await guest('GET', '/api/circles')), 'and can see it while it is open');
+    store.closeCircle(cid);
+    ok(!seenIn(await guest('GET', '/api/circles')), 'a closed circle leaves the list');
+    unread = await mine();
+    eq(unread.here, 0, 'and takes its unread count with it');
+    ok(!unread.listed, 'it is not in the breakdown either');
+
+    // The read marker is clamped to a message that exists.
+    const open = await host('POST', '/api/circles', { name: 'Marker circle', city: 'Denver',
+      blurb: 'A circle for checking what happens to a read marker from a client.',
+      question: 'What brings you here?', interests: ['books'], cap: 6, minTrust: 0 });
+    const mid = open.data.circle.id;
+    const a2 = await guest('POST', `/api/circles/${mid}/apply`, { answer: 'Books, mostly, and I would like somewhere to talk about them out loud.' });
+    eq(a2.status, 201, 'the guest applies to the second circle');
+    const apps2 = (await host('GET', '/api/circles/' + mid)).data.applications[0];
+    await host('POST', `/api/circles/${mid}/applications/${apps2.id}/approve`);
+
+    // A number from nowhere. MAX() only moves forward, so before this was
+    // clamped it put the marker past every id the circle would have for a
+    // long time and the guest stopped being told about anything said in it.
+    await guest('POST', `/api/circles/${mid}/read`, { lastId: 9999999 });
+    await host('POST', `/api/circles/${mid}/messages`, { body: 'Said after the marker was thrown forward.' });
+    const u2 = await guest('GET', '/api/unread');
+    const row = u2.data.byCircle.filter((r) => r.circle_id === mid)[0];
+    ok(row && row.unread > 0, 'a message after a silly read marker is still unread');
+
+    // And an honest one still works.
+    const msgs = await guest('GET', `/api/circles/${mid}/messages?since=0`);
+    const top = msgs.data.messages[msgs.data.messages.length - 1].id;
+    await guest('POST', `/api/circles/${mid}/read`, { lastId: top });
+    const u3 = await guest('GET', '/api/unread');
+    const row3 = u3.data.byCircle.filter((r) => r.circle_id === mid)[0];
+    eq(row3 ? row3.unread : 0, 0, 'reading up to the newest message clears it');
+    await guest('POST', `/api/circles/${mid}/read`, { lastId: -5 });
+    const u4 = await guest('GET', '/api/unread');
+    const row4 = u4.data.byCircle.filter((r) => r.circle_id === mid)[0];
+    eq(row4 ? row4.unread : 0, 0, 'and a negative one moves nothing backwards');
+  });
+
+  // fetch() keeps its sockets alive between requests, and closing the server
+  // out from under an idle one surfaces as an unhandled `read ECONNRESET`
+  // with a bare TCP stack and no test attached — which is exactly as much
+  // help as it sounds. It showed up about one run in five once this file had
+  // enough clients in it. Hang them up first, then close.
+  server.closeAllConnections();
   server.close();
   fs.rmSync(tmp, { recursive: true, force: true });
 

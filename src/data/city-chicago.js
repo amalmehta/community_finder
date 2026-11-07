@@ -7,6 +7,9 @@
     id: 'chi',
     name: 'Chicago',
     region: 'IL',
+    // A metro area is not a state: the south-east edge of Chicagoland is Indiana, and someone
+    // typing either should land here rather than nowhere.
+    states: ['IL', 'IN'],
     aliases: ['chicago', 'chi', 'chicagoland'],
     orgs: [
       {
@@ -84,8 +87,8 @@
         firstStep: {
           kind: 'visit',
           label: 'Come to a public open house or tour',
-          url: 'https://pumpingstationone.org/events/',
-          when: 'Regular open nights — check the calendar'
+          url: 'https://wiki.pumpingstationone.org/wiki/Events',
+          when: 'Open house Tuesdays at 8pm, weekly'
         },
         expect: [
           'Open houses exist so strangers can look around without joining',

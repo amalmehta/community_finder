@@ -71,10 +71,25 @@ if (cmd === 'stop') {
     try { fs.unlinkSync(PID_FILE); } catch (e) { /* fine */ }
     process.exit(0);
   }
-  process.kill(pid);
+  // SIGTERM, then wait for it to actually go. This used to print 'Stopped'
+  // the instant the signal was sent, so anything chained after it with &&
+  // raced the shutdown — including the restore that tools/backup.js prints,
+  // which copies a file the server may still have open.
+  process.kill(pid, 'SIGTERM');
+  const deadline = Date.now() + 10000;
+  let gone = false;
+  while (Date.now() < deadline) {
+    try { process.kill(pid, 0); } catch (e) { gone = true; break; }
+    // No sleep() in a sync script; a short blocking wait is what this needs.
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+  }
   try { fs.unlinkSync(PID_FILE); } catch (e) { /* fine */ }
-  console.log(`Stopped (pid ${pid}).`);
-  process.exit(0);
+  if (gone) {
+    console.log(`Stopped (pid ${pid}).`);
+    process.exit(0);
+  }
+  console.error(`pid ${pid} did not stop within 10s. Still running; not removing anything it holds.`);
+  process.exit(1);
 }
 
 if (cmd === 'log') {

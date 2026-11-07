@@ -8,3 +8,4 @@ community_finder.md
 server/data/
 server/data/server.pid
 server/data/server.log
+server/data/backups/

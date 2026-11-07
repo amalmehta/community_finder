@@ -9,9 +9,14 @@ var { execFile } = require('child_process');
 var root = path.join(__dirname, '..');
 
 require(path.join(root, 'src/data/core.js'));
-['sf', 'nyc', 'chicago', 'seattle', 'austin', 'boston', 'philadelphia', 'dc', 'la', 'sandiego'].forEach(function (c) {
-  require(path.join(root, 'src/data/city-' + c + '.js'));
-});
+// The city files, read off the directory. This was a hand-written list of
+// thirteen ids, which meant adding a city to the app and forgetting to add it
+// here left every one of its listings unchecked — with nothing to
+// say so, because everything it did check still passed.
+var cityFiles = require('fs').readdirSync(path.join(root, 'src/data'))
+  .filter(function (f) { return /^city-.+\.js$/.test(f); })
+  .sort();
+cityFiles.forEach(function (f) { require(path.join(root, 'src/data', f)); });
 require(path.join(root, 'src/data/universal.js'));
 var FYC = globalThis.FYC;
 

@@ -5,7 +5,8 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(dirname "$HERE")"
-APP_NAME="community_finder"
+APP_NAME="community_finder"          # the bundle on disk, and the repo name
+DISPLAY_NAME="Community Finder"      # what macOS shows: Dock, menu bar, Finder
 BUILD="$HERE/build"
 DIST="$HERE/dist"
 APP="$DIST/$APP_NAME.app"
@@ -20,7 +21,12 @@ swiftc -O -target "$(uname -m)-apple-macos13.0" \
 
 echo "→ bundling the site"
 mkdir -p "$APP/Contents/Resources/web"
-cp "$ROOT/index.html" "$APP/Contents/Resources/web/"
+# The footer of every screen links to Privacy and Terms, and only index.html
+# was copied in — so both links were a plain-text 404 from the bundled server,
+# in the one build of this app where there is no browser tab to escape to.
+# site.webmanifest is here because index.html asks for it on every load.
+cp "$ROOT/index.html" "$ROOT/privacy.html" "$ROOT/terms.html" \
+   "$ROOT/site.webmanifest" "$APP/Contents/Resources/web/"
 cp -R "$ROOT/assets" "$ROOT/src" "$APP/Contents/Resources/web/"
 
 echo "→ icon"
@@ -33,8 +39,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>$APP_NAME</string>
-  <key>CFBundleDisplayName</key><string>$APP_NAME</string>
+  <key>CFBundleName</key><string>$DISPLAY_NAME</string>
+  <key>CFBundleDisplayName</key><string>$DISPLAY_NAME</string>
   <key>CFBundleExecutable</key><string>fyc</string>
   <key>CFBundleIdentifier</key><string>com.amalmehta.communityfinder</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
