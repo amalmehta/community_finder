@@ -557,7 +557,12 @@ group('circles: the chat-first wiring', function () {
   ok(/said < 1/.test(server), 'a vouch requires that the two of you have actually talked');
 
   ok(social.indexOf("window.FYC_CIRCLES.render()") !== -1, 'social.js routes the circles tab');
-  ok(social.indexOf("['circles', 'messages']") !== -1, 'and shows the tab once signed in');
+  // Circles used to be hidden until you had an account, which meant the only
+  // mention of circles was behind a sign-up asking you to join one.
+  ok(/var t = document\.getElementById\('tab-messages'\);\s*\n\s*if \(t\) t\.hidden = !S\.user;/.test(social),
+     'the inbox tab waits for an account');
+  ok(!/\['circles', 'messages'\]/.test(social), 'and circles no longer waits with it');
+  ok(/tab\.hidden = false;/.test(circles), 'the circles tab shows for anyone with a server to talk to');
   ok(appjs.indexOf('FYC_CIRCLES.resultsStrip') !== -1,
      'the finder offers circles alongside the places to go alone');
   ok(circles.indexOf('readinessBlock') !== -1, 'the readiness gate is drawn, not just enforced');
@@ -1722,7 +1727,10 @@ group('one copy of each helper, and a back button', function () {
   // autocorrect quietly improving the place name.
   ok(app.indexOf("autocomplete: isCity ? 'address-level2' : 'off'") !== -1, 'the city field says what it is');
   ok(app.indexOf("enterkeyhint: 'go'") !== -1, 'and the keyboard offers Go');
-  eq((social.match(/autocomplete: 'address-level2'/g) || []).length, 2, 'both city fields in the account form too');
+  // One, not two: the sign-up form no longer asks for a city. The profile
+  // editor on the You tab is the only place that does.
+  eq((social.match(/autocomplete: 'address-level2'/g) || []).length, 1,
+     'the one city field left in the account screens says what it is');
   // A bare number inside a button that says 'Saved' was announced as
   // 'Saved 3', a count of nothing stated.
   ok(/aria-label', 'Saved, ' \+ n/.test(app), 'the saved count says what it counts');
@@ -2582,6 +2590,81 @@ group('four more, where the data meets the interface', function () {
      'and the comment that was there twice is there once');
   eq((match.match(/have badges\. Repeating them here/g) || []).length, 1,
      'as the one that says it');
+});
+
+group('the front door: no wall, and three fields behind it', function () {
+  var fs = require('fs');
+  var social = fs.readFileSync(path.join(root, 'src/social.js'), 'utf8');
+  var circles = fs.readFileSync(path.join(root, 'src/circles.js'), 'utf8');
+  var html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+
+  // The app used to open with a full-page sign-up over it, hiding a finder
+  // that runs entirely in the browser and needs no account for anything.
+  ok(!/renderGate/.test(social), 'nothing raises a gate any more');
+  ok(/\n    closeGate\(\);\n    if \(S\.user\)/.test(social),
+     'boot uncovers the app whether or not anyone is signed in');
+  ok(!/if \(!S\.user\) renderGate/.test(social), 'and does not put the sign-up in front of it');
+
+  // What the sign-up asks for, counted from the function that draws it.
+  var card = (function () {
+    var at = social.indexOf('function authCard(opts) {');
+    var depth = 0;
+    for (var i = social.indexOf('{', at); i < social.length; i++) {
+      if (social[i] === '{') depth++;
+      else if (social[i] === '}') { depth--; if (!depth) return social.slice(at, i); }
+    }
+    return '';
+  }());
+  ok(card.length > 200, 'there is a card to read');
+  var ids = (card.match(/id: 'au-[a-z]+'/g) || []).map(function (m) { return m.slice(5, -1); }).sort();
+  eq(ids.join(' '), 'au-age au-pass au-user', 'a username, a password, and whether you are eighteen');
+  ['au-display', 'au-city', 'au-bio'].forEach(function (gone) {
+    ok(card.indexOf(gone) === -1, 'it no longer asks for ' + gone.slice(3));
+  });
+  ok(card.indexOf('interestPicker') === -1, 'nor for a pick from thirty-two interests');
+
+  // The things it stopped asking for are the ones it already knows.
+  ok(/knownCity = \(saved && saved\.location \|\| ''\)/.test(card),
+     'the city comes from the finder answers');
+  ok(/knownInterests = \(saved && saved\.interests \|\| \[\]\)/.test(card),
+     'and so do the interests');
+  ok(/payload\.display = payload\.username;/.test(card), 'the name shown defaults to the username');
+  ok(/if \(knownCity\) payload\.city = knownCity;/.test(card), 'both are sent without being asked for');
+  ok(/if \(knownInterests\.length\) payload\.interests = knownInterests;/.test(card), 'silently');
+  // And it says so, rather than leaving someone wondering where their city went.
+  // Joined first: the sentence is split across lines in the source, and an
+  // assertion on half of it is an assertion about where the line wraps.
+  var prose = card.replace(/'\s*\n\s*\+ '/g, '');
+  ok(/your city and what you are into come from the answers you already gave/.test(prose),
+     'and the card says where they came from');
+
+  // Circles is how anyone finds out circles exist, so it is not behind the
+  // account it is asking for.
+  ok(/tab\.hidden = false;/.test(circles), 'the circles tab shows without an account');
+  ok(/if \(!S\.user\) return invitation\(host\);/.test(circles),
+     'and the list shows what a circle is rather than asking the server');
+  ok(/function invitation\(host\)/.test(circles), 'there is something to show them');
+  ok(/social\.authCard\(\{/.test(circles), 'with the way in underneath it');
+  ok(/Everything on the Find tab works without any of this/.test(circles),
+     'and it says the finder needs none of it');
+
+  // The inbox has nothing in it without an account, so it still waits.
+  ok(/var t = document\.getElementById\('tab-messages'\);\s*\n\s*if \(t\) t\.hidden = !S\.user;/.test(social),
+     'the inbox tab waits for one');
+  ok(/id="tab-messages"[^>]*hidden/.test(html), 'and starts hidden in the markup');
+  ok(/id="tab-circles"[^>]*hidden/.test(html),
+     'as does circles, until there is a server to talk to');
+
+  // Signing out leaves the app standing, so whatever is on screen has to be
+  // repainted — it used to be covered by the gate instead.
+  ok(/S\.user = null;[\s\S]{0,600}window\.FYC_VIEWS\.you\(\)/.test(social),
+     'signing out repaints the You tab');
+  ok(/if \(!S\.user\) \{\s*\n\s*return el\('article'/.test(social),
+     'which has something to say to someone signed out');
+
+  // Nothing of this reaches the static build, where there is no server at all.
+  ok(/S\.online = false;\s*\n\s*return;/.test(social),
+     'no backend and social.js bows out before any of it');
 });
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');

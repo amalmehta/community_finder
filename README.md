@@ -206,10 +206,18 @@ reachable:
 
 | | Static (GitHub Pages) | With the server |
 |---|---|---|
-| Accounts | none | required |
+| Accounts | none | only for circles and messages |
 | Finder, plan, learned preferences | yes | yes |
 | People and messaging | no | yes |
 | Data leaves your device | never | your profile and messages only |
+
+An account is never asked for on the way in. The finder runs entirely in the
+browser — it needs no server to work and no account to use — so the app opens
+on it either way. Circles and the inbox are the parts other people are in, and
+those are where an account is asked for, at the point you reach for one: a
+username, a password, and whether you are eighteen. Your city and what you are
+into come from the answers you already gave the finder, so nothing is asked
+for twice.
 
 The published site at <https://amalmehta.github.io/community_finder/> is the
 static one: no account, no server, nothing transmitted. Running `npm start`

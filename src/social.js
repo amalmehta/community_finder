@@ -50,97 +50,98 @@
       .map(function (b) { return { id: b.getAttribute('data-pick'), visible: true }; });
   }
 
-  function renderGate(mode) {
-    var gate = $('#auth-gate');
-    gate.innerHTML = '';
-    gate.hidden = false;
-    $('main').hidden = true;
-    $('.tabs').hidden = true;
-
-    var signup = mode !== 'login';
+  /**
+   * The whole of making an account: a username, a password, and whether you
+   * are eighteen.
+   *
+   * This used to be a wall across the front door, and it asked for a display
+   * name, a city, two sentences about yourself and a pick from thirty-two
+   * interests before showing a single thing the app does — for a finder that
+   * runs entirely in the browser and needs no account at all. Everything
+   * past the three fields here is either already known or not needed yet:
+   * the city and the interests are the answers just given to the finder and
+   * go up silently, the display name defaults to the username, and the bio
+   * is asked for where it is used — by the trust tier on the You tab, and by
+   * the written answer every circle application already requires.
+   *
+   * @param {{mode?:string, lead?:string, onDone?:Function}} opts
+   *   mode  'signup' (default) or 'login'
+   *   lead  one sentence saying why an account is being asked for here
+   *   onDone called once there is a signed-in user
+   */
+  function authCard(opts) {
+    opts = opts || {};
+    var signup = opts.mode !== 'login';
     var err = el('p', { class: 'err', role: 'alert', hidden: true });
 
-    // Reuse whatever they already picked in the finder, if anything.
+    // What the finder already knows. Nothing is asked for twice.
     var saved = null;
     try { saved = JSON.parse(localStorage.getItem('fyc.profile.v1') || 'null'); } catch (e) { saved = null; }
-    var pre = (saved && saved.interests || []).map(function (id) { return { id: id, visible: true }; });
+    var knownCity = (saved && saved.location || '').trim();
+    var knownInterests = (saved && saved.interests || []).map(function (id) {
+      return { id: id, visible: true };
+    });
 
-    var form = el('form', { class: 'card', onsubmit: async function (e) {
+    var user = el('input', { type: 'text', id: 'au-user', required: true,
+      autocomplete: 'username', autocapitalize: 'none', autocorrect: 'off',
+      spellcheck: 'false', placeholder: 'lowercase, numbers, underscores' });
+    var pass = el('input', { type: 'password', id: 'au-pass', required: true, minlength: '8',
+      autocomplete: signup ? 'new-password' : 'current-password',
+      placeholder: signup ? 'at least 8 characters' : '' });
+    var age = el('input', { type: 'checkbox', id: 'au-age', required: true });
+
+    var swap = el('button', { class: 'linkish', type: 'button', onclick: function () {
+      var next = authCard({ mode: signup ? 'login' : 'signup', lead: opts.lead, onDone: opts.onDone });
+      if (form.parentNode) form.parentNode.replaceChild(next, form);
+    } }, [signup ? 'I already have an account' : 'I need an account']);
+
+    var form = el('form', { class: 'card auth-card', onsubmit: async function (e) {
       e.preventDefault();
       err.hidden = true;
-      var payload = {
-        username: $('#au-user').value.trim().toLowerCase(),
-        password: $('#au-pass').value
-      };
+      var payload = { username: user.value.trim().toLowerCase(), password: pass.value };
       if (signup) {
-        payload.display = $('#au-display').value.trim() || payload.username;
-        payload.city = $('#au-city').value.trim();
-        payload.bio = $('#au-bio').value.trim();
-        payload.ageOk = $('#au-age').checked;
-        payload.interests = pickedInterests(form);
+        payload.ageOk = age.checked;
+        payload.display = payload.username;
+        if (knownCity) payload.city = knownCity;
+        if (knownInterests.length) payload.interests = knownInterests;
       }
+      var btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
       try {
         var out = await api('POST', signup ? '/api/signup' : '/api/login', payload);
         S.user = out.user;
-        closeGate();
+        paintAccountTabs();
+        refreshCounts();
+        if (opts.onDone) opts.onDone(S.user);
       } catch (e2) {
         err.textContent = e2.message;
         err.hidden = false;
+        btn.disabled = false;
       }
     } }, [
-      el('h2', { class: 'gate-head', text: signup ? 'Create your profile' : 'Welcome back' }),
-      signup ? el('p', { class: 'hint', text: 'No email at this step, so there is no password reset.' }) : null,
-
-      el('label', { class: 'field' }, [
-        el('span', { text: 'Username' }),
-        el('input', { type: 'text', id: 'au-user', required: true, autocomplete: 'username',
-                      placeholder: 'lowercase, numbers, underscores' })
-      ]),
-      el('label', { class: 'field' }, [
-        el('span', { text: 'Password' }),
-        el('input', { type: 'password', id: 'au-pass', required: true, minlength: '8',
-                      autocomplete: signup ? 'new-password' : 'current-password',
-                      placeholder: signup ? 'at least 8 characters' : '' })
-      ]),
-      signup ? el('label', { class: 'field' }, [
-        el('span', { text: 'Name people will see' }),
-        el('input', { type: 'text', id: 'au-display', placeholder: 'optional' })
-      ]) : null,
-      signup ? el('label', { class: 'field' }, [
-        el('span', { text: 'Your city' }),
-        el('input', { type: 'text', id: 'au-city', placeholder: 'e.g. Boston',
-                      autocomplete: 'address-level2', autocapitalize: 'words' })
-      ]) : null,
-      signup ? el('label', { class: 'field' }, [
-        el('span', { text: 'About you' }),
-        el('textarea', { id: 'au-bio', rows: '2', maxlength: '280',
-                         placeholder: 'What you are looking for, and what you are like to be around' })
-      ]) : null,
-
-      signup ? el('div', { class: 'field' }, [
-        el('span', { text: 'What are you into?' }),
-        interestPicker(pre)
-      ]) : null,
-
-      signup ? el('label', { class: 'check' }, [
-        el('input', { type: 'checkbox', id: 'au-age', required: true }),
-        el('span', { text: 'I am 18 or over' })
-      ]) : null,
-
+      opts.lead ? el('p', { class: 'auth-lead', text: opts.lead }) : null,
+      el('h2', { class: 'gate-head', text: signup ? 'Make an account' : 'Welcome back' }),
+      el('label', { class: 'field' }, [el('span', { text: 'Username' }), user]),
+      el('label', { class: 'field' }, [el('span', { text: 'Password' }), pass]),
+      signup ? el('label', { class: 'check' }, [age, el('span', { text: 'I am 18 or over' })]) : null,
+      // Why there are only three fields, said next to them rather than under
+      // the button, where it read as small print about something else.
+      signup ? el('p', { class: 'hint', text: knownCity || knownInterests.length
+        ? 'That is everything — your city and what you are into come from the answers you '
+          + 'already gave, and the You tab can change them.'
+        : 'That is everything. A city, a couple of sentences and what you are into are '
+          + 'asked for later, where they are used.' }) : null,
+      signup ? el('p', { class: 'hint', text: 'No email here, so there is no password reset.' }) : null,
       err,
       el('div', { class: 'actions' }, [
-        el('button', { class: 'btn', type: 'submit' }, [signup ? 'Create profile' : 'Sign in']),
-        el('button', { class: 'btn ghost sm', type: 'button', onclick: function () { renderGate(signup ? 'login' : 'signup'); } },
-          [signup ? 'I already have one' : 'I need an account'])
+        el('button', { class: 'btn', type: 'submit' }, [signup ? 'Make an account' : 'Sign in']),
+        swap
       ])
     ]);
-
-    gate.appendChild(el('div', { class: 'wrap' }, [
-      el('h1', { class: 'gate-title', text: 'Find your people.' }),
-      form
-    ]));
+    return form;
   }
 
+  /** Nothing covers the app any more; this only ever puts it back. */
   function closeGate() {
     $('#auth-gate').hidden = true;
     $('main').hidden = false;
@@ -151,10 +152,11 @@
 
   // ---------- tabs ----------
   function paintAccountTabs() {
-    ['circles', 'messages'].forEach(function (name) {
-      var t = document.getElementById('tab-' + name);
-      if (t) t.hidden = !S.user;
-    });
+    // Circles shows for anyone once there is a server to talk to — it is the
+    // only way to find out circles exist, and it is where an account is
+    // asked for. Inbox needs one to have anything in it.
+    var t = document.getElementById('tab-messages');
+    if (t) t.hidden = !S.user;
     if (window.FYC_CIRCLES) window.FYC_CIRCLES.enable(S);
   }
 
@@ -610,7 +612,17 @@
 
   // ---------- profile editing (lives on the You tab) ----------
   function profileCard() {
-    if (!S.user) return null;
+    // Signed out, this is where the way back in lives. It returned null
+    // before, which was fine while a gate covered the app and is a blank
+    // half-screen now that nothing does.
+    if (!S.user) {
+      return el('article', { class: 'card' }, [
+        el('h3', { text: 'Your profile' }),
+        el('p', { class: 'hint', text: 'Everything on this tab so far is this device\u2019s own. '
+          + 'An account adds the parts other people are in — circles, and messages.' }),
+        authCard({ onDone: function () { if (window.FYC_VIEWS && window.FYC_VIEWS.you) window.FYC_VIEWS.you(); } })
+      ]);
+    }
     var u = S.user;
     // Everyone else on People has a face; the card where you set yours up
     // was the only one without one.
@@ -705,7 +717,11 @@
         await api('POST', '/api/logout');
         S.user = null;
         stopPolling();
-        renderGate('login');
+        paintAccountTabs();
+        // Repaint what is on screen. Signing out used to raise the gate over
+        // the whole app, which hid this; now that nothing is hidden, the You
+        // tab would sit there showing the profile of whoever just left.
+        if (window.FYC_VIEWS && window.FYC_VIEWS.you) window.FYC_VIEWS.you();
       } }, ['Sign out'])
     ]);
 
@@ -754,11 +770,13 @@
     // and nothing has ever read.
     document.getElementById('tab-messages').addEventListener('click', function () { show('messages'); });
 
-    if (!S.user) renderGate('signup');
-    else {
-      closeGate();
-      // Signed in, so every tab exists and the one you were last on is worth
-      // reopening. app.js remembers it; show() is this file's with accounts.
+    // The app opens on the app. This used to raise a full-page sign-up over
+    // it, which hid a finder that runs entirely in the browser and has never
+    // needed an account for anything.
+    closeGate();
+    if (S.user) {
+      // The tab you were last on is worth reopening. app.js remembers it;
+      // show() is this file's, the one that knows about accounts.
       var last = window.FYC_LAST_TAB ? window.FYC_LAST_TAB() : 'find';
       if (last !== 'find' && document.getElementById('tab-' + last)) show(last);
     }
@@ -773,7 +791,7 @@
     }
 
     // Let the You tab render the profile editor underneath its charts.
-    window.FYC_SOCIAL = { profileCard: profileCard, state: S };
+    window.FYC_SOCIAL = { authCard: authCard, profileCard: profileCard, state: S };
     // Held so it can be stopped, which it never could be: this one ran
     // every thirty seconds for as long as the page was open, signed out or
     // not, visible or not.

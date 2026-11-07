@@ -512,6 +512,43 @@
   }
 
   // ---------- the list ----------
+  /**
+   * What a circle is, and the three fields it takes to join one.
+   *
+   * One sentence, then the form, then the detail. On a phone the other order
+   * put the first field below the fold behind a paragraph and three bullets,
+   * which is a lot of reading to do before being allowed to do anything.
+   */
+  function invitation(host) {
+    host.innerHTML = '';
+    host.appendChild(el('div', { class: 'screen-head' }, [
+      el('h2', { text: 'Circles' }),
+      el('p', { class: 'hint', text: 'Small local groups — four to eight people — that talk '
+        + 'first and only decide to meet once the conversation is real.' })
+    ]));
+
+    var social = window.FYC_SOCIAL;
+    if (social && social.authCard) {
+      host.appendChild(social.authCard({
+        lead: 'This is the one part that needs an account, because other people are in it.',
+        onDone: function () { renderList(); }
+      }));
+    }
+
+    host.appendChild(el('article', { class: 'card' }, [
+      el('h3', { text: 'How they work' }),
+      el('ul', { class: 'plain' }, [
+        el('li', { text: 'You apply with a written answer, and a host reads it. Nobody is '
+          + 'seated at a table with strangers on day one.' }),
+        el('li', { text: 'The group talks first. One question at a time, and it earns the '
+          + 'next set by answering the last.' }),
+        el('li', { text: 'A meetup is proposed only once the conversation is real — and it '
+          + 'is the group that decides, not us.' }),
+        el('li', { text: 'Everything on the Find tab works without any of this.' })
+      ])
+    ]));
+  }
+
   async function renderList() {
     var mine = views.take();
     stop();
@@ -519,6 +556,9 @@
     S.pane = 'chat';
     S.onReadiness = null;
     var host = $('#circles-body');
+    // Signed out: say what this is and offer the way in, rather than asking
+    // the server a question it will answer with 401.
+    if (!S.user) return invitation(host);
     host.innerHTML = '';
     host.appendChild(loading('Looking for circles near you…'));
 
@@ -1321,7 +1361,10 @@
     S.user = state.user;
     var tab = document.getElementById('tab-circles');
     if (!tab) return;
-    tab.hidden = !state.user;
+    // Shown to everyone once there is a server behind it. Nobody signed out
+    // could previously find out circles existed, because the only mention of
+    // them was behind the sign-up that asked them to join one.
+    tab.hidden = false;
     if (!tab.dataset.wired) {
       tab.dataset.wired = '1';
       tab.addEventListener('click', function () { show(); });
