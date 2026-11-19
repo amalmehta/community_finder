@@ -22,28 +22,36 @@
 <!-- iOS ignores an SVG here, so adding to the Home Screen gave a
      screenshot of the page instead of the mark. A raster of assets/icon.svg. -->
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
-<link rel="canonical" href="https://amalmehta.github.io/community_finder/">
+<!-- The host that actually serves this. Pages is configured with a custom
+     domain, so amalmehta.github.io/community_finder/ answers 301 and sends
+     everything here — and every URL in this file named the redirecting one.
+     A canonical that redirects is a canonical pointing somewhere else; a
+     sitemap listed on one host and served from another is thrown out by
+     crawlers outright; and an og:image that 302s comes back as no image at
+     all from several of the scrapers that matter, which is how a link to
+     this app got posted with a blank card. -->
+<link rel="canonical" href="https://amalmehta.com/community_finder/">
 <!-- Paired with color-scheme in the stylesheet: this one lands before the
      stylesheet has loaded, so the native canvas never flashes white. -->
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#fbf8f4" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161615" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Community Finder">
 <meta property="og:description" content="Real local groups near you, and small vetted circles that chat first and decide to meet up later.">
-<meta property="og:url" content="https://amalmehta.github.io/community_finder/">
+<meta property="og:url" content="https://amalmehta.com/community_finder/">
 <!-- A PNG, not the SVG this is drawn from. No major platform renders an SVG
      share card — Facebook, X, LinkedIn, Slack and iMessage all skip it — so
      every link to this app was posted with no image at all. Same mistake as
      the Home Screen icon, one meta tag over. Rastered by:
        rsvg-convert -w 1200 -h 630 assets/social.svg -o assets/social.png -->
-<meta property="og:image" content="https://amalmehta.github.io/community_finder/assets/social.png">
+<meta property="og:image" content="https://amalmehta.com/community_finder/assets/social.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Find your people. Real local groups, what they cost, and what actually happens when you turn up.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://amalmehta.github.io/community_finder/assets/social.png">
+<meta name="twitter:image" content="https://amalmehta.com/community_finder/assets/social.png">
 <link rel="manifest" href="site.webmanifest">
 <link rel="stylesheet" href="assets/styles.css">
 <script>

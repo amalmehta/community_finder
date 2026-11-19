@@ -18,11 +18,34 @@ const PID_FILE = path.join(DIR, 'server.pid');
 const LOG_FILE = path.join(DIR, 'server.log');
 const PORT = process.env.PORT || 4000;
 
+/**
+ * The pid in the file, if it is still this server.
+ *
+ * `process.kill(pid, 0)` only answers "is something alive with that number".
+ * Pids are reused, and a stale pid file outlives a crash — so after one, `npm
+ * run stop` would SIGTERM whatever process had inherited the number and print
+ * "Stopped". On a laptop that is as likely to be an editor as anything else.
+ * So: check the command line too, and only claim the process if it is a node
+ * running this repository's server.
+ */
 function running() {
   if (!fs.existsSync(PID_FILE)) return 0;
   const pid = Number(fs.readFileSync(PID_FILE, 'utf8').trim());
   if (!pid) return 0;
-  try { process.kill(pid, 0); return pid; } catch (e) { return 0; }
+  try { process.kill(pid, 0); } catch (e) { return 0; }
+  return isOurs(pid) ? pid : 0;
+}
+
+function isOurs(pid) {
+  let args = '';
+  try {
+    args = execSync(`ps -o command= -p ${pid}`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+  } catch (e) {
+    // No ps, or it refused. Fall back to the old behaviour rather than
+    // refusing to stop a server that is genuinely running.
+    return true;
+  }
+  return args.indexOf(path.join('server', 'app.js')) !== -1;
 }
 
 function portHolder() {

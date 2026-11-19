@@ -9,8 +9,8 @@
 <!-- Paired with color-scheme in the stylesheet: this one lands before the
      stylesheet has loaded, so the native canvas never flashes white. -->
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#fbf8f4" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161615" media="(prefers-color-scheme: dark)">
 <!-- The server sends this as a header; GitHub Pages cannot send headers, so
      the static build carries its own. frame-ancestors is deliberately absent:
      it is ignored in a meta element, and a directive that does nothing but
@@ -84,8 +84,13 @@
   <h2>A copy of the app, on your device</h2>
   <p>The app installs a <em>service worker</em>, which keeps a copy of its own files — the page, the stylesheet, the scripts and the city data — in your browser's cache, so it opens with no signal. That cache holds the app and nothing else: no answers, no saved plan, nothing you typed, and nothing about anyone else. It is refreshed whenever you open the app online, and it is removed along with everything else when you clear site data.</p>
 
+  <h2>Taking it with you</h2>
+  <p><b>Download everything</b>, on the You tab, hands you a JSON file with every one of the things listed above: your account, your interests and whether each is visible, your connections and the introductions written on them, every message you have sent, the circles you are in and what you said in them, what you wrote when applying, your vouches, your RSVPs and the plans attached to them, your blocks and your reports. Your twenty answers, your saved list and your click history are not in it, because they are not on the server — they are in this browser.</p>
+
   <h2>Getting rid of it</h2>
-  <p>Ask whoever runs the server to delete your account and they can remove it and everything attached to it. On the published site with no account, clearing your browser data — which covers both <code>localStorage</code> and the cached copy of the app above — is complete and immediate, and there is nothing held anywhere else.</p>
+  <p><b>Delete my account</b>, on the You tab, removes the account and everything attached to it. It asks for your password, and it cannot be undone.</p>
+  <p>Two things do not simply disappear with you, and both are deliberate. A circle you host that other people are in is handed to whoever has been in it longest, rather than being deleted underneath them — their conversation is not yours to end. And what you said inside a circle stays where other people replied to it, with your name taken off it: a group thread with the replies still in it and the thing they were replying to gone is worse for everyone, including you. Everything else — your profile, your one-to-one conversations, your applications, your vouches, your RSVPs — goes.</p>
+  <p>On the published site with no account, clearing your browser data — which covers both <code>localStorage</code> and the cached copy of the app above — is complete and immediate, and there is nothing held anywhere else.</p>
 
   <h2>Changes</h2>
   <p>This page is versioned with the code. Its history is in the repository, so you can see exactly what changed and when.</p>

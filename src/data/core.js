@@ -153,7 +153,14 @@
   function promptDepth(body) {
     var found = 0;
     PROMPT_SETS.forEach(function (s) {
-      if (s.prompts.indexOf(String(body)) !== -1) found = s.depth;
+      // The shallowest set a prompt belongs to, not the last one scanned.
+      // Depth is what gates a circle's climb up the ladder, so a prompt that
+      // ever appeared in two sets would be credited as the deeper one and let
+      // a circle skip a rung by answering an easy question. The fifteen are
+      // all distinct today, and the test below is what keeps them that way —
+      // but a tie-break that reads "whichever we looked at last" is not a
+      // rule, and this one costs nothing.
+      if (!found && s.prompts.indexOf(String(body)) !== -1) found = s.depth;
     });
     return found;
   }

@@ -27,37 +27,52 @@ function ok(cond, name) {
 function eq(a, b, name) { ok(a === b, name + ' (got ' + JSON.stringify(a) + ', want ' + JSON.stringify(b) + ')'); }
 function group(name, fn) { console.log('\n— ' + name); fn(); }
 
+/**
+ * Everything that has to be true of a thing the results list can show.
+ *
+ * This was written inline in the curated-listing loop, which meant it only
+ * ever ran over the curated listings — and the fallback recipes build org
+ * shapes that go through exactly the same card, the same matcher and the same
+ * ranking. Their own group checked four of these and the vocabulary of the
+ * rest; five of them (a real blurb, two what-to-expect bullets, a cost of
+ * 0/1/2, solo and gentleness in range) were asserted for no recipe at all. A
+ * `http://` typo in a recipe's link, or a one-bullet `expect`, shipped green.
+ */
+function listingInvariants(o) {
+  var n = o.name || o.id;
+  ok(typeof o.name === 'string' && o.name.length > 1, n + ': has a name');
+  ok(typeof o.blurb === 'string' && o.blurb.length > 40, n + ': has a real blurb');
+  ok(/^https:\/\//.test(o.url), n + ': https url');
+  ok(Array.isArray(o.interests) && o.interests.length > 0, n + ': has interests');
+  o.interests.forEach(function (i) {
+    ok(!!FYC.INTERESTS[i], n + ': interest "' + i + '" exists in the taxonomy');
+  });
+  ok(!!o.firstStep && !!o.firstStep.label, n + ': has a first step label');
+  ok(/^https:\/\//.test(o.firstStep.url || ''), n + ': first step has an https url');
+  // Two is the floor: some listings simply have fewer logistics worth stating,
+  // and padding them back out would mean reintroducing filler.
+  ok(Array.isArray(o.expect) && o.expect.length >= 2, n + ': at least 2 what-to-expect bullets');
+  ok(o.cost === 0 || o.cost === 1 || o.cost === 2, n + ': cost is 0/1/2');
+  ok(o.solo >= 1 && o.solo <= 5, n + ': solo rating in range');
+  ok(o.gentleness >= 1 && o.gentleness <= 5, n + ': gentleness rating in range');
+  ok(FYC.STRUCTURE.indexOf(o.structure) !== -1, n + ': structure "' + o.structure + '" is known');
+  ok(FYC.COMMITMENT.indexOf(o.commitment) !== -1, n + ': commitment "' + o.commitment + '" is known');
+  (o.when || []).forEach(function (w) { ok(FYC.WHEN.indexOf(w) !== -1, n + ': when "' + w + '" is known'); });
+  (o.goals || []).forEach(function (gl) { ok(FYC.GOALS.indexOf(gl) !== -1, n + ': goal "' + gl + '" is known'); });
+  // Listings no longer ship pre-written messages for people to send.
+  ok(!o.script, n + ': carries no pre-written message');
+}
+
 // ---------------------------------------------------------------- data shape
 group('curated data integrity', function () {
   var orgs = FYC.allOrgs();
-  ok(orgs.length >= 300, 'at least 160 curated organisations (' + orgs.length + ')');
+  ok(orgs.length >= 300, 'at least 300 curated organisations (' + orgs.length + ')');
 
   var ids = {};
   orgs.forEach(function (o) {
-    var n = o.name || o.id;
-    ok(!!o.id && !ids[o.id], n + ': unique id');
+    ok(!!o.id && !ids[o.id], (o.name || o.id) + ': unique id');
     ids[o.id] = true;
-    ok(typeof o.name === 'string' && o.name.length > 1, n + ': has a name');
-    ok(typeof o.blurb === 'string' && o.blurb.length > 40, n + ': has a real blurb');
-    ok(/^https:\/\//.test(o.url), n + ': https url');
-    ok(Array.isArray(o.interests) && o.interests.length > 0, n + ': has interests');
-    o.interests.forEach(function (i) {
-      ok(!!FYC.INTERESTS[i], n + ': interest "' + i + '" exists in the taxonomy');
-    });
-    ok(!!o.firstStep && !!o.firstStep.label, n + ': has a first step label');
-    ok(/^https:\/\//.test(o.firstStep.url || ''), n + ': first step has an https url');
-    // Two is the floor: some listings simply have fewer logistics worth stating,
-    // and padding them back out would mean reintroducing filler.
-    ok(Array.isArray(o.expect) && o.expect.length >= 2, n + ': at least 2 what-to-expect bullets');
-    ok(o.cost === 0 || o.cost === 1 || o.cost === 2, n + ': cost is 0/1/2');
-    ok(o.solo >= 1 && o.solo <= 5, n + ': solo rating in range');
-    ok(o.gentleness >= 1 && o.gentleness <= 5, n + ': gentleness rating in range');
-    ok(FYC.STRUCTURE.indexOf(o.structure) !== -1, n + ': structure "' + o.structure + '" is known');
-    ok(FYC.COMMITMENT.indexOf(o.commitment) !== -1, n + ': commitment "' + o.commitment + '" is known');
-    (o.when || []).forEach(function (w) { ok(FYC.WHEN.indexOf(w) !== -1, n + ': when "' + w + '" is known'); });
-    (o.goals || []).forEach(function (gl) { ok(FYC.GOALS.indexOf(gl) !== -1, n + ': goal "' + gl + '" is known'); });
-    // Listings no longer ship pre-written messages for people to send.
-    ok(!o.script, n + ': carries no pre-written message');
+    listingInvariants(o);
   });
 
   // Every interest in the taxonomy should be reachable somewhere, or the UI
@@ -84,6 +99,27 @@ group('curated data integrity', function () {
   // Every city covers every interest, so no chip ever falls through to the
   // national routes in a curated city. Keeping this green is the standard a
   // newly added city has to meet.
+  //
+  // Breadth only, though, and that is worth saying out loud: an interest
+  // served by exactly one listing passed this identically to one served by
+  // five. It is why Denver could ship with twenty listings and seventeen of
+  // its thirty-two interests reachable through a single group — pick that
+  // interest and that one group is the whole of what the city has to offer
+  // you, and if its cost or its day is wrong for you there is no second
+  // answer. Nothing is broken by it: the matcher soft-scores rather than
+  // filtering, so every interest still returns something. It is a ceiling on
+  // quality, and the number below is what makes it visible at review time
+  // instead of invisible behind a green run.
+  var THIN = 2;
+  var thinCities = [];
+  FYC.cities.forEach(function (c) {
+    var thin = Object.keys(FYC.INTERESTS).filter(function (i) {
+      return c.orgs.filter(function (o) { return o.interests.indexOf(i) !== -1; }).length < THIN;
+    });
+    if (thin.length) thinCities.push(c.id + ': ' + thin.length);
+  });
+  console.log('    depth — interests with fewer than ' + THIN + ' listings: '
+    + (thinCities.length ? thinCities.join(', ') : 'none'));
   FYC.cities.forEach(function (c) {
     Object.keys(FYC.INTERESTS).forEach(function (i) {
       ok(c.orgs.some(function (o) { return o.interests.indexOf(i) !== -1; }),
@@ -106,11 +142,25 @@ group('city lookup', function () {
 group('universal fallback', function () {
   var r = FYC.buildUniversal('Boise, ID', ['running', 'volunteering']);
   ok(r.length >= 5, 'builds several routes for an uncurated city (' + r.length + ')');
-  r.forEach(function (o) {
-    ok(/^https:\/\//.test(o.url), o.id + ': generated https url');
-    ok(o.expect.length >= 2, o.id + ': has what-to-expect bullets');
-    ok(!!o.firstStep.label, o.id + ': has a first step');
-    ok(!o.script, o.id + ': carries no pre-written message');
+
+  // Every recipe, not the eleven that one interest pair happens to select.
+  // That pair picked the `always` ones plus running/fitness/outdoors/social
+  // and volunteering/civic/mentoring — so sixteen of the twenty-seven had
+  // their generated link and their bullets checked by nothing at all. Asking
+  // for every interest in the taxonomy builds all of them.
+  var every = FYC.buildUniversal('Dallas, TX', Object.keys(FYC.INTERESTS));
+  eq(every.length, FYC.RECIPES.length, 'every recipe can be built (' + every.length + ')');
+  var seen = {};
+  every.forEach(function (o) {
+    ok(!seen[o.id], o.id + ': unique id among the recipes');
+    seen[o.id] = true;
+    // The same invariants the curated listings have to meet. These go through
+    // the same card, the same matcher and the same ranking, so the shape they
+    // have to hold is the same shape.
+    listingInvariants(o);
+    ok(o.universal === true, o.id + ': is marked as a directory rather than a place');
+    ok(typeof o.name === 'string' && o.name.indexOf('{city}') === -1,
+       o.id + ': the city placeholder is filled in');
   });
   var urls = r.map(function (o) { return o.url; });
   ok(urls.some(function (u) { return u.indexOf('Boise') !== -1; }), 'city name is interpolated into at least one link');
@@ -364,6 +414,46 @@ group('adaptive intake', function () {
     ok(r.asked.length <= 20, 'never asks more than twenty (' + mode + ')');
     ok(r.asked.length >= 15, 'and gets a decent way through (' + mode + ': ' + r.asked.length + ')');
     eq(new Set(r.asked).size, r.asked.length, 'never repeats a question (' + mode + ')');
+  });
+
+  // The bar reaches the end of every run.
+  //
+  // progress() answered a flat total of 20, which is the ceiling and not the
+  // length of the run — the form is adaptive and stops the moment nothing is
+  // worth asking. The two assertions above have said for a long time that a
+  // run is 15 to 20 questions, so the bar stopped short of the end on most
+  // of them and aria-valuemax told a screen reader "16 of 20" about a form
+  // that had finished. The total moves while the form is filled in, because
+  // answering one thing is what makes another worth asking, so what has to
+  // hold is that it ends full and the bar never travels backwards.
+  [
+    ['first', function (q) { return q.kind === 'many' ? [q.options[0].id] : q.options[0].id; }],
+    ['last', function (q) { return q.kind === 'many' ? [q.options[q.options.length - 1].id] : q.options[q.options.length - 1].id; }],
+    ['skipped', function () { return null; }]
+  ].forEach(function (pair) {
+    var name = pair[0], choose = pair[1];
+    var s = I.blankState();
+    var last = -1, backwards = 0, steps = 0;
+    while (!I.done(s) && steps < 60) {
+      var q = I.nextQuestion(s);
+      if (!q) break;
+      var p = I.progress(s);
+      ok(p.asked <= p.total, 'never claims more asked than there are (' + name + ')');
+      var now = p.asked / p.total;
+      if (now < last - 1e-9) backwards++;
+      last = now;
+      if (q.kind === 'text') I.answer(s, q, 'Boston');
+      else {
+        var v = choose(q);
+        if (v === null) s.asked.push(q.id);
+        else I.answer(s, q, v);
+      }
+      steps++;
+    }
+    var end = I.progress(s);
+    eq(end.asked, end.total, 'the bar is full when the form ends (' + name + ')');
+    eq(backwards, 0, 'and never goes backwards on the way (' + name + ')');
+    ok(end.total <= I.TOTAL, 'and never claims more than the ceiling (' + name + ': ' + end.total + ')');
   });
 });
 
@@ -640,6 +730,11 @@ group('circles: bonds, escalating questions and if-then plans', function () {
   eq(FYC.promptDepth('Something nobody wrote'), 0, 'and an invented one belongs to no set');
   eq(FYC.PROMPTS.length, FYC.PROMPT_SETS.reduce(function (n, s) { return n + s.prompts.length; }, 0),
      'the flat list is exactly the three sets');
+  // Depth decides whether a circle has earned the next rung, so a prompt that
+  // appeared in two sets would be credited as the deeper one and let an easy
+  // question open the deep end. The round-trip above cannot catch that — it
+  // compares each prompt against the set it is iterating. This can.
+  eq(new Set(FYC.PROMPTS).size, FYC.PROMPTS.length, 'no prompt appears in two sets');
   eq(FYC.PROMPTS[0], FYC.PROMPT_SETS[0].prompts[0],
      'and starts at the shallow end, which is what a new circle opens with');
 
@@ -692,8 +787,13 @@ group('circles: turn-taking, the quiet, and what a circle is for', function () {
   ok(db.indexOf('GROUP BY sender_id ORDER BY n DESC LIMIT 1') !== -1,
      'the loudest single voice is measured');
   ok(circles.indexOf('c.max !== undefined') !== -1, 'and the front end draws the ceiling too');
-  ok(circles.indexOf('All five before anyone can propose a meetup') !== -1,
-     'the gate says there are five of them');
+  // This used to pin the literal "All five", two lines under a count read off
+  // the server's own `r.of`. Change the gate and one of them went stale, and
+  // it was the one that reads like the rule. Now both come from the same
+  // number, so what the suite can usefully pin is that it is not typed in.
+  ok(circles.indexOf("'All ' + numberWord(r.of) + ' before anyone can propose a meetup.'") !== -1,
+     'the gate counts its own rungs rather than naming a number');
+  ok(!/All five before anyone/.test(circles), 'with nothing left saying five on its own authority');
   ok(circles.indexOf("'Plan \\u00b7 ' + r.done + '/' + r.of") !== -1,
      'and the count is on the tab, where you can see it without opening the gate');
 
@@ -786,7 +886,20 @@ group('polish: the type, the colour and the motion', function () {
     return (hi + 0.05) / (lo + 0.05);
   }
   var light = tokens(css.slice(css.indexOf(':root {'), css.indexOf('/* Dark theme')));
-  var dark = tokens(css.slice(css.indexOf(':root[data-theme="dark"] {')));
+  // The dark values are declared once, as --d-*, and assigned twice: a media
+  // query and an attribute selector cannot be one rule, and the fifteen of
+  // them used to be typed out in full in both. That means the dark palette is
+  // no longer a block of hexes to read off — so this resolves the one
+  // indirection rather than finding nothing and quietly skipping every
+  // dark-mode contrast check, which is what a naive hex scan now does.
+  var declared = tokens(css.slice(css.indexOf('/* Dark theme'), css.indexOf('@media (prefers-color-scheme: dark)')));
+  var dark = {};
+  Object.keys(declared).forEach(function (k) {
+    if (k.indexOf('--d-') === 0) dark['--' + k.slice(4)] = declared[k];
+  });
+  dark['--focus'] = dark['--accent'];
+  ok(Object.keys(dark).length >= 10,
+     'the dark palette is readable from one place (' + Object.keys(dark).length + ' tokens)');
   [['light', light], ['dark', dark]].forEach(function (pair) {
     var name = pair[0], t = pair[1];
     ['--bg', '--bg-raised', '--bg-sunk', '--moss-soft', '--accent-soft'].forEach(function (surface) {
@@ -823,10 +936,16 @@ group('polish: the type, the colour and the motion', function () {
   ok(/\.pill:active[^{]*\{[^}]*transform: translateY\(1px\)/.test(css), 'and options press in');
 
   // 10. A group chat that yanks you to the bottom while you are reading back.
-  ok(circles.indexOf('var wasAtEnd = atEnd()') !== -1, 'following is conditional on being at the end');
+  ok(circles.indexOf('var wasAtEnd = showing && atEnd()') !== -1, 'following is conditional on being at the end');
   ok(circles.indexOf('function toEnd(') !== -1, 'and each scroll says whether it glides');
   ok(css.indexOf('.to-latest') !== -1 && circles.indexOf("class: 'to-latest'") !== -1,
      'with a way back to the newest message');
+  // The same courtesy in a one-to-one thread, which had the unfixed copy of
+  // this logic: `if (added) list.scrollTop = list.scrollHeight` on every poll.
+  ok(social.indexOf('var wasAtEnd = atEnd()') !== -1, 'and a direct conversation does the same');
+  ok(social.indexOf("class: 'to-latest'") !== -1, 'with the same way back');
+  ok(!/if \(added\) list\.scrollTop = list\.scrollHeight/.test(social),
+     'rather than yanking you to the bottom every five seconds');
   ok(!/scroll-behavior: smooth;[^}]*\}\s*$/m.test(css.slice(css.indexOf('.msg-list'), css.indexOf('.msg-list') + 220)),
      'the list itself does not glide, or opening a thread would ride the whole history');
 });
@@ -1194,7 +1313,33 @@ group('the pass over the whole thing: technical', function () {
 
   // 4. Choosing dark inside a light system left the browser's own chrome
   //    light: both theme-color tags are scoped by prefers-color-scheme.
-  ok(html.indexOf('name="theme-color" content="#fbf8f4" media=') !== -1, 'the scoped pair is still there');
+  //
+  //    This used to pin the literal #fbf8f4, which is how it went stale: the
+  //    palette moved off cream to #fafaf9 and the chrome did not, in eight
+  //    places — three HTML heads, the manifest's splash colour, app.js's
+  //    override tag and the Mac shell's error page — so the strip above the
+  //    page was a visibly different shade from the page, which is the exact
+  //    seam the unscoped tag was added to close. A test that names the colour
+  //    cannot catch that. Read it off the stylesheet instead, and the only
+  //    way to be wrong is to be out of step, which is the thing that matters.
+  var lightBg = (css.slice(css.indexOf(':root {'), css.indexOf('@media (prefers-color-scheme: dark)'))
+    .match(/--bg:\s*(#[0-9a-f]{6})/) || [])[1];
+  var darkBg = (css.match(/--d-bg:\s*(#[0-9a-f]{6})/) || [])[1];
+  ok(lightBg && darkBg, 'the stylesheet names a ground for each palette');
+  var manifest = fs.readFileSync(path.join(root, 'site.webmanifest'), 'utf8');
+  var swift = fs.readFileSync(path.join(root, 'mac/Sources/main.swift'), 'utf8');
+  [['index.html', html], ['privacy.html', fs.readFileSync(path.join(root, 'privacy.html'), 'utf8')],
+   ['terms.html', fs.readFileSync(path.join(root, 'terms.html'), 'utf8')]].forEach(function (pair) {
+    ok(pair[1].indexOf('content="' + lightBg + '" media="(prefers-color-scheme: light)"') !== -1,
+       pair[0] + ' paints the chrome the colour of the page');
+    ok(pair[1].indexOf('content="' + darkBg + '" media="(prefers-color-scheme: dark)"') !== -1,
+       'and the same in the dark');
+  });
+  ok(manifest.indexOf('"background_color": "' + lightBg + '"') !== -1,
+     'the installed app’s splash is the page, not the cream it used to be');
+  ok(app.indexOf("BAR = { light: '" + lightBg + "', dark: '" + darkBg + "' }") !== -1,
+     'and so is the tag that overrides them when the theme is chosen by hand');
+  ok(swift.indexOf('background: ' + lightBg) !== -1, 'the Mac shell’s own page agrees');
   ok(app.indexOf('theme-color-pick') !== -1, 'and a third, unscoped tag follows the choice');
   ok(app.indexOf('paintBrowserChrome(currentTheme())') !== -1, 'set on load as well as on click');
 
@@ -1502,18 +1647,45 @@ group('offline: the app when the network is not there', function () {
   });
   eq(precached.length, listed.length, 'and the install asks for all of them');
 
-  // The list cannot be allowed to drift behind index.html: a city file added
+  // The list cannot be allowed to drift behind the pages: a city file added
   // to the page and not to the shell is a city that vanishes offline.
-  var scripts = (html.match(/<script src="([^"]+)"/g) || []).map(function (t) {
-    return t.replace(/<script src="/, '').replace(/"$/, '');
+  //
+  // This read <script src> out of index.html and nothing else — so a new
+  // <link>, an <img>, or anything privacy.html and terms.html reference was
+  // covered by three hardcoded assertions and then by nothing. Both of those
+  // pages are in the shell themselves, so what they ask for has to be there
+  // too, or they open offline missing their stylesheet.
+  var cachedPages = ['index.html', 'privacy.html', 'terms.html'];
+  var totalRefs = 0;
+  cachedPages.forEach(function (page) {
+    ok(listed.indexOf(page) !== -1, page + ' is in the shell');
+    var src = fs.readFileSync(path.join(root, page), 'utf8');
+    var refs = [];
+    (src.match(/<script[^>]+src="([^"]+)"/g) || []).forEach(function (t) {
+      refs.push(t.replace(/.*src="/, '').replace(/"$/, ''));
+    });
+    // Every <link> that fetches something: the stylesheet, the icons, the
+    // manifest. rel="canonical" and the like point outward and are skipped.
+    (src.match(/<link[^>]*>/g) || []).forEach(function (tag) {
+      var rel = (tag.match(/rel="([^"]+)"/) || [])[1] || '';
+      if (!/stylesheet|icon|manifest/.test(rel)) return;
+      var href = (tag.match(/href="([^"]+)"/) || [])[1];
+      if (href && !/^https?:|^data:/.test(href)) refs.push(href);
+    });
+    (src.match(/<img[^>]+src="([^"]+)"/g) || []).forEach(function (t) {
+      var s = t.replace(/.*src="/, '').replace(/"$/, '');
+      if (!/^https?:|^data:/.test(s)) refs.push(s);
+    });
+    refs.forEach(function (ref) {
+      totalRefs++;
+      ok(listed.indexOf(ref) !== -1, 'the shell covers ' + ref + ' (asked for by ' + page + ')');
+    });
   });
-  ok(scripts.length >= 22, 'the page loads every city and module');
-  scripts.forEach(function (src) {
-    ok(listed.indexOf(src) !== -1, 'the shell covers ' + src);
-  });
-  ok(listed.indexOf('assets/styles.css') !== -1, 'and the stylesheet');
-  ok(listed.indexOf('site.webmanifest') !== -1, 'and the manifest');
-  ok(listed.indexOf('assets/icon.svg') !== -1, 'and the icon');
+  ok(totalRefs >= 26, 'and there is a real page behind that (' + totalRefs + ' references)');
+  // A stylesheet that fetches is a request the page makes too. There is none
+  // today, which is the only reason the shell can be a flat list of files.
+  ok(!/url\(|@import|@font-face/.test(css),
+     'the stylesheet fetches nothing of its own, so the shell is the whole app');
 
   // --- how it keeps itself honest -----------------------------------------
   ok(/fyc-shell-' \+ VERSION/.test(swSrc), 'the cache name carries a version');
@@ -1531,11 +1703,32 @@ group('offline: the app when the network is not there', function () {
   // the "new HTML driving old JavaScript" deploy the ETag in server/app.js
   // exists to prevent. The live copy wins whenever there is one.
   ok(swSrc.indexOf('raceNetwork') !== -1, 'the network is asked first');
-  // Asserted as "the cache is consulted in the network's catch", not as the
-  // exact call: the argument changed when the shell gained a canonical key,
-  // and an assertion on the spelling would have failed for the wrong reason.
-  ok(/raceNetwork\(req\)\.catch\(function \(\) \{(\s*\/\/[^\n]*)*\s*return caches\.match\(/.test(swSrc),
+  // Asserted as "the cache is what answers when the network does not",
+  // rather than as the exact call: it has changed shape twice now, once when
+  // the shell gained a canonical key and once when the fallback became a
+  // named function, and an assertion on the spelling fails for the wrong
+  // reason each time.
+  ok(/function fromCache\(\)/.test(swSrc) && /caches\.match\(shellKey\(url\) \|\| req\)/.test(swSrc),
      'and the cache is what answers when it cannot');
+  ok(/raceNetwork\(req\)\.then\([\s\S]{0,200}?fromCache\s*\)/.test(swSrc),
+     'with the cache standing behind every live request');
+
+  // The stopwatch is per request, so on a connection that straddles 2500 ms
+  // index.html can come back fresh while eight of the twenty-three scripts
+  // come back from the cache — new HTML driving old JavaScript again, by a
+  // different route than cache-first. A page served from the cache now has
+  // its subresources served from the cache too, so a load is all one build.
+  ok(/var cachedClients = Object\.create\(null\)/.test(swSrc),
+     'the worker remembers where each page came from');
+  ok(/if \(!navigating && who && cachedClients\[who\]\)/.test(swSrc),
+     'and a cached page gets cached scripts rather than a mixed shell');
+  ok(/if \(navigating\) noteSource\(who, false\);/.test(swSrc), 'a live page clears it again');
+  // One worker serves every tab, so a single flag would let a window open
+  // offline pin a live window's scripts to the cache — the same bug with a
+  // smaller audience. resultingClientId is the page a navigation is about to
+  // become; clientId is that page, for everything that follows.
+  ok(/e\.resultingClientId \|\| e\.clientId/.test(swSrc), 'keyed to the page, not to the worker');
+  ok(/self\.clients\.matchAll/.test(swSrc), 'and tabs that have closed are forgotten');
   // Plain network-first makes a bad connection worse than no worker at all:
   // a request that will fail in thirty seconds blocks a file already on the
   // device, on exactly the bus this is for.
@@ -1673,6 +1866,17 @@ group('one copy of each helper, and a back button', function () {
   ok(app.indexOf('else if (!seedFromLink(urlOrg())) paintIntake();') !== -1,
      'and answers already given win over it');
 
+  // "See results now" did not survive a reload. The session is saved, but
+  // nothing recorded that results had been asked for — so boot saw an
+  // unfinished form and put question ten back on the screen, taking away the
+  // list that was being read. The three ways of asking to be in the form
+  // again all spend it.
+  ok(/if \(early && !session\.early\)/.test(app), 'leaving the form early is remembered');
+  ok(/if \(\(I\.done\(session\) \|\| wasEarly\) && session\.city\) finish\(false\);/.test(app),
+     'so a reload opens on the results rather than the next question');
+  eq((app.match(/session\.early = false/g) || []).length, 3,
+     'and Back, re-asking and Change answers each put you back in the form');
+
   // --- 3. the title -------------------------------------------------------
   ok(app.indexOf('function setTitle(') !== -1, 'the page is named after the screen');
   ok(/TAB_TITLE = \{/.test(app), 'one name per tab');
@@ -1707,7 +1911,12 @@ group('one copy of each helper, and a back button', function () {
   // fitted in the 64KB body limit, and the composer said nothing.
   ok(/const MAX_MESSAGE = (\d+)/.test(server), 'the server caps a message');
   var cap = Number((server.match(/const MAX_MESSAGE = (\d+)/) || [])[1]);
-  eq((server.match(/text\.length > MAX_MESSAGE/g) || []).length, 2, 'on both routes that store one');
+  // Four, not two. /api/direct and the circle side thread both stored a
+  // message and neither checked its length: addMessage truncates at 2000, so
+  // a 50,000-character body was accepted and silently cut in half a hundred
+  // times over. Every route that writes a message now refuses an oversized
+  // one instead.
+  eq((server.match(/text\.length > MAX_MESSAGE/g) || []).length, 4, 'on all four routes that store one');
   ok(social.indexOf("maxlength: '" + cap + "'") !== -1, 'the direct composer stops there too');
   ok(circles.indexOf("maxlength: '" + cap + "'") !== -1, 'and the circle composer');
 
@@ -1786,10 +1995,28 @@ group('the quiet pass: polling, announcements and an icon iOS will take', functi
   //    counter: a failed sign-in or send said nothing at all. This is where
   //    the network messages from the last commit land.
   eq((app.match(/class: 'err', role: 'alert'/g) || []).length, 1, 'the intake error announces itself');
-  eq((social.match(/class: 'err', role: 'alert'/g) || []).length, 6, 'and all six in social.js');
-  eq((circles.match(/class: 'err', role: 'alert'/g) || []).length, 3, 'and all three in circles.js');
+  // These two used to be counted one by one in each file, because each file
+  // wrote the line out by hand. It is one helper in dom.js now, so what
+  // matters is that both files take it from there rather than keeping a copy
+  // that can drift — which is the whole reason dom.js exists.
+  ok(/function errLine\(\)/.test(dom) && /role: 'alert'/.test(dom),
+     'the error line is written once, in dom.js');
+  ok(/errLine = D\.errLine/.test(social) && /errLine = D\.errLine/.test(circles),
+     'and both feature files take it from there');
+  ok((social.match(/errLine\(\)/g) || []).length >= 6, 'social.js still has one everywhere it needs one');
+  ok((circles.match(/errLine\(\)/g) || []).length >= 3, 'and so does circles.js');
   ok(social.indexOf("class: 'err' }") === -1 && circles.indexOf("class: 'err' }") === -1,
      'with none left silent');
+
+  // 2b. And a handler that talks to the server says so when it fails.
+  //     Twelve of them were a bare `await api(...)` followed by a re-render:
+  //     on a rejection the re-render never ran and nothing reached the
+  //     screen, so a failed Remove or Save looked exactly like a click that
+  //     did nothing. Two sat behind a confirm(), which makes it worse.
+  ok(/function guard\(node, fn\)/.test(dom), 'dom.js has one way to run a click that can fail');
+  ok(/catch \(e\) \{ showErr\(node, e\); \}/.test(dom), 'which puts the reason on the screen');
+  ok((social.match(/guard\(/g) || []).length >= 5, 'social.js uses it on the silent ones');
+  ok((circles.match(/guard\(/g) || []).length >= 4, 'and so does circles.js');
 
   // 3. Same fault as the Saved badge, left in two places when that was fixed.
   ok(/aria-label', 'Circles, ' \+ n \+ ' waiting'/.test(circles), 'the circles badge says what it counts');
@@ -2114,11 +2341,28 @@ group('seven smaller things, each in its own place', function () {
     return sandbox.CACHE;
   }
   var name = cacheName(swSrc);
-  ok(/^fyc-shell-v1-[0-9a-z]+$/.test(name), 'the cache name carries a fingerprint as well as a version');
+  // This used to pin the literal v1 — which made the one documented way to
+  // throw every device's cache away, bumping the version by hand, fail CI.
+  ok(/^fyc-shell-v\d+-[0-9a-z]+-[0-9a-z]+$/.test(name),
+     'the cache name carries a version, the shell list and a digest of its contents (' + name + ')');
   var moved = cacheName(swSrc.replace("  'src/circles.js'\n];", "  'src/circles.js',\n  'src/something-new.js'\n];"));
   ok(moved !== name, 'and it changes when a file is added to the shell');
   eq(cacheName(swSrc), name, 'while the same list always gives the same name');
   ok(swSrc.indexOf('src/dom.js') !== -1, 'the file that was forgotten is in the shell');
+
+  // The list fingerprint changes when a file is added; it says nothing about
+  // a file being *edited*, which is what actually happens between deploys.
+  // So a device that installed the worker and then went offline kept the
+  // styles.css and app.js it had on the day, indefinitely, under a cache name
+  // that still looked current. The digest is stamped in by `npm run stamp`
+  // and checked here, because a worker cannot hash files at run time and this
+  // project has no build step to do it at.
+  ok(/var SHELL_HASH = '[0-9a-z]+'/.test(swSrc), 'the worker carries a digest of the shell contents');
+  // --check only reads; the stamping half is a separate run of the same file.
+  var stampOut = require('node:child_process')
+    .spawnSync(process.execPath, [path.join(root, 'tools/stamp.js'), '--check'], { encoding: 'utf8' });
+  eq(stampOut.status, 0, 'and it is current — run `npm run stamp` if this fails. ' +
+     String(stampOut.stderr || '').trim().replace(/\n\s*/g, ' '));
 });
 
 group('a directory searched for what it is actually about', function () {
@@ -2322,10 +2566,91 @@ group('the shell cache holds the shell, and not a token', function () {
   eq(put.length, 0, 'a 404 and an opaque response are both refused, as before');
 });
 
+// The README is the thing most people see and the thing most likely to drift
+// away from what is actually here. These check the parts of it that are
+// claims about the repository rather than prose about the idea.
+group('the README is about this repository', function () {
+  var fs = require('fs');
+  var read = function (p) { return fs.readFileSync(path.join(root, p), 'utf8'); };
+  var readme = read('README.md');
+
+  // It was 802 lines with no picture in it, which is the research shape; this
+  // is a product. A line on what it is, then visuals, then links.
+  var lines = readme.split('\n').length;
+  ok(lines < 200, 'it reads at a glance (' + lines + ' lines)');
+  var images = readme.match(/!\[[^\]]*\]\(([^)]+)\)/g) || [];
+  ok(images.length >= 2, 'with real visuals (' + images.length + ')');
+  images.forEach(function (tag) {
+    var alt = (tag.match(/!\[([^\]]*)\]/) || [])[1] || '';
+    var src = (tag.match(/\(([^)]+)\)/) || [])[1];
+    ok(alt.length > 12, 'the picture of ' + src + ' describes itself to somebody who cannot see it');
+    ok(fs.existsSync(path.join(root, src)), src + ' exists');
+    var png = fs.readFileSync(path.join(root, src));
+    eq(png.slice(1, 4).toString('latin1'), 'PNG', src + ' is really a PNG');
+    ok(png.readUInt32BE(16) >= 1000, src + ' is wide enough to read (' + png.readUInt32BE(16) + 'px)');
+  });
+  ok(/```mermaid/.test(readme), 'and a diagram of how it works');
+
+  // Every linked file is a file.
+  (readme.match(/\]\((?!https?:)([^)#]+)(?:#[^)]*)?\)/g) || []).forEach(function (link) {
+    var target = (link.match(/\]\(([^)#]+)/) || [])[1];
+    ok(fs.existsSync(path.join(root, target)), 'the README links to ' + target + ', which exists');
+  });
+
+  // The four documents the project asks for, and the README pointing at them.
+  ['docs/SYSTEM-DESIGN.md', 'docs/INSTRUCTIONS.md', 'docs/FILE-STRUCTURE.md'].forEach(function (doc) {
+    ok(fs.existsSync(path.join(root, doc)), doc + ' exists');
+    ok(readme.indexOf(doc) !== -1, 'and the README links to it');
+    ok(read(doc).split('\n').length > 60, 'and it has something in it');
+  });
+  var design = read('docs/SYSTEM-DESIGN.md');
+  ok(/```mermaid/.test(design), 'the design doc has its architecture diagram');
+  ok(/threat model/i.test(design), 'and records the threat model, which the spec asks to be kept there');
+  ok(/## Known limits/.test(design), 'and says what it does not do');
+
+  // Numbers in the README that are facts about the data.
+  var orgs = FYC.allOrgs().length;
+  ok(readme.indexOf(String(orgs)) !== -1, 'the README’s listing count is the real one (' + orgs + ')');
+  ok(readme.indexOf(String(Object.keys(FYC.INTERESTS).length) + ' interests') !== -1,
+     'and so is its interest count');
+  ok(readme.indexOf(String(FYC.cities.length)) !== -1 || /[Tt]hirteen/.test(readme),
+     'and its city count');
+  // The host that actually serves it. github.io answers 301 and sends
+  // everything to the custom domain, so a link to it is a link to a redirect.
+  ok(readme.indexOf('amalmehta.com/community_finder/') !== -1, 'it links to the host that serves it');
+  ok(readme.indexOf('amalmehta.github.io') === -1, 'and not to the one that redirects');
+});
+
 group('eight more, and where each of them was', function () {
   var fs = require('fs');
   var read = function (p) { return fs.readFileSync(path.join(root, p), 'utf8'); };
   var privacy = read('privacy.html'), terms = read('terms.html');
+
+  // 0. The page promised two things the app did not do.
+  //
+  //    It listed everything the server holds about someone and then said to
+  //    ask whoever runs it to delete the account — which is an answer about a
+  //    person, not a thing the software does, and the only promise on that
+  //    page the code did not keep. The spec asks for both outright: say what
+  //    is stored, where, and who can see it, "with a way to export and delete
+  //    it". Pinned to the routes and the buttons, not to the prose, because
+  //    prose is what was already there.
+  var srv = read('server/app.js'), soc = read('src/social.js');
+  ok(/route\('GET', \/\^\\\/api\\\/me\\\/export\$\//.test(srv), 'the server can hand back everything it holds');
+  ok(/route\('DELETE', \/\^\\\/api\\\/me\$\//.test(srv), 'and can end an account');
+  ok(/verifyPassword\(String\(body\.password \|\| ''\), u\.salt, u\.pass\)[\s\S]{0,120}That password does not match/.test(srv),
+     'which takes the password, not just the cookie');
+  ok(/exportOf\(userId\)/.test(read('server/db.js')), 'the export is one query set, in one place');
+  ok(/deleteUser\(userId\)/.test(read('server/db.js')), 'and so is the deletion');
+  ok(soc.indexOf("['Download everything']") !== -1, 'the You tab offers the download');
+  ok(soc.indexOf("['Delete my account']") !== -1, 'and the ending');
+  ok(privacy.indexOf('Download everything') !== -1 && privacy.indexOf('Delete my account') !== -1,
+     'and the privacy page names the two buttons rather than naming a person to ask');
+  // A circle with other people in it is not the host's to delete.
+  ok(/ORDER BY joined_at ASC LIMIT 1/.test(read('server/db.js')),
+     'a hosted circle is handed to whoever has been in it longest');
+  ok(/sender_id {2}INTEGER REFERENCES users\(id\) ON DELETE SET NULL/.test(read('server/db.js')),
+     'and what was said in a circle outlives the account that said it, unattributed');
 
   // 1. On Pages the app is at /community_finder/, so "/" left the site.
   [['privacy.html', privacy], ['terms.html', terms]].forEach(function (pair) {
@@ -2355,7 +2680,10 @@ group('eight more, and where each of them was', function () {
 
   // 4. The Mac bundle shipped the app without the pages its footer links to.
   var build = read('mac/build.sh');
-  ['index.html', 'privacy.html', 'terms.html', 'site.webmanifest'].forEach(function (f) {
+  // sw.js joined this list because index.html registers it on any localhost
+  // origin, and the bundled server is one — so the Mac app asked for a file
+  // it had not been given, on every launch.
+  ['index.html', 'privacy.html', 'terms.html', 'site.webmanifest', 'sw.js'].forEach(function (f) {
     ok(build.indexOf('"$ROOT/' + f + '"') !== -1, 'the Mac bundle includes ' + f);
   });
 
@@ -2403,8 +2731,14 @@ group('eight more, and where each of them was', function () {
   eq(png.readUInt32BE(20), 630, 'and 630 high');
   ok(png.length > 8000, 'and it is not an empty canvas');
   ok(fs.existsSync(path.join(root, 'assets/social.svg')), 'the drawing it came from is kept');
-  ok(read('README.md').indexOf('rsvg-convert -w 1200 -h 630') !== -1,
-     'and the README says how to make it again');
+  // The command moved out of the README with the rest of the detail. It is
+  // about what a file in the repository *is*, so it is where the files are
+  // described — and both rasters are generated, so both are named there.
+  var structure = read('docs/FILE-STRUCTURE.md');
+  ok(structure.indexOf('rsvg-convert -w 1200 -h 630') !== -1,
+     'the file-structure doc says how to make the share card again');
+  ok(structure.indexOf('rsvg-convert -w 180 -h 180') !== -1,
+     'and the home-screen icon too');
 });
 
 group('the end of the form is not a room with no door', function () {
@@ -2665,8 +2999,23 @@ group('the front door: no wall, and three fields behind it', function () {
 
   // Signing out leaves the app standing, so whatever is on screen has to be
   // repainted — it used to be covered by the gate instead.
-  ok(/S\.user = null;[\s\S]{0,600}window\.FYC_VIEWS\.you\(\)/.test(social),
+  ok(/S\.user = null;[\s\S]{0,1200}window\.FYC_VIEWS\.you\(\)/.test(social),
      'signing out repaints the You tab');
+  // And takes everything that was running for that person with it. circles.js
+  // keeps its own poller, which only show() ever stopped — and signing out
+  // does not call show(), so a circle left open went on fetching its messages
+  // every five seconds, with no session, until the next reload.
+  ok(/S\.user = null;[\s\S]{0,1200}window\.FYC_CIRCLES\.stop\(\)/.test(social),
+     'and stops the circles poller, which it never did');
+  ok(/S\.user = null;[\s\S]{0,1200}window\.FYC_CIRCLES\.clearBadge\(\)/.test(social),
+     'and takes the last person’s unread count off the tab');
+  ok(/S\.user = null;[\s\S]{0,1200}stopCounts\(\)/.test(social),
+     'and stops the thirty-second counts loop');
+  // The turnstile could not cross the file boundary: circles.js has its own,
+  // so nothing outside it could supersede a circle that was still loading.
+  ok(/function leave\(\) \{\s*\n\s*views\.take\(\);\s*\n\s*stop\(\);/.test(circles),
+     'leaving circles takes a ticket as well as cancelling the poller');
+  ok(/stop: leave,/.test(circles), 'and that is what the rest of the app calls');
   ok(/if \(!S\.user\) \{\s*\n\s*return el\('article'/.test(social),
      'which has something to say to someone signed out');
 

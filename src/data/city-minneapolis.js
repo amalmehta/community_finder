@@ -41,10 +41,13 @@
         when: ['weekday-eve'], size: 'medium', goals: ['skill', 'friends']
       },
       {
-        id: 'msp-ourstreets', name: 'Our Streets Minneapolis', neighborhood: 'Citywide',
+        // Renamed from Our Streets Minneapolis, and the mpls domain no longer
+        // resolves — caught by the weekly link check. It still works statewide
+        // from Minneapolis; the events page is the one with dates on it.
+        id: 'msp-ourstreets', name: 'Our Streets', neighborhood: 'Citywide',
         blurb: 'Campaigns for streets that work for walking, biking and rolling, with volunteer events and neighbourhood organising.',
-        interests: ['cycling', 'civic', 'environment', 'volunteering'], url: 'https://www.ourstreetsmpls.org/',
-        firstStep: { kind: 'rsvp', label: 'Come to a volunteer event or a campaign meeting', url: 'https://www.ourstreetsmpls.org/', when: 'Events and meetings monthly' },
+        interests: ['cycling', 'civic', 'environment', 'volunteering'], url: 'https://www.ourstreetsmn.org/',
+        firstStep: { kind: 'rsvp', label: 'Come to a volunteer event or a campaign meeting', url: 'https://www.ourstreetsmn.org/events/', when: 'Events and meetings monthly' },
         expect: ['Meetings open with introductions', 'Free', 'You are given something concrete to do if you want it'],
         solo: 4, gentleness: 4, structure: 'rsvp', commitment: 'weekly', cost: 0,
         when: ['weekday-eve', 'weekend'], size: 'medium', goals: ['impact', 'friends']

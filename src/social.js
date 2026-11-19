@@ -17,38 +17,15 @@
   // Which view is current. See FYC_DOM.turnstile.
   var views = D.turnstile();
   var el = D.el, svg = D.svg, $ = D.$, api = D.api, label = D.label, ago = D.ago;
+  // Written out by hand in six places in this file before they lived in dom.js.
+  var errLine = D.errLine, showErr = D.showErr, guard = D.guard;
 
   // ---------- the sign-in gate ----------
-  function interestPicker(selected) {
-    var chosen = {};
-    (selected || []).forEach(function (i) { chosen[i.id] = i.visible !== false; });
-    var box = el('div', { class: 'groups' });
-    FYC.GROUPS.forEach(function (grp) {
-      var pills = el('div', { class: 'pills' });
-      grp.interests.forEach(function (i) {
-        var btn = el('button', {
-          type: 'button', class: 'pill', 'data-pick': i.id,
-          'aria-pressed': chosen[i.id] ? 'true' : 'false',
-          onclick: function () {
-            var on = btn.getAttribute('aria-pressed') === 'true';
-            btn.setAttribute('aria-pressed', on ? 'false' : 'true');
-          }
-        }, [
-          (art() && art().pictogram(i.id)) ||
-            el('span', { 'aria-hidden': 'true', text: i.icon }),
-          el('span', { text: i.label })
-        ]);
-        pills.appendChild(btn);
-      });
-      box.appendChild(el('div', { class: 'group' }, [el('h3', { text: grp.label }), pills]));
-    });
-    return box;
-  }
-
-  function pickedInterests(scope) {
-    return Array.prototype.slice.call(scope.querySelectorAll('[data-pick][aria-pressed="true"]'))
-      .map(function (b) { return { id: b.getAttribute('data-pick'), visible: true }; });
-  }
+  // interestPicker() and pickedInterests() stood here: a thirty-two-pill
+  // chooser and the function that read it. Nothing has called either since
+  // the sign-up wall came down and the front door went to three fields — the
+  // city and the interests come from the answers already given to the finder.
+  // Twenty-nine lines of a screen that no longer exists.
 
   /**
    * The whole of making an account: a username, a password, and whether you
@@ -72,7 +49,7 @@
   function authCard(opts) {
     opts = opts || {};
     var signup = opts.mode !== 'login';
-    var err = el('p', { class: 'err', role: 'alert', hidden: true });
+    var err = errLine();
 
     // What the finder already knows. Nothing is asked for twice.
     var saved = null;
@@ -290,6 +267,11 @@
   }
 
   async function renderPeople() {
+    // The one view in this file with no ticket. Toggling People → Chats →
+    // People faster than the two requests come back left two runs in flight,
+    // and both painted: every person twice, with duplicate person-N ids, so
+    // the graph's jump-to-card landed on whichever copy came first.
+    var mine = views.take();
     var host = $('#people-body');
     function reset() { host.innerHTML = ''; host.appendChild(segBar('people')); }
     reset();
@@ -297,14 +279,18 @@
 
     var data, graph;
     try {
-      data = await api('GET', '/api/people');
-      graph = await api('GET', '/api/graph');
+      // Independent of each other.
+      var both = await Promise.all([api('GET', '/api/people'), api('GET', '/api/graph')]);
+      data = both[0];
+      graph = both[1];
     }
     catch (e) {
+      if (!views.current(mine)) return;
       reset();
       host.appendChild(el('p', { class: 'err', role: 'alert', text: e.message }));
       return;
     }
+    if (!views.current(mine)) return;
     reset();
     S.people = data.people;
 
@@ -319,12 +305,21 @@
     // scroll past every time. Folded away; the list is the page.
     if (graph && graph.nodes.filter(function (n) { return n.kind === 'person'; }).length) {
       var fold = el('details', { class: 'fold' }, [
-        el('summary', { text: 'How you overlap' }),
-        graphSvg(graph, function (n) {
+        el('summary', { text: 'How you overlap' })
+      ]);
+      // Drawn when it is opened, not before. The layout is 260 iterations of
+      // an all-pairs repulsion loop — at forty people and thirty-two
+      // interests, something like 650,000 inner steps on the main thread,
+      // before a single card painted, for a fold most people never open. It
+      // is deterministic, so building it later is the same picture.
+      fold.addEventListener('toggle', function () {
+        if (!fold.open || fold.dataset.drawn) return;
+        fold.dataset.drawn = '1';
+        fold.appendChild(graphSvg(graph, function (n) {
           var card = document.getElementById('person-' + n.userId);
           if (card) { card.scrollIntoView({ block: 'center' }); card.classList.add('flash'); setTimeout(function () { card.classList.remove('flash'); }, 1200); }
-        })
-      ]);
+        }));
+      });
       host.appendChild(fold);
     }
 
@@ -349,7 +344,7 @@
         class: 'intro-box', hidden: true, maxlength: direct ? '2000' : '300',
         placeholder: direct ? 'Message' : 'Say hello in 300 characters'
       });
-      var err = el('p', { class: 'err', role: 'alert', hidden: true });
+      var err = errLine();
 
       var card = el('article', { class: 'card person', id: 'person-' + p.id }, [
         el('div', { class: 'person-top' }, [
@@ -391,18 +386,18 @@
           // Block and report are safety valves, not things you do to five
           // people a day. One button per card, and these as quiet text.
           el('span', { class: 'quiet-acts' }, [
-            el('button', { class: 'linkish', type: 'button', onclick: async function () {
+            el('button', { class: 'linkish', type: 'button', onclick: guard(err, async function () {
               if (!confirm('Block ' + p.display + '? They will disappear from your results and cannot contact you.')) return;
               await api('POST', '/api/blocks', { userId: p.id });
               renderPeople();
-            } }, ['Block']),
-            el('button', { class: 'linkish', type: 'button', onclick: async function () {
+            }) }, ['Block']),
+            el('button', { class: 'linkish', type: 'button', onclick: guard(err, async function () {
               var reason = prompt('What is the problem? (harassment, spam, fake profile, other)');
               if (!reason) return;
               await api('POST', '/api/reports', { userId: p.id, reason: reason });
               alert('Reported, and they are now blocked.');
               renderPeople();
-            } }, ['Report'])
+            }) }, ['Report'])
           ])
         ])
       ]);
@@ -438,23 +433,28 @@
         el('h2', { text: 'Introductions' })
       ]));
       reqs.incoming.forEach(function (r) {
+        // Three answers to an introduction, none of which used to say
+        // anything when the request failed: the card simply stayed where it
+        // was, which is also what it does when nothing is wrong.
+        var reqErr = errLine();
         host.appendChild(el('article', { class: 'card' }, [
           el('h3', { text: r.other_name }),
           el('p', { class: 'where', text: [r.other_city, ago(r.created_at)].filter(Boolean).join(' · ') }),
           el('p', { class: 'intro-text', text: r.intro }),
+          reqErr,
           el('div', { class: 'actions' }, [
-            el('button', { class: 'btn sm', type: 'button', onclick: async function () {
+            el('button', { class: 'btn sm', type: 'button', onclick: guard(reqErr, async function () {
               await api('POST', '/api/requests/' + r.id + '/accept');
               renderMessages(); refreshCounts();
-            } }, ['Accept']),
-            el('button', { class: 'btn ghost sm', type: 'button', onclick: async function () {
+            }) }, ['Accept']),
+            el('button', { class: 'btn ghost sm', type: 'button', onclick: guard(reqErr, async function () {
               await api('POST', '/api/requests/' + r.id + '/decline');
               renderMessages(); refreshCounts();
-            } }, ['Decline']),
-            el('button', { class: 'btn ghost sm', type: 'button', onclick: async function () {
+            }) }, ['Decline']),
+            el('button', { class: 'btn ghost sm', type: 'button', onclick: guard(reqErr, async function () {
               await api('POST', '/api/blocks', { userId: r.from_id });
               renderMessages(); refreshCounts();
-            } }, ['Block'])
+            }) }, ['Block'])
           ])
         ]));
       });
@@ -485,7 +485,11 @@
 
     threads.forEach(function (t) {
       host.appendChild(el('article', {
+        // Same as a circle card: the button is named for the person, and the
+        // last message, the time and the unread count stay as content rather
+        // than being read out as part of its name.
         class: 'card thread', role: 'button', tabindex: '0',
+        'aria-label': 'Conversation with ' + t.other_name,
         onclick: function () { openThread(t); },
         onkeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openThread(t); } }
       }, [
@@ -509,6 +513,11 @@
     if (S.poll) { S.poll(); S.poll = null; }
   }
 
+  /** The thirty-second unread count, which only means anything signed in. */
+  function stopCounts() {
+    if (S.counts) { S.counts(); S.counts = null; }
+  }
+
   async function openThread(t) {
     var mine = views.take();
     stopPolling();
@@ -519,8 +528,12 @@
     // role="log" carries aria-live="polite": a reply arriving on the 5s poll
     // was appended silently, so the only way to find out somebody had written
     // back was to go and read the page again.
+    // aria-live starts off: the list is in the document before the first
+    // fetch, so a region meant for arriving replies read the whole history
+    // out as live updates when the thread opened. Switched on after the
+    // first pull, when everything that lands really is news.
     var list = el('div', { class: 'msg-list', id: 'msg-list', role: 'log',
-      'aria-label': 'Messages with ' + t.other_name });
+      'aria-live': 'off', 'aria-label': 'Messages with ' + t.other_name });
     // Matches the server's cap; the only two textareas in the app that had none.
     // The placeholder is not a name — it is not read by every screen reader
     // and it disappears the moment anything is typed. This is the control the
@@ -528,7 +541,7 @@
     var input = el('textarea', { class: 'msg-input', maxlength: '2000',
       'aria-label': 'Write a message to ' + t.other_name,
       placeholder: 'Write a message…', rows: '2' });
-    var err = el('p', { class: 'err', role: 'alert', hidden: true });
+    var err = errLine();
     var lastId = 0;
     var seen = Object.create(null);   // message ids already on screen
     var pulling = false;              // only one request in flight at a time
@@ -536,9 +549,30 @@
     // Sending triggers a pull, and so does the 5s timer. Without the guard and
     // the id check, two overlapping pulls share a cursor and render the same
     // message twice.
+    // Within a couple of lines of the end counts as being at the end. Same
+    // rule as a circle's chat, which solved this and kept the solution to
+    // itself: a one-to-one thread yanked you to the bottom on every poll, so
+    // reading back through a conversation was interrupted every five seconds
+    // by a jump with nothing to explain it and no way back but scrolling.
+    function atEnd() {
+      return list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+    }
+    function toEnd(glide) {
+      list.scrollTo({ top: list.scrollHeight, behavior: glide ? 'smooth' : 'auto' });
+    }
+    var toLatest = el('button', {
+      class: 'to-latest', type: 'button', hidden: true,
+      onclick: function () { toEnd(false); toLatest.hidden = true; }
+    }, ['New messages ↓']);
+    list.addEventListener('scroll', function () { if (atEnd()) toLatest.hidden = true; });
+
     async function pull() {
       if (pulling || !views.current(mine)) return;
       pulling = true;
+      // Measured before anything is appended, or the new message is already
+      // part of the height being measured against.
+      var wasAtEnd = atEnd();
+      var first = !lastId;
       try {
         var r = await api('GET', '/api/threads/' + t.id + '/messages?since=' + lastId);
         if (!views.current(mine)) return;
@@ -553,7 +587,11 @@
             el('span', { class: 'msg-time', text: ago(m.created_at) })
           ]));
         });
-        if (added) list.scrollTop = list.scrollHeight;
+        if (added) {
+          if (wasAtEnd) { toEnd(!first); toLatest.hidden = true; }
+          else toLatest.hidden = false;
+        }
+        if (first) list.setAttribute('aria-live', 'polite');
       } catch (e) { /* transient */ } finally {
         pulling = false;
       }
@@ -567,30 +605,36 @@
         await api('POST', '/api/threads/' + t.id + '/messages', { body: text });
         input.value = '';
         await pull();
-      } catch (e) { err.textContent = e.message; err.hidden = false; }
+        // Saying something is always a reason to be shown the end of it.
+        toEnd(false);
+        toLatest.hidden = true;
+      } catch (e) { showErr(err, e); }
     }
 
     host.appendChild(el('div', { class: 'results-head' }, [
       el('h2', { text: t.other_name }),
       el('p', { text: t.other_city || '' })
     ]));
+    // Block and Report both sit behind a confirm, so a failure that showed
+    // nothing left the person certain it had happened — and the conversation
+    // still open in front of them.
     host.appendChild(el('div', { class: 'actions' }, [
       el('button', { class: 'btn ghost sm', type: 'button', onclick: function () { stopPolling(); renderMessages(); } }, ['← All conversations']),
-      el('button', { class: 'btn ghost sm', type: 'button', onclick: async function () {
+      el('button', { class: 'btn ghost sm', type: 'button', onclick: guard(err, async function () {
         if (!confirm('Block ' + t.other_name + '? This ends the conversation.')) return;
         await api('POST', '/api/blocks', { userId: t.other_id });
         stopPolling(); renderMessages();
-      } }, ['Block']),
-      el('button', { class: 'btn ghost sm', type: 'button', onclick: async function () {
+      }) }, ['Block']),
+      el('button', { class: 'btn ghost sm', type: 'button', onclick: guard(err, async function () {
         var reason = prompt('What is the problem? (harassment, spam, fake profile, other)');
         if (!reason) return;
         await api('POST', '/api/reports', { userId: t.other_id, reason: reason });
         alert('Reported, and they are now blocked.');
         stopPolling(); renderMessages();
-      } }, ['Report'])
+      }) }, ['Report'])
     ]));
     host.appendChild(el('article', { class: 'card' }, [
-      list,
+      el('div', { class: 'chat-wrap' }, [list, toLatest]),
       err,
       el('div', { class: 'composer' }, [
         input,
@@ -644,7 +688,7 @@
 
     var emailInput = el('input', { type: 'email', value: u.email || '', placeholder: 'you@example.com' });
     var emailMsg = el('p', { class: 'hint', hidden: true });
-    var emailErr = el('p', { class: 'err', role: 'alert', hidden: true });
+    var emailErr = errLine();
     var directCb = el('input', { type: 'checkbox' });
     directCb.checked = u.openToDirect !== false;
 
@@ -679,6 +723,7 @@
       ])
     ]);
 
+    var profileErr = errLine();
     var profile = el('article', { class: 'card' }, [
       el('div', { class: 'who who-head' }, [
         me,
@@ -694,19 +739,34 @@
         el('span', { text: 'Visible to others' }),
         rows
       ]) : null,
+      profileErr,
       el('div', { class: 'actions' }, [
-        el('button', { class: 'btn sm', type: 'button', onclick: async function () {
+        // This had no catch and no disabled state, so offline — or any 4xx —
+        // rejected the promise, skipped the "Saved" line and showed nothing
+        // at all. A click that fails in exactly the same way as a click that
+        // does nothing is the worst of both: the person walks away believing
+        // their city and bio are stored.
+        el('button', { class: 'btn sm', type: 'button', onclick: async function (ev) {
+          var btn = ev.currentTarget;
           var interests = Array.prototype.slice.call(rows.querySelectorAll('[data-vis]')).map(function (cb) {
             return { id: cb.getAttribute('data-vis'), visible: cb.checked };
           });
-          var out = await api('PATCH', '/api/me', {
-            city: city.value, bio: bio.value, discoverable: disc.checked,
-            openToDirect: directCb.checked,
-            interests: interests.length ? interests : undefined
-          });
-          S.user = out.user;
-          saved.hidden = false;
-          setTimeout(function () { saved.hidden = true; }, 1600);
+          btn.disabled = true;
+          profileErr.hidden = true;
+          try {
+            var out = await api('PATCH', '/api/me', {
+              city: city.value, bio: bio.value, discoverable: disc.checked,
+              openToDirect: directCb.checked,
+              interests: interests.length ? interests : undefined
+            });
+            S.user = out.user;
+            saved.hidden = false;
+            setTimeout(function () { saved.hidden = true; }, 1600);
+          } catch (e) {
+            showErr(profileErr, e);
+          } finally {
+            btn.disabled = false;
+          }
         } }, ['Save profile']),
         saved
       ])
@@ -717,6 +777,18 @@
         await api('POST', '/api/logout');
         S.user = null;
         stopPolling();
+        stopCounts();
+        // stopPolling() is this file's own loop. circles.js has another, and
+        // the only thing that ever stopped it was show() — which signing out
+        // does not call. So a circle left open went on asking the server for
+        // its messages every five seconds with no session, silently, until
+        // the next reload. The badge is the same oversight the other way
+        // round: the Circles tab stays visible when signed out, so it carried
+        // on advertising the last person's unread count to whoever was there.
+        if (window.FYC_CIRCLES) {
+          window.FYC_CIRCLES.stop();
+          window.FYC_CIRCLES.clearBadge();
+        }
         paintAccountTabs();
         // Repaint what is on screen. Signing out used to raise the gate over
         // the whole app, which hid this; now that nothing is hidden, the You
@@ -725,9 +797,62 @@
       } }, ['Sign out'])
     ]);
 
+    // What this server holds about you, and the end of it. The privacy page
+    // has listed the first and promised the second since it was written, and
+    // the promise was "ask whoever runs the server" — which is a sentence on
+    // a page rather than something the app does. Folded away, because these
+    // are not things anybody needs in front of them every visit.
+    var dangerErr = errLine();
+    var account2 = el('details', { class: 'fold' }, [
+      el('summary', { text: 'Your data on this server' }),
+      el('p', { class: 'hint', text:
+        'Your answers to the finder, your saved list and what you have clicked are not on '
+        + 'the server at all — they are in this browser, and the controls for them are below.' }),
+      dangerErr,
+      el('div', { class: 'actions' }, [
+        el('button', { class: 'btn ghost sm', type: 'button', onclick: guard(dangerErr, async function () {
+          // Fetched rather than linked, so a failure is a message on the page
+          // instead of a browser tab showing a JSON error.
+          var data = await api('GET', '/api/me/export');
+          var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'community-finder-' + u.username + '.json';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+        }) }, ['Download everything']),
+        el('button', { class: 'btn ghost sm danger', type: 'button', onclick: guard(dangerErr, async function () {
+          if (!confirm('Delete your account? Your profile, your messages and your conversations '
+            + 'go with it, and it cannot be undone. A circle you host is handed to whoever has '
+            + 'been in it longest.')) return;
+          // The password, not just the confirm: this is the one thing in the
+          // app that cannot be undone, and a session cookie is a thing a
+          // borrowed laptop has.
+          var pw = prompt('Type your password to confirm.');
+          if (!pw) return;
+          var out = await api('DELETE', '/api/me', { password: pw });
+          S.user = null;
+          stopPolling();
+          stopCounts();
+          if (window.FYC_CIRCLES) {
+            window.FYC_CIRCLES.stop();
+            window.FYC_CIRCLES.clearBadge();
+          }
+          paintAccountTabs();
+          if (window.FYC_VIEWS && window.FYC_VIEWS.you) window.FYC_VIEWS.you();
+          alert('Your account is gone.'
+            + (out.handedOver ? ' ' + out.handedOver + (out.handedOver === 1 ? ' circle' : ' circles')
+                + ' you hosted ' + (out.handedOver === 1 ? 'has' : 'have') + ' a new host.' : ''));
+        }) }, ['Delete my account'])
+      ])
+    ]);
+
     var wrap = document.createDocumentFragment();
     wrap.appendChild(profile);
     wrap.appendChild(emailCard);
+    wrap.appendChild(account2);
     wrap.appendChild(account);
     return wrap;
   }
@@ -792,9 +917,11 @@
 
     // Let the You tab render the profile editor underneath its charts.
     window.FYC_SOCIAL = { authCard: authCard, profileCard: profileCard, state: S };
-    // Held so it can be stopped, which it never could be: this one ran
-    // every thirty seconds for as long as the page was open, signed out or
-    // not, visible or not.
+    // Held so it can be stopped — and now it is. S.counts was assigned here
+    // and never read anywhere, so the comment that used to sit on this line
+    // described the problem rather than fixing it: the loop ran every thirty
+    // seconds for as long as the page was open, signed in or not. (It does
+    // pause while the tab is hidden; D.every sees to that.)
     S.counts = D.every(30000, refreshCounts);
   }
 
@@ -839,8 +966,21 @@
     ].map(function (pair) {
       return el('button', {
         class: 'seg-btn', type: 'button', role: 'tab',
+        'data-seg': pair[0],
         'aria-selected': active === pair[0] ? 'true' : 'false',
-        onclick: function () { inboxSeg = pair[0]; show(pair[0] === 'people' ? 'people' : 'messages'); }
+        onclick: function () {
+          inboxSeg = pair[0];
+          show(pair[0] === 'people' ? 'people' : 'messages');
+          // show() re-renders the half it switched to, and that render builds
+          // a fresh seg bar — so the button that was just clicked is gone and
+          // focus has fallen to <body>. wireTablist finds its place in the
+          // strip from document.activeElement, so an arrow key worked once
+          // and then did nothing at all. Put focus on the button's
+          // replacement, which is where the person thinks they are.
+          var again = document.querySelector(
+            (pair[0] === 'people' ? '#people-body' : '#messages-body') + ' [data-seg="' + pair[0] + '"]');
+          if (again) again.focus();
+        }
       }, [pair[1]]);
     }));
     D.wireTablist(seg);

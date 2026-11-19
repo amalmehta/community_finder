@@ -191,6 +191,47 @@
     };
   }
 
+  // ---------- saying what went wrong ----------
+
+  /**
+   * A line for an error, hidden until there is one.
+   *
+   * circles.js had these two as helpers and social.js wrote them out by hand
+   * in six places, which is the same drift this file exists to stop. They are
+   * here because every screen that talks to the server needs somewhere to put
+   * the answer when it is "no".
+   */
+  function errLine() {
+    return el('p', { class: 'err', role: 'alert', hidden: true });
+  }
+
+  function showErr(node, e) {
+    if (!node) return;
+    node.textContent = (e && e.message) || String(e);
+    node.hidden = false;
+  }
+
+  /**
+   * Run a click handler that talks to the server, and say so when it fails.
+   *
+   * Twelve handlers across these two files were a bare `await api(...)`
+   * followed by a re-render. On a rejection — offline, a 403, the 15-second
+   * timeout — the re-render never ran and nothing reached the screen, so a
+   * failed Remove, Save or Close looked exactly like a click that did
+   * nothing. Two of them sat behind a confirm(), so the person had already
+   * been asked whether they were sure.
+   */
+  function guard(node, fn) {
+    return async function (ev) {
+      var btn = ev && ev.currentTarget;
+      if (btn && btn.tagName === 'BUTTON') btn.disabled = true;
+      if (node) node.hidden = true;
+      try { return await fn(ev); }
+      catch (e) { showErr(node, e); }
+      finally { if (btn && btn.tagName === 'BUTTON') btn.disabled = false; }
+    };
+  }
+
   // ---------- small shared formatting ----------
 
   function label(id) {
@@ -241,6 +282,7 @@
     $: $, $$: $$, el: el, svg: svg,
     api: api, apiUrl: apiUrl, API_TIMEOUT: TIMEOUT,
     wireTablist: wireTablist, every: every, turnstile: turnstile,
+    errLine: errLine, showErr: showErr, guard: guard,
     label: label, ago: ago
   };
 }(typeof window !== 'undefined' ? window : globalThis));

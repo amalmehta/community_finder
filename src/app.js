@@ -233,6 +233,7 @@
 
   function goBack() {
     session = I.back(session);
+    session.early = false;
     save(KEY.intake, session);
     $('#results').hidden = true;
     paintIntake();
@@ -262,6 +263,7 @@
   function reask(id) {
     session.asked = session.asked.filter(function (x) { return x !== id; });
     delete session.answers[id];
+    session.early = false;
     save(KEY.intake, session);
     $('#results').hidden = true;
     paintIntake();
@@ -390,6 +392,16 @@
     var p = I.toProfile(session);
     // Nothing to search. Ask again, properly, so the answer is recorded.
     if (!p.location) return reask('city');
+    // Leaving the form early is a decision, and it did not survive a reload:
+    // the session is saved, but nothing recorded that results had been asked
+    // for, so boot saw an unfinished form and put the next question back on
+    // screen. You lost the list you were reading and had to find the escape
+    // again. Going back, re-asking or starting over all clear it, because
+    // each of them is a request to be in the form.
+    if (early && !session.early) {
+      session.early = true;
+      save(KEY.intake, session);
+    }
     save(KEY.profile, p);
     if (FYC.prefs && FYC.prefs.isEnabled()) p.learned = FYC.prefs.profile();
 
@@ -715,6 +727,10 @@
         el('span', { class: 'browse-n', text: String(items.length) }),
         el('button', { class: 'linkish', type: 'button', onclick: function () {
           if (!more) return startOver();
+          // Asking to change an answer is asking to be in the form, so the
+          // escape that put these results on screen is spent.
+          session.early = false;
+          save(KEY.intake, session);
           host.hidden = true;
           paintIntake();
         } }, [more ? 'Change answers' : 'Start over'])
@@ -1261,7 +1277,7 @@
      the system. From then on the page is dark and the browser's own chrome
      around it is not, which is the one place the choice visibly fails to
      take. A third, unscoped tag wins over both and is removed on auto. */
-  var BAR = { light: '#fbf8f4', dark: '#171512' };
+  var BAR = { light: '#fafaf9', dark: '#161615' };
   function paintBrowserChrome(t) {
     var tag = document.getElementById('theme-color-pick');
     if (t === 'auto') { if (tag) tag.remove(); return; }
@@ -1457,6 +1473,9 @@
     });
 
     resumeSession();
+    // "Change answers" from the results list is a request to be back in the
+    // form, so it clears the escape the same way Back does.
+    var wasEarly = !!session.early;
     // A link to one listing has to open that listing, including on a first
     // visit with no answers given. The id names a city and a set of
     // interests, which is enough of a profile to rank its neighbours around
@@ -1466,7 +1485,7 @@
     // Answers already given win: following a link should show that group
     // among your own results, not replace them. The seeded session is never
     // saved, so a half-finished intake is still there on the next load.
-    if (I.done(session) && session.city) finish(false);
+    if ((I.done(session) || wasEarly) && session.city) finish(false);
     else if (!seedFromLink(urlOrg())) paintIntake();
 
     // Gated on the button being available rather than on there being no

@@ -12,9 +12,12 @@ on:
     - cron: '0 14 * * 1'
   workflow_dispatch:
 
+# Least privilege by default. `issues: write` was set here, workflow-wide,
+# which handed it to the test job as well — and that one runs on every push
+# and every pull request, including from forks. Only the link checker files
+# issues, so only the link checker asks for it.
 permissions:
   contents: read
-  issues: write
 
 jobs:
   test:

@@ -3,17 +3,17 @@
      behind a sign-in and is disallowed in robots.txt. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://amalmehta.github.io/community_finder/</loc>
+    <loc>https://amalmehta.com/community_finder/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://amalmehta.github.io/community_finder/privacy.html</loc>
+    <loc>https://amalmehta.com/community_finder/privacy.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://amalmehta.github.io/community_finder/terms.html</loc>
+    <loc>https://amalmehta.com/community_finder/terms.html</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>

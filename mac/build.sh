@@ -25,8 +25,13 @@ mkdir -p "$APP/Contents/Resources/web"
 # was copied in — so both links were a plain-text 404 from the bundled server,
 # in the one build of this app where there is no browser tab to escape to.
 # site.webmanifest is here because index.html asks for it on every load.
+# sw.js is here because index.html registers it on any localhost origin, and
+# the bundled server is one — so without it every launch fetched a file that
+# was not in the bundle and got a 404. Harmless, since the registration is
+# caught, but the app is already offline by construction and a worker that
+# cannot be found is not what "offline copy" in the title bar should mean.
 cp "$ROOT/index.html" "$ROOT/privacy.html" "$ROOT/terms.html" \
-   "$ROOT/site.webmanifest" "$APP/Contents/Resources/web/"
+   "$ROOT/site.webmanifest" "$ROOT/sw.js" "$APP/Contents/Resources/web/"
 cp -R "$ROOT/assets" "$ROOT/src" "$APP/Contents/Resources/web/"
 
 echo "→ icon"

@@ -17,7 +17,6 @@
     openId: null,
     pane: 'chat',          // which pane of an open circle is showing
     trust: null,
-    rule: null,
     capRange: { min: 4, max: 8, default: 6 },
     wantsRule: { maxChars: 140, minChars: 8 },
     safety: [],
@@ -33,6 +32,11 @@
   // Which view is current. See FYC_DOM.turnstile.
   var views = D.turnstile();
   var el = D.el, $ = D.$, api = D.api, label = D.label, ago = D.ago;
+
+  /** Whether a URL from the server is safe to put in an href. Only http(s):
+   *  every other scheme either does nothing useful here or does something
+   *  nobody asked for — `javascript:` runs in this origin, with this session. */
+  function webLink(url) { return /^https?:\/\//i.test(String(url || '')); }
 
   function icon(id) { return (FYC.INTERESTS[id] || {}).icon || ''; }
   /* The drawn half, guarded: a missing drawing is null and el() drops it. */
@@ -107,14 +111,14 @@
   function hoursBlock(c) {
     var mine = c.hours.mine;
     var next = mine.next;
-    var pct = next ? Math.min(100, Math.round(mine.hours / next.hours * 100)) : 100;
+    var done = next ? pct(mine.hours, next.hours) : 100;
     return el('div', { class: 'hours' }, [
       el('div', { class: 'ready-head' }, [
         el('b', { text: 'Hours together' }),
         el('span', { class: 'badge', text: 'you: ' + hoursText(mine.hours) })
       ]),
       el('div', { class: 'quorum' }, [
-        el('div', { class: 'quorum-fill', style: 'width:' + pct + '%' })
+        el('div', { class: 'quorum-fill', style: 'width:' + done + '%' })
       ]),
       el('p', { class: 'hint', text: next
         ? hoursText(next.hours) + ' is roughly where people become ' + next.label + '.'
@@ -192,12 +196,24 @@
     if (c.met) line.push(c.met === 1 ? 'one time together' : c.met + ' times together');
     if (c.hours.circle) line.push(hoursText(c.hours.circle) + ' between you');
 
-    var want = el('textarea', { rows: '2', maxlength: String(st.maxChars),
+    // S.wantsRule is what the server sent and nothing read; this read
+    // st.maxChars instead, so if the server ever stopped sending it the
+    // attribute became the string "undefined" and the cap quietly vanished.
+    // One of the two had to go, and the one with a default is the one to keep.
+    var rule = S.wantsRule || {};
+    var want = el('textarea', { rows: '2', maxlength: String(st.maxChars || rule.maxChars || 140),
       placeholder: 'One line — what you want out of this circle' });
     want.value = me ? me.wants : '';
 
+    var floor = st.minChars || rule.minChars || 8;
     async function save(text, btn) {
       err.hidden = true;
+      // The floor was only ever enforced on the server, so a line that was
+      // too short made a round trip to come back refused. Saying so here is
+      // immediate, and an empty box still means "take mine down".
+      if (text && text.length < floor) {
+        return showErr(err, new Error('A few more words — ' + floor + ' characters at least.'));
+      }
       if (btn) btn.disabled = true;
       try {
         await api('POST', '/api/circles/' + c.id + '/wants', { wants: text });
@@ -250,15 +266,30 @@
     ]);
   }
 
-  function errLine() { return el('p', { class: 'err', role: 'alert', hidden: true }); }
-  function showErr(node, e) { node.textContent = e.message || String(e); node.hidden = false; }
+  // These two moved to dom.js, where social.js can reach them: it had been
+  // writing the same line out by hand in six places.
+  var errLine = D.errLine, showErr = D.showErr, guard = D.guard;
 
   // ---------- the unread badge ----------
-  async function refreshBadge() {
+  /** Take the count off the tab. enable() used to skip the refresh when
+   *  nobody was signed in, which left the previous person's number on it —
+   *  the Circles tab stays visible after signing out, so it carried on
+   *  telling a signed-out visitor that three things were waiting for them. */
+  function clearBadge() {
+    var badge = document.getElementById('circles-count');
+    if (badge) { badge.textContent = '0'; badge.hidden = true; }
+    var tab = document.getElementById('tab-circles');
+    if (tab) tab.removeAttribute('aria-label');
+  }
+
+  /** @param {Object} [given] an /api/unread payload the caller already has. */
+  async function refreshBadge(given) {
     var badge = document.getElementById('circles-count');
     if (!badge) return;
     try {
-      var r = await api('GET', '/api/unread');
+      // renderList has just fetched this to build the list. Asking again is a
+      // third request per render, identical to the second.
+      var r = given || await api('GET', '/api/unread');
       var n = r.circles + r.pending;
       badge.textContent = String(n);
       badge.hidden = n === 0;
@@ -294,6 +325,17 @@
   }
 
   // ---------- readiness ----------
+  var WORDS = ['none', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+  function numberWord(n) { return WORDS[n] || String(n); }
+
+  /** A percentage that is a number. Both of these divided by a figure the
+   *  server supplies, and a zero denominator reached the DOM as
+   *  style="width:NaN%", which is invalid, so the bar silently drew empty. */
+  function pct(have, of) {
+    if (!of) return 0;
+    return Math.max(0, Math.min(100, Math.round(have / of * 100)));
+  }
+
   /** The gate, as a thing you can look at and see how far along you are. */
   function readinessBlock(r, opts) {
     var o = opts || {};
@@ -317,9 +359,12 @@
             : Math.min(c.have, c.need) + ' of ' + c.need + ' ' + c.label })
         ]);
       })),
+      // "All five" was typed in, two lines under a count that comes from the
+      // server. Change the gate and one of them is wrong, and it is the one
+      // that reads like the rule.
       o.quiet ? null : el('p', { class: 'hint', text: r.ready
         ? 'Anyone can propose something now.'
-        : 'All five before anyone can propose a meetup.' })
+        : 'All ' + numberWord(r.of) + ' before anyone can propose a meetup.' })
     ]);
   }
 
@@ -345,7 +390,13 @@
 
   function myCircleCard(c, unread) {
     return el('article', {
-      class: 'card circle mine', role: 'button', tabindex: '0',
+      // Without a label, a button's accessible name is computed from every
+      // word inside it — so this one announced as "Thursday night board
+      // games, Somerville, 3 to vet, 5 new, Somerville · 4 of 6 people ·
+      // quiet since 2d ago · you host, Talking first, 4 of 5…" in one
+      // breath, and the heading inside stopped being reachable as a heading.
+      // The button is called the circle; the rest is what is in it.
+      class: 'card circle mine', role: 'button', tabindex: '0', 'aria-label': c.name,
       onclick: function () { openCircle(c.id); },
       onkeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCircle(c.id); } }
     }, [
@@ -415,11 +466,13 @@
         : st === 'declined' ? 'They said no this time.'
         : 'Approved.' }));
       if (st === 'pending' || st === 'waitlisted') {
+        var wErr = errLine();
+        body.push(wErr);
         body.push(el('div', { class: 'actions' }, [
-          el('button', { class: 'btn ghost sm', type: 'button', onclick: async function () {
+          el('button', { class: 'btn ghost sm', type: 'button', onclick: guard(wErr, async function () {
             await api('DELETE', '/api/circles/' + c.id + '/apply');
             onChange();
-          } }, ['Withdraw'])
+          }) }, ['Withdraw'])
         ]));
       }
     } else if (c.apply.ok) {
@@ -567,8 +620,15 @@
 
     var data, unread;
     try {
-      data = await api('GET', '/api/circles');
-      unread = await api('GET', '/api/unread');
+      // Independent of each other, so they go together rather than one after
+      // the other: this is the slowest route in the app and the list waits on
+      // the sum of them.
+      var both = await Promise.all([
+        api('GET', '/api/circles'),
+        api('GET', '/api/unread')
+      ]);
+      data = both[0];
+      unread = both[1];
     } catch (e) {
       if (!views.current(mine)) return;
       host.innerHTML = '';
@@ -578,7 +638,8 @@
     if (!views.current(mine)) return;
     host.innerHTML = '';
     S.trust = data.trust;
-    S.rule = data.rule;
+    // S.rule was assigned here and read nowhere. The gate's own numbers come
+    // down on each circle's `readiness`, which is what the screen draws.
     S.capRange = data.capRange;
 
     var unreadBy = {};
@@ -628,7 +689,7 @@
     // Reference, not news: folded away under what it currently says about you.
     host.appendChild(trustCard(data.trust));
 
-    refreshBadge();
+    refreshBadge(unread);
   }
 
   // ---------- one circle ----------
@@ -703,20 +764,60 @@
     var ready = c.readiness;
     function planLabel(r) { return r.ready ? 'Plan' : 'Plan \u00b7 ' + r.done + '/' + r.of; }
     var planBtn = null;
+    var segBtns = {};
+
+    /**
+     * Show one pane.
+     *
+     * This used to be `S.pane = k; openCircle(id)` \u2014 the whole circle fetched
+     * again, for three panes that were all built a moment ago and merely
+     * hidden. Chat \u2192 People \u2192 Chat downloaded the conversation twice over.
+     *
+     * Worse, openCircle empties the host synchronously before its await, so
+     * the button that was just clicked was detached in the same task and
+     * focus fell back to <body>. wireTablist reads document.activeElement to
+     * know where it is in the strip, so an arrow key worked exactly once and
+     * then did nothing \u2014 on the only two strips wireTablist was written for.
+     */
+    var chat = null;                    // set once chatCard has been built
+    function showPane(k) {
+      if (!panes[k]) return;
+      S.pane = k;
+      Object.keys(panes).forEach(function (name) {
+        panes[name].hidden = name !== k;
+        if (segBtns[name]) segBtns[name].setAttribute('aria-selected', name === k ? 'true' : 'false');
+      });
+      // Arriving at the conversation is what marks it read, and what puts you
+      // at the end of it. A hidden list has no scroll height to go to.
+      if (k === 'chat' && chat && chat.shown) chat.shown();
+    }
+
     var bar = el('div', { class: 'seg', role: 'tablist' }, [
       ['chat', 'Chat'], ['people', 'People'], ['plan', planLabel(ready)]
     ].map(function (pair) {
       var b = el('button', {
         class: 'seg-btn', type: 'button', role: 'tab',
+        id: 'circle-tab-' + pair[0],
+        'aria-controls': 'circle-pane-' + pair[0],
         'aria-selected': current === pair[0] ? 'true' : 'false',
-        onclick: function () { S.pane = pair[0]; openCircle(id); }
+        onclick: function () { showPane(pair[0]); }
       }, [pair[1]]);
+      segBtns[pair[0]] = b;
       if (pair[0] === 'plan') planBtn = b;
       return b;
     }));
     D.wireTablist(bar);
     host.appendChild(bar);
-    S.onReadiness = function (r) { if (planBtn) planBtn.textContent = planLabel(r); };
+    // The gate can move while you are reading, and only the tab's own label
+    // tracked it \u2014 so the Plan pane underneath went on saying "4 of 5" and
+    // offering no way to propose anything after the tab had said the gate was
+    // passed. That was invisible while every pane switch refetched the
+    // circle; now that it does not, the one transition that changes the
+    // pane's structure has to ask for the rebuild itself.
+    S.onReadiness = function (r) {
+      if (planBtn) planBtn.textContent = planLabel(r);
+      if (r.ready !== ready.ready) openCircle(id);
+    };
 
     // Anything that needs answering follows you between panes.
     var alerts = el('div', {}, [
@@ -726,13 +827,18 @@
     if (alerts.childNodes.length) host.appendChild(alerts);
 
     Object.keys(panes).forEach(function (k) {
+      // A tablist with nothing it controls is a promise the markup does not
+      // keep. Each pane is now the panel its tab names.
+      panes[k].setAttribute('role', 'tabpanel');
+      panes[k].setAttribute('id', 'circle-pane-' + k);
+      panes[k].setAttribute('aria-labelledby', 'circle-tab-' + k);
       panes[k].hidden = k !== current;
       host.appendChild(panes[k]);
     });
 
     // --- chat ---
     if (d.confirm && d.confirm.length) confirmCard(panes.chat, c, d.confirm);
-    chatCard(panes.chat, c, mine);
+    chat = chatCard(panes.chat, c, mine, function () { return !panes.chat.hidden; });
     // Which levels exist and what is left to unlock: worth one look, not a
     // standing fixture under every conversation.
     var ladder = disclosureBlock(c, d.promptSets);
@@ -780,12 +886,23 @@
   }
 
   // ---------- chat ----------
-  function chatCard(host, c, ticket) {
+  function chatCard(host, c, ticket, visible) {
     // role="log" carries aria-live="polite". Messages arrive on a 5s poll and
     // were appended with nothing to announce them, which in a group chat is
     // the whole conversation going past in silence.
+    //
+    // It starts off, though. The list is in the document before the first
+    // fetch, so a live region meant for arriving messages read out the entire
+    // backlog on open — two hundred messages of history, uninterruptibly, as
+    // live updates, instead of a conversation to navigate. Switched on after
+    // the first pull, when everything after it genuinely is news.
     var list = el('div', { class: 'msg-list circle-chat', role: 'log',
-      'aria-label': c.name + ' conversation' });
+      'aria-live': 'off', 'aria-label': c.name + ' conversation' });
+    // Whether this pane is the one on screen. All three panes are built when
+    // a circle opens, so without this the chat polled, measured scroll
+    // positions on a display:none node and marked the conversation read while
+    // the person was looking at People or Plan.
+    var onScreen = visible || function () { return true; };
     // 2000 is the server's cap. Without it here the composer accepted a
     // message the server then refused, which reads as the app losing it.
     // The placeholder is not an accessible name; this is.
@@ -824,8 +941,11 @@
       if (pulling || !views.current(ticket)) return;
       pulling = true;
       // Measured before anything is appended, or the new messages are already
-      // part of the height being measured against.
-      var wasAtEnd = atEnd();
+      // part of the height being measured against. A hidden pane has no
+      // height at all, so atEnd() on one is true by arithmetic rather than
+      // because anybody has read to the end of anything.
+      var showing = onScreen();
+      var wasAtEnd = showing && atEnd();
       var first = !lastId;
       try {
         var r = await api('GET', '/api/circles/' + c.id + '/messages?since=' + lastId);
@@ -877,11 +997,21 @@
           if (wasAtEnd) {
             toEnd(!first);
             toLatest.hidden = true;
-          } else {
+          } else if (showing) {
             toLatest.hidden = false;
           }
-          api('POST', '/api/circles/' + c.id + '/read', { lastId: lastId }).catch(function () {});
+          // Read means read. This fired whatever had just happened: on a
+          // hidden pane, so opening a circle on People or Plan cleared its
+          // unread count without showing a word of it; and on a visible one
+          // where the person was scrolled up, so the messages the app had
+          // just decided *not* to scroll to — the ones behind "New messages
+          // ↓" — were marked read on the way past.
+          if (showing && wasAtEnd) {
+            api('POST', '/api/circles/' + c.id + '/read', { lastId: lastId }).catch(function () {});
+          }
         }
+        // Everything from here is news, so the region can speak.
+        if (first) list.setAttribute('aria-live', 'polite');
       } catch (e) { /* transient */ } finally { pulling = false; }
     }
 
@@ -936,6 +1066,19 @@
     if (!views.current(ticket)) return;
     stop();
     S.poll = D.every(5000, pull);
+
+    // Called when the chat pane becomes the one on screen. Reading now starts
+    // here rather than on open, since a circle can open on People or Plan —
+    // so this is where the conversation gets scrolled to the end and marked
+    // read, which is the pair of things that used to happen whether or not
+    // anybody was looking at it.
+    return {
+      shown: function () {
+        toEnd(false);
+        toLatest.hidden = true;
+        if (lastId) api('POST', '/api/circles/' + c.id + '/read', { lastId: lastId }).catch(function () {});
+      }
+    };
   }
 
   // ---------- meetups ----------
@@ -968,7 +1111,7 @@
     (meetups || []).forEach(function (k) {
       var err = errLine();
       var bar = el('div', { class: 'quorum' }, [
-        el('div', { class: 'quorum-fill', style: 'width:' + Math.min(100, Math.round(k.yes / k.quorum * 100)) + '%' })
+        el('div', { class: 'quorum-fill', style: 'width:' + pct(k.yes, k.quorum) + '%' })
       ]);
       var planSlot = el('div');
 
@@ -1032,9 +1175,17 @@
           'proposed by ' + k.proposer
         ].join(' · ') }),
         k.details ? el('p', { class: 'blurb', text: k.details }) : null,
+        // The one attribute in this file that server data reaches which can
+        // execute. el() never takes markup, but an href dispatches on its
+        // scheme, so `javascript:…` from whoever proposed the meetup ran in
+        // this origin with this session. The server refuses to store one now;
+        // this refuses to render one, because a database written before that
+        // fix is still a database. Not a link, then — just the name.
         k.org ? el('p', { class: 'hint' }, [
           'Anchored to ',
-          el('a', { href: k.org.url, target: '_blank', rel: 'noopener noreferrer', text: k.org.name })
+          webLink(k.org.url)
+            ? el('a', { href: k.org.url, target: '_blank', rel: 'noopener noreferrer', text: k.org.name })
+            : el('span', { text: k.org.name })
         ]) : null,
         bar,
         el('p', { class: 'hint', text: k.going.length ? 'Going: ' + k.going.join(', ') : 'Nobody has said yes yet.' }),
@@ -1048,11 +1199,11 @@
           rsvpBtn('yes', k.myRsvp === 'yes' ? 'Yes · change the plan' : 'Yes'),
           rsvpBtn('maybe', 'Maybe'), rsvpBtn('no', 'No'),
           (k.proposerId === (S.user && S.user.id) || c.myRole === 'host')
-            ? el('button', { class: 'btn ghost sm', type: 'button', onclick: async function () {
+            ? el('button', { class: 'btn ghost sm', type: 'button', onclick: guard(err, async function () {
                 if (!confirm('Call off "' + k.title + '"?')) return;
                 await api('POST', '/api/meetups/' + k.id + '/cancel');
                 openCircle(c.id);
-              } }, ['Call it off']) : null
+              }) }, ['Call it off']) : null
         ]),
         planSlot,
         safetyList()
@@ -1277,11 +1428,13 @@
                 catch (e) { showErr(err, e); ev.currentTarget.disabled = false; }
               } }, ['Vouch for them'])
             : null,
-          (c.myRole === 'host' && p.role !== 'host') ? el('button', { class: 'btn ghost sm', type: 'button', onclick: async function () {
+          // Behind a confirm, so a silent failure left the host certain the
+          // person was gone, with the person still listed underneath.
+          (c.myRole === 'host' && p.role !== 'host') ? el('button', { class: 'btn ghost sm', type: 'button', onclick: guard(err, async function () {
             if (!confirm('Remove ' + p.display + ' from this circle?')) return;
             await api('DELETE', '/api/circles/' + c.id + '/members/' + p.id);
             openCircle(c.id);
-          } }, ['Remove']) : null
+          }) }, ['Remove']) : null
         ]),
         slot
       ]);
@@ -1307,11 +1460,11 @@
             openCircle(c.id);
           } catch (e) { showErr(err, e); }
         } }, ['Save']),
-        c.status === 'open' ? el('button', { class: 'btn ghost sm', type: 'button', onclick: async function () {
+        c.status === 'open' ? el('button', { class: 'btn ghost sm', type: 'button', onclick: guard(err, async function () {
           if (!confirm('Close this circle to new people? The conversation stays.')) return;
           await api('POST', '/api/circles/' + c.id + '/close');
           openCircle(c.id);
-        } }, ['Close to new people']) : null
+        }) }, ['Close to new people']) : null
       ]));
     }
     rows.push(el('div', { class: 'actions' }, [
@@ -1373,12 +1526,32 @@
       tab.addEventListener('click', function () { show(); });
     }
     if (state.user) refreshBadge();
+    else clearBadge();
+  }
+
+  /**
+   * Leave the Circles tab.
+   *
+   * stop() only cancels a poller that is already installed, which is not the
+   * same as leaving: an openCircle still waiting on its fetch had not
+   * installed one yet, and nothing outside this file could advance its
+   * turnstile — so switching to Inbox mid-load let the circle paint into a
+   * hidden host and install a five-second poller over the top, which then ran
+   * for the rest of the session fetching a conversation nobody was reading.
+   * Taking a ticket here is what makes that load superseded, which is exactly
+   * what the turnstile was written for; it just could not cross the file
+   * boundary. This is what social.js calls, and what signing out calls.
+   */
+  function leave() {
+    views.take();
+    stop();
   }
 
   window.FYC_CIRCLES = {
     enable: enable,
     render: renderList,
-    stop: stop,
+    stop: leave,
+    clearBadge: clearBadge,
     refreshBadge: refreshBadge,
     resultsStrip: resultsStrip
   };

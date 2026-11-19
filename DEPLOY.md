@@ -5,7 +5,7 @@ Two things can be deployed, independently.
 ## 1. The finder, as a static site
 
 No server, no accounts, nothing transmitted. This is what is published today at
-<https://amalmehta.github.io/community_finder/>.
+<https://amalmehta.com/community_finder/>.
 
 Any static host works — push to `main` and GitHub Pages rebuilds, or copy
 `index.html`, `privacy.html`, `terms.html`, `robots.txt`, `site.webmanifest`,

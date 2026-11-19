@@ -73,46 +73,69 @@
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
 }
 
-/* Dark theme. Applied when the system asks for it, unless the person has
-   explicitly chosen light — and applied outright when they choose dark. */
+/* Dark theme.
+ *
+ * There are two ways to be in it — the system asks for it and nothing has
+ * been chosen, or it has been chosen outright — and a media query and an
+ * attribute selector cannot be written as one rule. So the fifteen values
+ * used to be typed out twice, in full, with nothing keeping them in step
+ * beyond whoever was editing remembering there was a second copy. Naming
+ * them once up here and assigning them twice leaves one place to change. */
+:root {
+  --d-bg: #161615;
+  --d-bg-raised: #1f1f1d;
+  --d-bg-sunk: #121211;
+  --d-ink: #ededea;
+  --d-ink-soft: #b2b0aa;
+  --d-ink-faint: #9a9892;
+  --d-line: #2e2e2b;
+  --d-line-strong: #434340;
+  --d-accent: #e08155;
+  --d-accent-soft: #33231c;
+  --d-accent-ink: #f0a582;
+  --d-moss: #79b79c;
+  --d-moss-soft: #1c2b25;
+  --d-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-  color-scheme: dark;
-  --bg: #161615;
-  --bg-raised: #1f1f1d;
-  --bg-sunk: #121211;
-  --ink: #ededea;
-  --ink-soft: #b2b0aa;
-  --ink-faint: #9a9892;
-  --line: #2e2e2b;
-  --line-strong: #434340;
-  --accent: #e08155;
-  --accent-soft: #33231c;
-  --accent-ink: #f0a582;
-  --moss: #79b79c;
-  --moss-soft: #1c2b25;
-  --focus: #e08155;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+    color-scheme: dark;
+    --bg: var(--d-bg);
+    --bg-raised: var(--d-bg-raised);
+    --bg-sunk: var(--d-bg-sunk);
+    --ink: var(--d-ink);
+    --ink-soft: var(--d-ink-soft);
+    --ink-faint: var(--d-ink-faint);
+    --line: var(--d-line);
+    --line-strong: var(--d-line-strong);
+    --accent: var(--d-accent);
+    --accent-soft: var(--d-accent-soft);
+    --accent-ink: var(--d-accent-ink);
+    --moss: var(--d-moss);
+    --moss-soft: var(--d-moss-soft);
+    --focus: var(--d-accent);
+    --shadow: var(--d-shadow);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #161615;
-  --bg-raised: #1f1f1d;
-  --bg-sunk: #121211;
-  --ink: #ededea;
-  --ink-soft: #b2b0aa;
-  --ink-faint: #9a9892;
-  --line: #2e2e2b;
-  --line-strong: #434340;
-  --accent: #e08155;
-  --accent-soft: #33231c;
-  --accent-ink: #f0a582;
-  --moss: #79b79c;
-  --moss-soft: #1c2b25;
-  --focus: #e08155;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  --bg: var(--d-bg);
+  --bg-raised: var(--d-bg-raised);
+  --bg-sunk: var(--d-bg-sunk);
+  --ink: var(--d-ink);
+  --ink-soft: var(--d-ink-soft);
+  --ink-faint: var(--d-ink-faint);
+  --line: var(--d-line);
+  --line-strong: var(--d-line-strong);
+  --accent: var(--d-accent);
+  --accent-soft: var(--d-accent-soft);
+  --accent-ink: var(--d-accent-ink);
+  --moss: var(--d-moss);
+  --moss-soft: var(--d-moss-soft);
+  --focus: var(--d-accent);
+  --shadow: var(--d-shadow);
 }
 
 * { box-sizing: border-box; }
@@ -274,6 +297,10 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 :root[data-theme="light"] { color-scheme: light; }
 .btn.ghost { background: none; color: var(--ink-soft); border-color: var(--line-strong); font-weight: 500; }
 .btn.ghost:hover { border-color: var(--ink); color: var(--ink); filter: none; }
+/* The one button in the app that cannot be undone. It stays a ghost — the
+   accent means "here", and this is not where you are — and only takes the
+   colour on hover, where you have already reached for it. */
+.btn.ghost.danger:hover { border-color: var(--accent); color: var(--accent-ink); }
 .btn.sm { font-size: var(--t-meta); padding: 7px 14px; }
 .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
 

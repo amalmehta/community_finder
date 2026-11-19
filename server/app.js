@@ -348,32 +348,70 @@ function readJson(req, limit = 64 * 1024) {
       if (settled) return;
       settled = true;
       if (!bytes) return resolve({});
-      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); }
-      catch (e) { reject(new BadRequest('invalid JSON')); }
+      try {
+        const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        // Valid JSON is not necessarily an object. A body of `null`, `3` or
+        // `true` parsed fine and was handed to a route that immediately read
+        // a property off it, so every POST in the app answered 500 to a body
+        // any HTTP client can send. Every route here wants an object; a scalar
+        // is a request with no fields, which is what {} means.
+        resolve(parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {});
+      } catch (e) { reject(new BadRequest('invalid JSON')); }
     });
     req.on('error', (e) => stop(e));
   });
 }
 
+// decodeURIComponent throws URIError on a lone '%', and this is called from
+// currentUser on essentially every route — so one malformed cookie turned the
+// whole API into 500s, logout included. Logout is the one route that would
+// clear the cookie, and it read it the same way, so there was no way out of it
+// from inside the app. Anything able to write a cookie on the domain could put
+// someone there. An undecodable value is not a session token either way.
 function cookies(req) {
   const out = {};
   (req.headers.cookie || '').split(';').forEach((p) => {
     const i = p.indexOf('=');
-    if (i > 0) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim());
+    if (i <= 0) return;
+    const raw = p.slice(i + 1).trim();
+    try { out[p.slice(0, i).trim()] = decodeURIComponent(raw); }
+    catch (e) { out[p.slice(0, i).trim()] = raw; }
   });
   return out;
 }
 
 // ---------------------------------------------------------------- passwords
+//
+// scryptSync is the whole point of scrypt — it is meant to be slow — and this
+// is a single-threaded process, so it was slow for everybody at once. The same
+// hash, measured on one machine with a 1 ms interval running alongside it:
+// synchronous, 74 ms during which the interval fired **once**; asynchronous,
+// 73 ms during which it fired **62 times**. The duration is the same and it is
+// meant to be; what changed is who else is waiting. Every poll, every static
+// file and the Docker health check used to queue behind somebody's sign-in,
+// and a slower box than this one makes each of those numbers worse.
+//
+// crypto.scrypt is the same algorithm with the same parameters, run on libuv's
+// threadpool. Still no dependency; the two call sites await it.
+const SCRYPT = { N: 16384, r: 8, p: 1 };
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
-  const hash = crypto.scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString('hex');
-  return { hash, salt };
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(password, salt, 64, SCRYPT, (err, buf) => {
+      if (err) reject(err); else resolve({ hash: buf.toString('hex'), salt });
+    });
+  });
 }
-function verifyPassword(password, salt, expected) {
-  const { hash } = hashPassword(password, salt);
+async function verifyPassword(password, salt, expected) {
+  const { hash } = await hashPassword(password, salt);
   const a = Buffer.from(hash, 'hex'), b = Buffer.from(expected, 'hex');
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
+
+// Something of the right shape to hash against when the username does not
+// exist, so an unknown name costs exactly what a known one costs. The hash is
+// 64 bytes of a password nobody has; it never matches.
+const DUMMY_SALT = crypto.randomBytes(16).toString('hex');
+const DUMMY_HASH = crypto.randomBytes(64).toString('hex');
 
 // ---------------------------------------------------------------- validation
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
@@ -515,7 +553,7 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     if (!body.ageOk) return fail(res, 400, 'You must confirm you are 18 or over.');
     if (store.userByName(username)) return fail(res, 409, 'That username is taken.');
 
-    const { hash, salt } = hashPassword(password);
+    const { hash, salt } = await hashPassword(password);
     const id = store.createUser({
       username, display: display || username, pass: hash, salt,
       city: String(body.city || '').slice(0, 60), ageOk: true
@@ -538,7 +576,14 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     store.note('ip:' + ip, 'login');
     const body = await readJson(req);
     const user = store.userByName(String(body.username || '').trim());
-    const ok = user && verifyPassword(String(body.password || ''), user.salt, user.pass);
+    // Hash either way. `user && verify(...)` answered a username nobody has
+    // in microseconds and a real one in most of a second, so the 401 that is
+    // supposed to say nothing told you which half of it was wrong.
+    const ok = await verifyPassword(
+      String(body.password || ''),
+      user ? user.salt : DUMMY_SALT,
+      user ? user.pass : DUMMY_HASH
+    ) && !!user;
     if (!ok) return fail(res, 401, 'That username and password do not match.');
 
     const token = crypto.randomBytes(32).toString('hex');
@@ -562,14 +607,50 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     const u = currentUser(req);
     if (!u) return fail(res, 401, 'Sign in first.');
     const body = await readJson(req);
+    // A PATCH says what to change. openToDirect and interests were already
+    // guarded; city and bio were not, so `PATCH {"discoverable":true}` blanked
+    // both — and since trustOf asks for a city and a 40-character bio, that one
+    // request dropped the person from "Introduced" to "New here", which takes
+    // circle hosting away with it and can put them under a circle's min_trust.
+    // An absent field means "leave it"; an empty string still means "clear it".
     store.updateProfile(u.id, {
-      city: String(body.city || '').slice(0, 60),
-      bio: String(body.bio || ''),
-      discoverable: body.discoverable !== false
+      city: body.city === undefined ? u.city : String(body.city || '').slice(0, 60),
+      bio: body.bio === undefined ? u.bio : String(body.bio),
+      discoverable: body.discoverable === undefined ? !!u.discoverable : body.discoverable !== false
     });
     if (body.openToDirect !== undefined) store.setOpenToDirect(u.id, body.openToDirect !== false);
     if (body.interests) store.setInterests(u.id, cleanInterests(body.interests));
     send(res, 200, { user: publicUser(store.userById(u.id), store) });
+  });
+
+  // ---- taking it with you, and ending it ----
+  //
+  // privacy.html lists what this server holds and then says to ask whoever
+  // runs it to delete the account. That is a sentence on a page rather than
+  // something the app does, and it is the one promise in there that the code
+  // did not keep. These two keep it.
+
+  route('GET', /^\/api\/me\/export$/, async (req, res) => {
+    const u = currentUser(req);
+    if (!u) return fail(res, 401, 'Sign in first.');
+    const data = store.exportOf(u.id);
+    if (!data) return fail(res, 404, 'No such account.');
+    res.setHeader('Content-Disposition',
+      `attachment; filename="community-finder-${u.username}.json"`);
+    send(res, 200, data);
+  });
+
+  route('DELETE', /^\/api\/me$/, async (req, res) => {
+    const u = currentUser(req);
+    if (!u) return fail(res, 401, 'Sign in first.');
+    const body = await readJson(req);
+    // The password, because this is the one request that cannot be undone and
+    // a session cookie is a thing a borrowed laptop has.
+    const ok = await verifyPassword(String(body.password || ''), u.salt, u.pass);
+    if (!ok) return fail(res, 403, 'That password does not match.');
+    const out = store.deleteUser(u.id);
+    res.setHeader('Set-Cookie', 'sid=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0');
+    send(res, 200, Object.assign({ deleted: true }, out));
   });
 
   // ---- email verification ----
@@ -661,26 +742,47 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     if (!other || other.id === u.id) return fail(res, 400, 'No such person.');
     if (store.isBlocked(u.id, other.id)) return fail(res, 403, 'You cannot contact this person.');
 
-    const shared = store.discover(u.id, {}).filter((p) => p.id === other.id)[0];
-    const verdict = directAllowed(u, other, shared ? shared.shared : 0);
+    // Asked of the pair, not of the discovery list. discover() returns the 40
+    // best rows, ordered by overlap and then by who logged in most recently —
+    // so somebody genuinely sharing three visible interests fell off the end
+    // once a city filled up, and was told "3 shared interests needed; you have
+    // 0", which the server knew to be false. sharedInterests() asks about the
+    // two people and is visible-only on both sides, which is the same rule.
+    const shared = store.sharedInterests(u.id, other.id).length;
+    const verdict = directAllowed(u, other, shared);
     if (!verdict.ok) return fail(res, 403, verdict.why);
 
     // Same limits as introductions; alignment removes the wait, not the cap.
     if (store.countSince('u:' + u.id, 'request', DAY) >= L.requestsPerDay) {
       return fail(res, 429, `That is ${L.requestsPerDay} new conversations today.`);
     }
+    // The hourly message cap belongs here too. This route checked the
+    // introduction budget and recorded against it only when it created the
+    // connection — so once a thread existed, every further message through
+    // this door was free: a hundred and twenty of them went in with no limit
+    // reached and no row in `actions` for anyone to see afterwards. The length
+    // ceiling was missing for the same reason; addMessage truncates at 2000,
+    // so an oversized body was accepted rather than refused.
+    if (store.countSince('u:' + u.id, 'message', HOUR) >= L.messagesPerHour) {
+      return fail(res, 429, 'Slow down a little.');
+    }
     const text = String(body.body || '').trim();
     if (text.length < 10) return fail(res, 400, 'Write at least a sentence.');
+    if (text.length > MAX_MESSAGE) return fail(res, 400, 'That message is too long.');
 
     let conn = store.connectionBetween(u.id, other.id);
     if (!conn) {
       const id = store.createAccepted(u.id, other.id);
       conn = { id };
       store.note('u:' + u.id, 'request');
-    } else if (conn.status !== 'accepted') {
+    } else if (conn.status === 'pending') {
       return fail(res, 409, 'There is already a pending request with this person.');
+    } else if (conn.status !== 'accepted') {
+      // Declined. It said "pending", which is a different thing and not true.
+      return fail(res, 409, 'That introduction was already answered.');
     }
     store.addMessage(conn.id, u.id, text);
+    store.note('u:' + u.id, 'message');
     send(res, 201, { threadId: conn.id });
   });
 
@@ -872,6 +974,17 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     if (conn && conn.status === 'pending') {
       return no('There is already an introduction waiting with them.');
     }
+    // A declined connection used to fall through to `canMessage: true`, and
+    // the route then inserted a second row for the same pair. One direction
+    // hit UNIQUE(from_id, to_id) and surfaced as a 500; the other succeeded
+    // and left the pair holding `declined` and `accepted` at once, which
+    // connectionBetween then resolved by whichever SQLite reached first. The
+    // real answer is neither: somebody said no, and a side door is not the
+    // place to overturn it. block() also writes `declined`, so this covers
+    // "they blocked me and then unblocked me" the same way.
+    if (conn && conn.status === 'declined') {
+      return no('That introduction was already answered.');
+    }
     if (!them.open_to_direct) return no(them.display + ' only takes introductions.');
     if (BOND.bothSpoken && !store.saidIn(circleId, me.id)) {
       return no('Say something to the circle first.');
@@ -883,14 +996,18 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
   /** Everything the UI needs about one circle, from this person's angle.
    *  `deep` adds what only the circle's own page shows, and costs a query per
    *  question the circle has asked — so the list of sixty does without it. */
-  function viewCircle(c, u, trust, deep) {
+  function viewCircle(c, u, trust, deep, mineVisible) {
     const stats = store.circleStats(c.id);
     const interests = c.interests !== undefined && c.interests !== null
       ? String(c.interests).split(',').filter(Boolean)
       : store.circleInterests(c.id);
     const mem = store.memberOf(c.id, u.id);
     const app = mem ? null : store.myApplication(c.id, u.id);
-    const mine = store.interestsOf(u.id).filter((r) => r.visible).map((r) => r.interest);
+    // The caller can pass this in when it is looping: it is the same person's
+    // interests for every circle in the list, and asking the database sixty
+    // times for one answer is sixty queries to learn it once.
+    const mine = mineVisible
+      || store.interestsOf(u.id).filter((r) => r.visible).map((r) => r.interest);
     const overlap = interests.filter((i) => mine.indexOf(i) !== -1);
     const sameCity = !!norm(c.city) && norm(c.city) === norm(u.city);
     const full = stats.members >= c.cap;
@@ -1004,9 +1121,18 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     const trust = trustOf(u, store);
     const override = String(url.searchParams.get('interests') || '').split(',').filter(Boolean);
 
+    // This listed every circle twice and then asked, once per row, a question
+    // the row already answered. rollCircle only ever writes to meetups and
+    // their occurrences, attendance and RSVPs — never to `circles` — so the
+    // second listing came back byte for byte the same as the first; and
+    // my_role is already selected, so the memberOf call per row was a query
+    // to learn something that was sitting in the result. At seventy circles
+    // the route ran 816 statements, and the client polls it.
     const rows = store.listCircles(u.id, {});
-    rows.forEach((c) => { if (store.memberOf(c.id, u.id)) rollCircle(c.id); });
-    let views = store.listCircles(u.id, {}).map((c) => viewCircle(c, u, trust));
+    rows.forEach((c) => { if (c.my_role) rollCircle(c.id); });
+    // Asked once rather than once per circle: it is the same person every time.
+    const mineVisible = store.interestsOf(u.id).filter((r) => r.visible).map((r) => r.interest);
+    let views = rows.map((c) => viewCircle(c, u, trust, false, mineVisible));
     const city = url.searchParams.get('city');
     if (city) views = views.filter((v) => norm(v.city) === norm(city) || v.myRole);
 
@@ -1377,8 +1503,15 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     if (store.countSince('u:' + got.u.id, 'request', DAY) >= L.requestsPerDay) {
       return fail(res, 429, `That is ${L.requestsPerDay} new conversations today.`);
     }
+    // The hourly message cap, which this route never applied: it charged the
+    // introduction budget and only on the first message, so every message
+    // after that through this door was uncapped and unrecorded.
+    if (store.countSince('u:' + got.u.id, 'message', HOUR) >= L.messagesPerHour) {
+      return fail(res, 429, 'Slow down a little.');
+    }
     const text = String(body.body || '').trim();
     if (text.length < 10) return fail(res, 400, 'Write at least a sentence.');
+    if (text.length > MAX_MESSAGE) return fail(res, 400, 'That message is too long.');
 
     let threadId = gate.threadId;
     if (!threadId) {
@@ -1386,6 +1519,7 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
       store.note('u:' + got.u.id, 'request');
     }
     store.addMessage(threadId, got.u.id, text);
+    store.note('u:' + got.u.id, 'message');
     send(res, 201, { threadId });
   });
 
@@ -1431,10 +1565,25 @@ function createApp({ file = path.join(__dirname, 'data', 'community.db'), secure
     // Proposing something counts as your yes, so it carries a plan like one.
     if (plan.length < INTENTION.minChars) return fail(res, 400, PLAN_ASK);
 
+    // The one piece of a meetup that becomes an href for everybody else in
+    // the circle. It arrived in a request body, was truncated to 300
+    // characters and stored, and nothing anywhere asked what scheme it was —
+    // so a member could anchor a meetup to `javascript:…` and have it run in
+    // the app's origin, with their session, for every other member who
+    // clicked the place's name. The page's CSP does not stop that: a
+    // javascript: URL is governed by script-src, and this one says
+    // 'unsafe-inline'. Through the UI it is always one of the app's own
+    // listings; a request body is not the UI. The client refuses to render a
+    // non-http(s) href as well — this is the half that stops it being stored.
+    const orgUrl = String(body.orgUrl || '');
+    if (orgUrl && !/^https?:\/\//i.test(orgUrl)) {
+      return fail(res, 400, 'A link has to be an ordinary web address.');
+    }
+
     const id = store.createMeetup({
       circleId: got.c.id, proposerId: got.u.id, title, place, startsAt,
       details: String(body.details || ''),
-      orgId: body.orgId, orgName: body.orgName, orgUrl: body.orgUrl,
+      orgId: body.orgId, orgName: body.orgName, orgUrl,
       quorum: quorumFor(stats.members), cadence, hours, plan
     });
     store.note('u:' + got.u.id, 'meetup');

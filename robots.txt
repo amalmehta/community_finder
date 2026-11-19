@@ -9,4 +9,4 @@ Allow: /assets/
 Disallow: /api/
 Disallow: /verify
 
-Sitemap: https://amalmehta.github.io/community_finder/sitemap.xml
+Sitemap: https://amalmehta.com/community_finder/sitemap.xml

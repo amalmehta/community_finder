@@ -263,6 +263,19 @@ CREATE INDEX IF NOT EXISTS idx_conn_to ON connections(to_id, status);
 CREATE INDEX IF NOT EXISTS idx_capp_user ON circle_applications(user_id);
 CREATE INDEX IF NOT EXISTS idx_vouch_to ON vouches(to_id);
 
+-- meetups had no index at all, so dueMeetups() and meetupsFor() both showed
+-- SCAN meetups in EXPLAIN QUERY PLAN. dueMeetups runs once per circle you are
+-- in on every GET /api/circles, which the client polls — one whole-table scan
+-- per member circle per request.
+CREATE INDEX IF NOT EXISTS idx_meetup_circle ON meetups(circle_id, status);
+
+-- idx_cmsg is (circle_id, id), which answers "the messages in this circle" but
+-- not "has this person said anything here", "when did they last", or "how many
+-- of these are prompts" — all of which narrow by sender or kind, and all of
+-- which are asked per member row when a circle is opened. quietMembers asks
+-- three of them for every member.
+CREATE INDEX IF NOT EXISTS idx_cmsg_sender ON circle_messages(circle_id, sender_id, kind);
+
 -- prune() runs hourly and scanned every table it cleaned. idx_actions is
 -- (who, kind, at), which cannot answer "everything older than X" — and
 -- actions is the largest table here, one row per rate-limited action.
@@ -356,8 +369,14 @@ function createStore(db) {
   const tx = (fn) => {
     if (depth > 0) return fn();          // already inside one
     depth++;
-    db.exec('BEGIN');
+    // BEGIN was outside the try, so if it threw — which it does when a
+    // transaction is somehow still open, after a COMMIT and its ROLLBACK both
+    // failed — `depth` was never given back. From that moment every tx() in
+    // the process takes the shortcut above and runs with no transaction at
+    // all, which is exactly the DELETE-then-INSERT-leaves-nothing failure the
+    // comment above describes, silently, for the rest of the process's life.
     try {
+      db.exec('BEGIN');
       const out = fn();
       db.exec('COMMIT');
       return out;
@@ -749,7 +768,15 @@ function createStore(db) {
                  WHERE a.circle_id = c.id AND a.status IN ('pending', 'waitlisted')) AS pending
         FROM circles c JOIN users u ON u.id = c.host_id
         ${includeClosed ? '' : "WHERE c.status = 'open'"}
-        ORDER BY c.created_at DESC
+        -- Your own circles first, then the newest. The limit is a cap on how
+        -- much of the city to show you, and it was quietly a cap on how many
+        -- of your own circles you had: past sixty open circles, the oldest
+        -- ones you belong to fell off the end of your own list — while
+        -- /api/unread, which is membership-driven and uncapped, carried on
+        -- counting them, so the badge pointed at a circle you could no longer
+        -- open. Ordering by membership keeps the truncation on the half it
+        -- was meant for.
+        ORDER BY (my_role IS NOT NULL) DESC, c.created_at DESC
         LIMIT ?
       `).all(userId, userId, limit);
     },
@@ -1158,6 +1185,93 @@ function createStore(db) {
      *  on each one. */
     ping() {
       return q('SELECT 1 AS ok').get().ok === 1;
+    },
+
+    // ---- taking your account with you ----
+    //
+    // The privacy page has always said what the server holds about someone
+    // and then told them to ask whoever runs it to get rid of it. That is an
+    // answer on a page, not a thing the app does, and the two below are what
+    // make it true: everything held about you, and the end of it.
+
+    /** Everything this server holds about one person, as plain data. */
+    exportOf(userId) {
+      const u = q('SELECT * FROM users WHERE id = ?').get(userId);
+      if (!u) return null;
+      const all = (sql, ...args) => q(sql).all(...args);
+      return {
+        exportedAt: new Date(now()).toISOString(),
+        note: 'Everything this server holds about this account. Your answers to '
+          + 'the finder, your saved list and what you have clicked are not here: '
+          + 'they never leave your browser.',
+        account: {
+          username: u.username, display: u.display, city: u.city, bio: u.bio,
+          email: u.email || null, emailVerified: !!u.email_verified,
+          discoverable: !!u.discoverable, openToDirect: !!u.open_to_direct,
+          createdAt: new Date(u.created_at).toISOString(),
+          lastSeen: new Date(u.last_seen).toISOString()
+        },
+        interests: all('SELECT interest, visible FROM user_interests WHERE user_id = ?', userId),
+        connections: all(`SELECT c.id, c.status, c.intro, c.created_at,
+                                 c.from_id = ? AS sentByMe, u.username AS other
+                          FROM connections c
+                          JOIN users u ON u.id = CASE WHEN c.from_id = ? THEN c.to_id ELSE c.from_id END
+                          WHERE c.from_id = ? OR c.to_id = ?`, userId, userId, userId, userId),
+        messages: all(`SELECT m.id, m.connection_id, m.body, m.created_at
+                       FROM messages m WHERE m.sender_id = ?`, userId),
+        circles: all(`SELECT c.id, c.name, c.city, cm.role, cm.joined_at
+                      FROM circle_members cm JOIN circles c ON c.id = cm.circle_id
+                      WHERE cm.user_id = ?`, userId),
+        circleMessages: all(`SELECT id, circle_id, body, kind, created_at
+                             FROM circle_messages WHERE sender_id = ?`, userId),
+        applications: all(`SELECT circle_id, answer, status, created_at
+                           FROM circle_applications WHERE user_id = ?`, userId),
+        wants: all('SELECT circle_id, wants FROM circle_members WHERE user_id = ? AND wants != \'\'', userId),
+        vouchesGiven: all('SELECT circle_id, to_id, created_at FROM vouches WHERE from_id = ?', userId),
+        vouchesReceived: all('SELECT circle_id, from_id, created_at FROM vouches WHERE to_id = ?', userId),
+        rsvps: all('SELECT meetup_id, answer, plan, at FROM meetup_rsvps WHERE user_id = ?', userId),
+        attendance: all('SELECT occurrence_id, attended, at FROM attendance WHERE user_id = ?', userId),
+        blocks: all('SELECT blocked_id, created_at FROM blocks WHERE blocker_id = ?', userId),
+        reportsMade: all('SELECT reported_id, reason, detail, created_at FROM reports WHERE reporter_id = ?', userId)
+      };
+    },
+
+    /**
+     * Delete an account and everything attached to it.
+     *
+     * Nearly all of it is cascades that were already declared — and
+     * circle_messages.sender_id is ON DELETE SET NULL, which is the right
+     * answer and not an accident: a circle's conversation belongs to the
+     * circle, so what you said stays where other people replied to it, with
+     * your name gone from it.
+     *
+     * circles.host_id is the exception, and it cascades. Deleting the host
+     * would take the whole circle with it — the other members, everything
+     * they ever said, the meetups they turned up to — which is not something
+     * one person leaving should be able to do to seven others. So a circle
+     * with anyone else in it is handed to its longest-standing member, and
+     * only a circle that is just you is removed with you.
+     *
+     * @returns {{handedOver: number, circlesRemoved: number}}
+     */
+    deleteUser(userId) {
+      return tx(() => {
+        let handedOver = 0, circlesRemoved = 0;
+        q('SELECT id FROM circles WHERE host_id = ?').all(userId).forEach((c) => {
+          const heir = q(`SELECT user_id FROM circle_members
+                          WHERE circle_id = ? AND user_id != ?
+                          ORDER BY joined_at ASC LIMIT 1`).get(c.id, userId);
+          if (!heir) { circlesRemoved++; return; }      // cascades with the user
+          q('UPDATE circles SET host_id = ? WHERE id = ?').run(heir.user_id, c.id);
+          q(`UPDATE circle_members SET role = 'host' WHERE circle_id = ? AND user_id = ?`)
+            .run(c.id, heir.user_id);
+          S.addCircleMessage(c.id, null,
+            'The host left. This circle is now hosted by whoever has been here longest.', 'system');
+          handedOver++;
+        });
+        q('DELETE FROM users WHERE id = ?').run(userId);
+        return { handedOver, circlesRemoved };
+      });
     },
 
     prune() {

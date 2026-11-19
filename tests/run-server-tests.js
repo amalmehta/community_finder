@@ -1582,6 +1582,333 @@ async function verifyEmail(call, email) {
     eq(row4 ? row4.unread : 0, 0, 'and a negative one moves nothing backwards');
   });
 
+  // ---------------------------------------------------------------------
+  // Each of these is a defect that was reproduced against a running server
+  // before it was fixed. They are pinned here so the fix cannot quietly come
+  // undone — every one of them was invisible from the outside until somebody
+  // sent the request that triggers it.
+  // ---------------------------------------------------------------------
+
+  await group('what a malformed request should not be able to do', async () => {
+    // A lone '%' is not valid percent-encoding, so decodeURIComponent threw —
+    // from currentUser, which every API route calls. The whole API answered
+    // 500, logout included, and logout is the one route that would have
+    // cleared the cookie. There was no way out of it from inside the app.
+    const broken = await fetch(base + '/api/me', { headers: { Cookie: 'sid=%' } });
+    eq(broken.status, 200, 'a cookie that cannot be decoded is not a 500');
+    const bye = await fetch(base + '/api/logout', { method: 'POST', headers: { Cookie: 'sid=%E0%A4%A' } });
+    ok(bye.status < 500, 'and logout still answers, so the cookie can be cleared');
+
+    // `null` is valid JSON and not an object. Every route read a property off
+    // the parsed body, so any POST in the app could be made to answer 500 by
+    // anyone who could send four characters.
+    const nul = await fetch(base + '/api/signup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: 'null'
+    });
+    ok(nul.status < 500, 'a JSON body of null is a bad request, not a crash (' + nul.status + ')');
+    const scalar = await fetch(base + '/api/signup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '3'
+    });
+    ok(scalar.status < 500, 'and so is a number');
+    const arr = await fetch(base + '/api/signup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '[1,2]'
+    });
+    ok(arr.status < 500, 'and so is an array');
+  });
+
+  await group('a PATCH changes what it names, and nothing else', async () => {
+    const pat = client();
+    await pat('POST', '/api/signup', {
+      username: 'patch_user', password: 'longenough1', ageOk: true, city: 'Denver',
+      bio: 'Moved here in the spring and I am trying to find people to be outside with.'
+    });
+    const before = (await pat('GET', '/api/me')).data.user;
+    eq(before.city, 'Denver', 'the city is set at signup');
+    ok(before.bio.length >= 40, 'and so is a bio long enough for the Introduced tier');
+
+    // This blanked both. trustOf asks for a city and a 40-character bio, so
+    // one PATCH that mentioned neither dropped the person a trust tier and
+    // took circle hosting with it.
+    await pat('PATCH', '/api/me', { discoverable: true });
+    const after = (await pat('GET', '/api/me')).data.user;
+    eq(after.city, 'Denver', 'a PATCH that does not mention the city keeps it');
+    eq(after.bio, before.bio, 'and keeps the bio');
+
+    // An empty string is still a value, and still means "clear it".
+    await pat('PATCH', '/api/me', { city: '' });
+    eq((await pat('GET', '/api/me')).data.user.city, '', 'an empty string does clear it');
+  });
+
+  await group('every door into a conversation counts the messages', async () => {
+    // /api/direct and the circle side-thread both checked the *introduction*
+    // budget, and recorded against it only when they created the connection.
+    // Once a thread existed, every further message through either door was
+    // uncapped and left no row in `actions` for a moderator to see.
+    const one = client(), two = client();
+    await one('POST', '/api/signup', { username: 'flood_a', password: 'longenough1', ageOk: true, city: 'Austin' });
+    await two('POST', '/api/signup', { username: 'flood_b', password: 'longenough1', ageOk: true, city: 'Austin' });
+    const ids = ['books', 'games', 'tech'].map((i) => ({ id: i, visible: true }));
+    await one('PATCH', '/api/me', { interests: ids });
+    await two('PATCH', '/api/me', { interests: ids, openToDirect: true });
+    await verifyEmail(one, 'flood_a@example.com');
+    await verifyEmail(two, 'flood_b@example.com');
+
+    const toId = store.userByName('flood_b').id;
+    const first = await one('POST', '/api/direct', {
+      toUserId: toId, body: 'We both picked books, games and tech — fancy a coffee about any of them?'
+    });
+    eq(first.status, 201, 'strong alignment opens a direct conversation');
+
+    // Long enough to pass the floor, far over the ceiling. addMessage
+    // truncates at 2000, so this used to be accepted and silently cut.
+    const huge = await one('POST', '/api/direct', { toUserId: toId, body: 'x'.repeat(50000) });
+    eq(huge.status, 400, 'an oversized body is refused rather than truncated');
+
+    let capped = 0, sent = 0;
+    for (let i = 0; i < 70; i++) {
+      const r = await one('POST', '/api/direct', { toUserId: toId, body: 'Another thought about books, number ' + i });
+      if (r.status === 429) capped++; else sent++;
+    }
+    ok(capped > 0, 'the hourly message cap applies to /api/direct too (' + sent + ' sent, ' + capped + ' refused)');
+    ok(store.countSince('u:' + store.userByName('flood_a').id, 'message', 3600000) > 0,
+       'and each one leaves a row a moderator can see');
+  });
+
+  await group('a no is not reopened by a side door', async () => {
+    // sideThread handled accepted and pending and fell through for declined,
+    // so the route inserted a second row for a pair that already had one. One
+    // direction hit UNIQUE(from_id, to_id) and surfaced as a 500; the other
+    // succeeded and left the pair holding `declined` and `accepted` at once.
+    const asker = client(), decliner = client();
+    await asker('POST', '/api/signup', { username: 'ask_side', password: 'longenough1', ageOk: true, city: 'Boston' });
+    await decliner('POST', '/api/signup', {
+      username: 'decline_side', password: 'longenough1', ageOk: true, city: 'Boston',
+      bio: 'Here for the board games and the walking, and happy to be asked about either of them.'
+    });
+    await decliner('PATCH', '/api/me', { interests: [{ id: 'games', visible: true }] });
+    await asker('PATCH', '/api/me', { interests: [{ id: 'games', visible: true }] });
+    await verifyEmail(asker, 'ask_side@example.com');
+    await verifyEmail(decliner, 'decline_side@example.com');
+
+    const them = store.userByName('decline_side').id;
+    const req = await asker('POST', '/api/requests', {
+      toUserId: them, intro: 'We both picked board games — is there one you would recommend to a beginner?'
+    });
+    eq(req.status, 201, 'the introduction is sent');
+    const pending = (await decliner('GET', '/api/requests')).data.incoming[0];
+    await decliner('POST', `/api/requests/${pending.id}/decline`);
+
+    // Put them in a circle together, which is the only route to a side thread.
+    const cid = store.createCircle({
+      name: 'Board games after a no', city: 'Boston',
+      blurb: 'A circle that exists so two people who have already answered an introduction can be in one.',
+      question: 'What are you playing?', hostId: them, cap: 6, minTrust: 0, interests: ['games']
+    });
+    store.addMember(cid, store.userByName('ask_side').id);
+    store.addCircleMessage(cid, them, 'Opening the room so that both of us have said something.', 'chat');
+    store.addCircleMessage(cid, store.userByName('ask_side').id, 'And here is mine, so the side-thread gate is open.', 'chat');
+
+    const side = await asker('POST', `/api/circles/${cid}/threads`, {
+      userId: them, body: 'Trying the side door after the introduction was declined.'
+    });
+    ok(side.status !== 500, 'a declined connection does not crash the side thread (' + side.status + ')');
+    eq(side.status, 403, 'it is refused');
+    const conn = store.connectionBetween(store.userByName('ask_side').id, them);
+    eq(conn.status, 'declined', 'and the decline still stands');
+
+    // The other direction: the person who declined tries the side door.
+    const back = await decliner('POST', `/api/circles/${cid}/threads`, {
+      userId: store.userByName('ask_side').id, body: 'And the same from the other side of the same decline.'
+    });
+    ok(back.status !== 500, 'in either direction (' + back.status + ')');
+    eq(back.status, 403, 'and is refused there too');
+  });
+
+  await group('a meetup link has to be a web address', async () => {
+    // orgUrl went from a request body to an href in every other member's
+    // Plan pane with nothing asking what scheme it was. The page's CSP does
+    // not stop a javascript: URL — script-src says 'unsafe-inline'.
+    const host2 = client();
+    await host2('POST', '/api/signup', {
+      username: 'anchor_host', password: 'longenough1', ageOk: true, city: 'Chicago',
+      bio: 'Hosting a circle so that there is somewhere to propose a meetup with a link on it.'
+    });
+    await host2('PATCH', '/api/me', { interests: [{ id: 'books', visible: true }] });
+    const hid = store.userByName('anchor_host').id;
+    const cid = store.createCircle({
+      name: 'Anchored meetups', city: 'Chicago',
+      blurb: 'A circle used to check what a meetup will accept as the address of the place it names.',
+      question: 'What are you reading?', hostId: hid, cap: 6, minTrust: 0, interests: ['books']
+    });
+    // Talk enough to open the gate: three speakers, twenty messages, nobody
+    // over half, across the one day this suite allows.
+    const extras = [];
+    for (let i = 0; i < 2; i++) {
+      const uid = store.createUser({
+        username: 'anchor_m' + i, display: 'Anchor ' + i, pass: 'x', salt: 'y', city: 'Chicago', ageOk: true
+      });
+      store.addMember(cid, uid);
+      extras.push(uid);
+    }
+    for (let i = 0; i < 21; i++) {
+      const who = i % 3 === 0 ? hid : extras[i % 2];
+      store.addCircleMessage(cid, who, 'A sentence in the circle, number ' + i + '.', 'chat');
+    }
+
+    const when = Date.now() + 7 * 86400000;
+    const bad = await host2('POST', `/api/circles/${cid}/meetups`, {
+      title: 'Reading at the park', place: 'The big park bandstand', startsAt: when,
+      orgName: 'Somewhere', orgUrl: 'javascript:alert(document.cookie)',
+      plan: 'Walking from home at ten past six, straight there.'
+    });
+    eq(bad.status, 400, 'a javascript: URL is refused');
+    const good = await host2('POST', `/api/circles/${cid}/meetups`, {
+      title: 'Reading at the park', place: 'The big park bandstand', startsAt: when,
+      orgName: 'Somewhere', orgUrl: 'https://example.org/park',
+      plan: 'Walking from home at ten past six, straight there.'
+    });
+    eq(good.status, 201, 'and an ordinary https one is not');
+  });
+
+  await group('your own circles survive the cap on the list', async () => {
+    // listCircles caps at sixty, and both halves of /api/circles were built
+    // from the same sixty newest rows — so past that, the oldest circles you
+    // belong to fell off your own list, while /api/unread (membership-driven,
+    // uncapped) carried on counting them.
+    const far = client();
+    await far('POST', '/api/signup', { username: 'many_circles', password: 'longenough1', ageOk: true, city: 'Seattle' });
+    const me = store.userByName('many_circles').id;
+    const owner = store.createUser({
+      username: 'circle_owner', display: 'Owner', pass: 'x', salt: 'y', city: 'Seattle', ageOk: true
+    });
+    // The oldest one is mine; seventy newer ones are not.
+    const oldest = store.createCircle({
+      name: 'My oldest circle', city: 'Seattle',
+      blurb: 'The circle created first, which is the one that used to fall off the end of my own list.',
+      question: 'What brings you?', hostId: owner, cap: 8, minTrust: 0, interests: ['books']
+    });
+    store.addMember(oldest, me);
+    for (let i = 0; i < 70; i++) {
+      store.createCircle({
+        name: 'Filler circle ' + i, city: 'Seattle',
+        blurb: 'One of the circles created after mine, to push the list past the limit it truncates at.',
+        question: 'What brings you?', hostId: owner, cap: 8, minTrust: 0, interests: ['books']
+      });
+    }
+    const list = await far('GET', '/api/circles');
+    eq(list.status, 200, 'the list answers');
+    ok(list.data.mine.some((c) => c.id === oldest),
+       'the circle I am in is in my list even though seventy newer ones exist');
+  });
+
+  await group('permission is asked of the pair, not of the leaderboard', async () => {
+    // directAllowed was handed the overlap count from discover(), which
+    // returns the forty best rows ordered by overlap and then by who logged
+    // in most recently. Someone genuinely sharing three visible interests
+    // fell off the end as a city filled up and was told "you have 0" — a
+    // number the server could have asked for directly and knew to be wrong.
+    const seeker = client();
+    await seeker('POST', '/api/signup', { username: 'window_seeker', password: 'longenough1', ageOk: true, city: 'Portland' });
+    const sid = store.userByName('window_seeker').id;
+    const three = ['outdoors', 'nature', 'gardening'];
+    store.setInterests(sid, three.map((i) => ({ id: i, visible: true })));
+    await verifyEmail(seeker, 'window_seeker@example.com');
+
+    // The person we want to reach, pushed to the back by last_seen.
+    const target = store.createUser({
+      username: 'window_target', display: 'Target', pass: 'x', salt: 'y', city: 'Portland', ageOk: true
+    });
+    store.setInterests(target, three.map((i) => ({ id: i, visible: true })));
+    store.setOpenToDirect(target, true);
+    store.setEmail(target, 'window_target@example.com');
+    store.createVerification('tok_window', target, 'window_target@example.com', 60000);
+    store.useVerification('tok_window');
+    store.touch ? store.touch(target) : null;
+
+    // Fifty others sharing the same three, all seen more recently.
+    for (let i = 0; i < 50; i++) {
+      const uid = store.createUser({
+        username: 'window_filler' + i, display: 'Filler ' + i, pass: 'x', salt: 'y', city: 'Portland', ageOk: true
+      });
+      store.setInterests(uid, three.map((x) => ({ id: x, visible: true })));
+    }
+
+    const inWindow = store.discover(sid, {}).some((p) => p.id === target);
+    ok(!inWindow, 'the person we want is outside the forty-row discovery window');
+    eq(store.sharedInterests(sid, target).length, 3, 'while the pair genuinely shares three');
+
+    const r = await seeker('POST', '/api/direct', {
+      toUserId: target, body: 'We both picked hiking, nature and gardening — any walk you would recommend?'
+    });
+    eq(r.status, 201, 'and the message is allowed on the strength of the pair');
+  });
+
+  await group('taking your account with you, and ending it', async () => {
+    // privacy.html has always listed what this server holds and then told
+    // people to ask whoever runs it to delete the account. That was the one
+    // promise on the page the code did not keep.
+    const leaver = client(), stays = client();
+    await leaver('POST', '/api/signup', {
+      username: 'leaver', password: 'longenough1', ageOk: true, city: 'Austin',
+      bio: 'Here for a while and now leaving, which is the thing being tested.'
+    });
+    await stays('POST', '/api/signup', { username: 'stays', password: 'longenough1', ageOk: true, city: 'Austin' });
+    await leaver('PATCH', '/api/me', { interests: [{ id: 'books', visible: true }] });
+    await verifyEmail(leaver, 'leaver@example.com');
+
+    const dump = await leaver('GET', '/api/me/export');
+    eq(dump.status, 200, 'everything held about you can be downloaded');
+    eq(dump.data.account.username, 'leaver', 'and it is about you');
+    eq(dump.data.account.email, 'leaver@example.com', 'with the address you added');
+    ok(Array.isArray(dump.data.interests) && dump.data.interests.length === 1,
+       'and the interests you picked');
+    ['connections', 'messages', 'circles', 'circleMessages', 'applications',
+     'vouchesGiven', 'rsvps', 'blocks', 'reportsMade'].forEach((k) => {
+      ok(Array.isArray(dump.data[k]), 'the export has a ' + k + ' section');
+    });
+    const out = await fetch(base + '/api/me/export');
+    eq(out.status, 401, 'and it is not public');
+
+    // A hosted circle with other people in it is not the host's to delete.
+    const lid = store.userByName('leaver').id;
+    const sid2 = store.userByName('stays').id;
+    const kept = store.createCircle({
+      name: 'Outliving its host', city: 'Austin',
+      blurb: 'A circle whose host is about to delete their account, with somebody else still in it.',
+      question: 'What brings you?', hostId: lid, cap: 6, minTrust: 0, interests: ['books']
+    });
+    store.addMember(kept, sid2);
+    store.addCircleMessage(kept, lid, 'Something the host said, which other people replied to.', 'chat');
+    const alone = store.createCircle({
+      name: 'Just me', city: 'Austin',
+      blurb: 'A circle with nobody in it but the host, which goes when the host goes.',
+      question: 'What brings you?', hostId: lid, cap: 6, minTrust: 0, interests: ['books']
+    });
+
+    const wrongPw = await leaver('DELETE', '/api/me', { password: 'not the password' });
+    eq(wrongPw.status, 403, 'deleting takes the password, not just the cookie');
+    ok(!!store.userByName('leaver'), 'and the account is still there');
+
+    const gone = await leaver('DELETE', '/api/me', { password: 'longenough1' });
+    eq(gone.status, 200, 'with the password, the account goes');
+    eq(gone.data.handedOver, 1, 'a circle with other people in it is handed on');
+    eq(gone.data.circlesRemoved, 1, 'and one that was only you goes with you');
+    ok(!store.userByName('leaver'), 'the user row is gone');
+    ok(!!store.circleById(kept), 'the circle other people were in survives');
+    eq(store.circleById(kept).host_id, sid2, 'hosted by whoever had been there longest');
+    ok(!store.circleById(alone), 'and the empty one does not');
+
+    // The conversation stays where other people replied to it, with the name
+    // off it: circle_messages.sender_id is ON DELETE SET NULL, deliberately.
+    const left = store.circleMessages(kept, 0).filter((m) => m.kind === 'chat');
+    ok(left.length >= 1, 'what was said in the circle is still there');
+    ok(left.every((m) => m.sender_id === null || m.sender_id !== lid),
+       'with the departed account no longer attached to it');
+
+    const after = await leaver('GET', '/api/me');
+    ok(!after.data.user, 'and the session does not outlive the account');
+  });
+
   // fetch() keeps its sockets alive between requests, and closing the server
   // out from under an idle one surfaces as an unhandled `read ECONNRESET`
   // with a bare TCP stack and no test attached — which is exactly as much

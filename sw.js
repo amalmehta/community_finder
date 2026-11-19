@@ -15,7 +15,21 @@
 'use strict';
 
 // Bump this when the *behaviour* of this worker changes.
-var VERSION = 'v1';
+var VERSION = 'v2';
+
+// A digest of what is *in* the shell files, not just which files there are.
+//
+// The fingerprint below covers the list, which catches a file being added and
+// nothing else: edit styles.css or app.js and the cache keeps its name, so a
+// device that installed the worker and then went offline holds that old copy
+// indefinitely with nothing to say so. The only escape was to remember to
+// bump VERSION by hand, which is the same thing that was already forgotten
+// once — and the suite pinned the literal 'v1', so doing it failed CI.
+//
+// A worker cannot hash files at run time and this project has no build step,
+// so the digest is stamped in by `npm run stamp` and checked by the suite:
+// change a shell file and the tests say so, and one command fixes it.
+var SHELL_HASH = 'si3mw2';
 
 // Where the app lives, read off this file rather than assumed: it is served
 // from a subdirectory on GitHub Pages and from the root by the Node server,
@@ -77,7 +91,7 @@ function fingerprint(s) {
   }
   return h.toString(36);
 }
-var CACHE = 'fyc-shell-' + VERSION + '-' + fingerprint(SHELL.join('\n'));
+var CACHE = 'fyc-shell-' + VERSION + '-' + fingerprint(SHELL.join('\n')) + '-' + SHELL_HASH;
 
 self.addEventListener('install', function (e) {
   e.waitUntil(
@@ -198,27 +212,96 @@ function raceNetwork(req) {
   });
 }
 
+/**
+ * Which pages came out of the cache, by the id of the page itself.
+ *
+ * The stopwatch above is per request, which quietly reintroduced the bug
+ * network-first was chosen to avoid. On a connection that straddles 2500 ms,
+ * index.html can win its race and come back fresh while eight of the
+ * twenty-three scripts lose theirs and come back from the cache — new HTML
+ * driving old JavaScript, by a different route.
+ *
+ * So a navigation records where it came from, and the subresources that
+ * follow it go the same way the page did: a cached page is answered from the
+ * cache throughout, which is both consistent and much faster than making
+ * every one of those files wait out its own 2.5 seconds. A live page still
+ * races, which is what keeps a deploy reaching people.
+ *
+ * Keyed by client, not held as one flag, because one worker serves every tab:
+ * a second window open offline would otherwise pin a live window's scripts to
+ * the cache, which is the same bug again with a smaller audience. The map is
+ * swept when it grows, since a closed tab never tells us it has gone.
+ */
+var cachedClients = Object.create(null);
+var cachedCount = 0;
+
+function noteSource(id, fromTheCache) {
+  if (!id) return;
+  if (fromTheCache) {
+    if (!cachedClients[id]) cachedCount++;
+    cachedClients[id] = true;
+    // Ask who is actually still open, and forget the rest.
+    if (cachedCount > 20 && self.clients && self.clients.matchAll) {
+      self.clients.matchAll({ type: 'window' }).then(function (open) {
+        var live = Object.create(null);
+        open.forEach(function (c) { if (cachedClients[c.id]) live[c.id] = true; });
+        cachedClients = live;
+        cachedCount = open.length;
+      }).catch(function () {});
+    }
+  } else if (cachedClients[id]) {
+    delete cachedClients[id];
+    cachedCount--;
+  }
+}
+
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   var url;
   try { url = new URL(req.url); } catch (err) { return; }
   if (!ours(url, req)) return;
 
+  var navigating = req.mode === 'navigate';
+  // A navigation's own id is resultingClientId: the page it is about to
+  // become. Everything after it arrives under clientId, which is that page.
+  var who = navigating ? (e.resultingClientId || e.clientId) : e.clientId;
+
+  function fromCache() {
+    // Look it up under the same key it was stored under, so '?tab=plan'
+    // and a '?org=' link both find the page they are.
+    return caches.match(shellKey(url) || req).then(function (hit) {
+      if (hit) {
+        if (navigating) noteSource(who, true);
+        return hit;
+      }
+      // Any URL under the app opens the app: '?tab=plan' from the
+      // installed shortcut has to work with the radio off, and it is not
+      // a URL anything ever cached under that name.
+      if (navigating) {
+        return caches.match(new URL('index.html', self.location).href)
+          .then(function (page) {
+            if (page) noteSource(who, true);
+            return page || Response.error();
+          });
+      }
+      return Response.error();
+    });
+  }
+
+  // A subresource of a page that came from the cache belongs to that page.
+  if (!navigating && who && cachedClients[who]) {
+    e.respondWith(fromCache().then(function (hit) {
+      // Not in the shell — a file the cached page asks for and the cache
+      // does not have. The network is the only place left to look.
+      return hit && hit.type !== 'error' ? hit : raceNetwork(req).catch(fromCache);
+    }));
+    return;
+  }
+
   e.respondWith(
-    raceNetwork(req).catch(function () {
-      // Look it up under the same key it was stored under, so '?tab=plan'
-      // and a '?org=' link both find the page they are.
-      return caches.match(shellKey(url) || req).then(function (hit) {
-        if (hit) return hit;
-        // Any URL under the app opens the app: '?tab=plan' from the
-        // installed shortcut has to work with the radio off, and it is not
-        // a URL anything ever cached under that name.
-        if (req.mode === 'navigate') {
-          return caches.match(new URL('index.html', self.location).href)
-            .then(function (page) { return page || Response.error(); });
-        }
-        return Response.error();
-      });
-    })
+    raceNetwork(req).then(function (res) {
+      if (navigating) noteSource(who, false);
+      return res;
+    }, fromCache)
   );
 });

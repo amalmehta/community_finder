@@ -563,9 +563,29 @@
       return state;
     },
 
-    /** How far through, for the progress bar. */
+    /**
+     * How far through, for the progress bar.
+     *
+     * This answered a flat 20, which is the ceiling rather than the length of
+     * the run. The form is adaptive: how many questions are left to ask
+     * depends on what has been said, and `done()` ends it the moment nothing
+     * is worth asking. Answering every question with the last option gives a
+     * nineteen-question run; skipping everything gives sixteen. So the bar
+     * stopped at 80% and the results appeared, and aria-valuemax told a
+     * screen reader "16 of 20" at the end of a finished form. The suite knew
+     * this all along — it asserts a run is between 15 and 20.
+     *
+     * The honest total is what has been asked plus what can still be asked,
+     * capped at the ceiling. It can move while the form is being filled in,
+     * because answering one thing is what makes another worth asking — so it
+     * never moves below what has already been asked, and the bar only ever
+     * goes forward.
+     */
     progress: function (state) {
-      return { asked: state.asked.length, total: TOTAL };
+      var asked = state.asked.length;
+      var left = 0;
+      QUESTIONS.forEach(function (q) { if (priority(q, state) > 0) left++; });
+      return { asked: asked, total: Math.max(asked, Math.min(TOTAL, asked + left)) };
     },
 
     /** True when there is nothing useful left to ask. */
