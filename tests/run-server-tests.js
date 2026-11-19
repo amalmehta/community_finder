@@ -73,6 +73,17 @@ function client() {
 
 let base;
 
+/* A fetch whose body is always read, for checks that only look at the status
+   or the headers. Node 22's fetch (undici) can crash the whole process with
+   assert(!this.paused) when a keep-alive socket closes under a body nobody
+   consumed. It took CI down intermittently while passing every time on Node
+   24, and a bigger stylesheet made it likelier. */
+async function got(p) {
+  const res = await fetch(base + p);
+  await res.arrayBuffer();
+  return res;
+}
+
 /** Add an address and click the link, the way a person would. */
 async function verifyEmail(call, email) {
   const r = await call('POST', '/api/email', { email });
@@ -1062,7 +1073,7 @@ async function verifyEmail(call, email) {
 
     // Security headers on every response, page and API alike.
     for (const p of ['/', '/api/health']) {
-      const res = await fetch(base + p);
+      const res = await got(p);
       eq(res.headers.get('x-content-type-options'), 'nosniff', `nosniff on ${p}`);
       eq(res.headers.get('x-frame-options'), 'DENY', `framing denied on ${p}`);
       ok((res.headers.get('content-security-policy') || '').includes("default-src 'self'"),
@@ -1071,19 +1082,19 @@ async function verifyEmail(call, email) {
          `frame-ancestors on ${p}`);
     }
     // HSTS only over TLS; sending it on plain http would be wrong.
-    eq((await fetch(base + '/')).headers.get('strict-transport-security'), null,
+    eq((await got('/')).headers.get('strict-transport-security'), null,
        'no HSTS when not running behind TLS');
 
     // Caching: the page must revalidate or a deploy never lands; assets may cache.
-    eq((await fetch(base + '/')).headers.get('cache-control'), 'no-cache', 'the page revalidates');
-    ok((await fetch(base + '/assets/styles.css')).headers.get('cache-control').includes('max-age'),
+    eq((await got('/')).headers.get('cache-control'), 'no-cache', 'the page revalidates');
+    ok((await got('/assets/styles.css')).headers.get('cache-control').includes('max-age'),
        'assets are cacheable');
-    eq((await fetch(base + '/api/me')).headers.get('cache-control'), 'no-store', 'API responses are never cached');
+    eq((await got('/api/me')).headers.get('cache-control'), 'no-store', 'API responses are never cached');
 
     // The public, non-app files a deployment needs.
     for (const p of ['/privacy.html', '/terms.html', '/robots.txt', '/site.webmanifest',
                      '/sitemap.xml', '/sw.js']) {
-      eq((await fetch(base + p)).status, 200, `serves ${p}`);
+      eq((await got(p)).status, 200, `serves ${p}`);
     }
     ok((await (await fetch(base + '/robots.txt')).text()).includes('Disallow: /api/'),
        'robots keeps crawlers out of the API');
@@ -1114,19 +1125,21 @@ async function verifyEmail(call, email) {
     eq(r.status, 200, 'the app itself is served');
     ok((await r.text()).indexOf('community_finder') !== -1, 'and it is the right page');
 
-    eq((await fetch(base + '/assets/styles.css')).status, 200, 'the stylesheet is served');
-    eq((await fetch(base + '/src/match.js')).status, 200, 'front-end scripts are served');
+    eq((await got('/assets/styles.css')).status, 200, 'the stylesheet is served');
+    eq((await got('/src/match.js')).status, 200, 'front-end scripts are served');
 
     // Assets are cached for five minutes with must-revalidate, which needs a
     // validator to revalidate against. Without one a deploy handed people the
     // new page driving the old scripts.
     const asset = await fetch(base + '/src/match.js');
+    await asset.arrayBuffer();
     const tag = asset.headers.get('etag');
     ok(!!tag, 'a static asset carries an ETag (' + tag + ')');
     const again = await fetch(base + '/src/match.js', { headers: { 'If-None-Match': tag } });
     eq(again.status, 304, 'and a conditional GET is answered with a 304');
     eq(again.headers.get('etag'), tag, 'the 304 repeats the tag');
     const changed = await fetch(base + '/src/match.js', { headers: { 'If-None-Match': '"nonsense"' } });
+    await changed.arrayBuffer();
     eq(changed.status, 200, 'a stale tag gets the file');
 
     // Only the front end is public. Everything else in the repo stays private,
@@ -1134,12 +1147,12 @@ async function verifyEmail(call, email) {
     for (const p of ['/server/db.js', '/server/app.js', '/package.json', '/.gitignore',
                      '/tests/run-server-tests.js', '/tools/check-links.js', '/mac/build.sh',
                      '/README.md', '/server/data/community.db']) {
-      eq((await fetch(base + p)).status, 404, 'not served: ' + p);
+      eq((await got(p)).status, 404, 'not served: ' + p);
     }
 
     // fetch() normalises '/../' away, so traversal has to be tested encoded
     // and over a raw socket.
-    eq((await fetch(base + '/%2e%2e/package.json')).status, 404, 'encoded traversal is refused');
+    eq((await got('/%2e%2e/package.json')).status, 404, 'encoded traversal is refused');
     const raw = await new Promise((resolve) => {
       const net = require('node:net');
       const s = net.connect(server.address().port, '127.0.0.1', () => {
@@ -1150,12 +1163,13 @@ async function verifyEmail(call, email) {
       s.on('end', () => resolve(buf.split('\r\n')[0]));
     });
     ok(/ 404 /.test(raw), 'raw-socket path traversal is refused (' + raw.trim() + ')');
-    eq((await fetch(base + '/api/nope')).status, 404, 'unknown endpoints 404');
+    eq((await got('/api/nope')).status, 404, 'unknown endpoints 404');
 
     const cross = await fetch(base + '/api/login', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' },
       body: JSON.stringify({ username: 'ava', password: 'hunter2hunter' })
     });
+    await cross.arrayBuffer();
     eq(cross.status, 403, 'cross-origin writes are refused');
   });
 
