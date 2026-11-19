@@ -14,9 +14,28 @@
   function enc(s) {
     return encodeURIComponent(String(s || '').trim());
   }
-  /** Search terms for the chosen interests, best-first. */
-  function kw(ctx) {
-    var t = ctx.interests
+  /**
+   * Search terms to send a directory, from the person's interests in the order
+   * they ranked them.
+   *
+   * `prefer` is for a directory that only covers one thing. Without it this
+   * took the top interest and handed it to whoever asked, so somebody who
+   * picked board games and volunteering had VolunteerMatch searched for
+   * "board games tabletop" — a volunteering site queried with a term it has
+   * nothing under, which looks like the site being empty rather than the
+   * search being wrong. Only when volunteering happened to be ranked first
+   * did that link work. A directory that lists everything, like Meetup,
+   * passes nothing and still gets the top interest, which is right for it.
+   */
+  function kw(ctx, prefer) {
+    var ranked = ctx.interests;
+    if (prefer && prefer.length) {
+      var mine = ranked.filter(function (id) { return prefer.indexOf(id) !== -1; });
+      // Nothing of theirs is in this directory's subject, so fall back to the
+      // subject itself rather than to something it does not cover.
+      ranked = mine.length ? mine : prefer;
+    }
+    var t = ranked
       .map(function (id) {
         return FYC.INTERESTS[id] && FYC.INTERESTS[id].search;
       })
@@ -68,9 +87,12 @@
       always: true,
       name: 'VolunteerMatch — one-off shifts near {city}',
       blurb: 'Search local volunteer roles by cause and filter to one-time opportunities. A single shift is the lowest-commitment way to be in a room with people who share a value with you.',
-      interests: ['volunteering', 'impact'],
+      // 'impact' used to be in this list. It is a goal, not an interest, so it
+      // could never match one — and the goals below are where it belongs.
+      interests: ['volunteering', 'civic', 'mentoring'],
       link: function (ctx) {
-        return 'https://www.volunteermatch.org/search/?l=' + enc(ctx.city) + '&k=' + enc(kw(ctx));
+        return 'https://www.volunteermatch.org/search/?l=' + enc(ctx.city) +
+               '&k=' + enc(kw(ctx, ['volunteering', 'civic', 'mentoring']));
       },
       step: 'Filter to one-time opportunities and sign up for exactly one',
       expect: [
@@ -401,7 +423,9 @@
       name: 'Eventbrite — what\'s on in {city}',
       blurb: 'Good for one-off classes, workshops, gigs and tastings. A ticketed event with a defined end time is the easiest kind of thing to attend alone.',
       link: function (ctx) {
-        return 'https://www.eventbrite.com/d/' + slug(ctx.city) + '/' + slug(kw(ctx)) + '/';
+        return 'https://www.eventbrite.com/d/' + slug(ctx.city) + '/' +
+               slug(kw(ctx, ['music', 'theater', 'art', 'filmphoto', 'food', 'games',
+                             'dance', 'books'])) + '/';
       },
       step: 'Buy one ticket for something with a clear start and end time',
       expect: [

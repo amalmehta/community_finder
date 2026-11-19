@@ -77,6 +77,11 @@ final class StaticServer {
             return
         }
 
+        // A HEAD response carries the same headers as the GET and none of the
+        // body. Sending the file anyway is what a client asking only for the
+        // headers is explicitly trying to avoid.
+        let bodyless = parts[0] == "HEAD"
+
         var path = String(parts[1])
         if let q = path.firstIndex(of: "?") { path = String(path[..<q]) }
         path = path.removingPercentEncoding ?? path
@@ -88,19 +93,21 @@ final class StaticServer {
         guard target.path == root.path || target.path.hasPrefix(root.path + "/"),
               let body = try? Data(contentsOf: target) else {
             send(status: "404 Not Found", body: Data("Not found".utf8),
-                 type: "text/plain; charset=utf-8", on: conn)
+                 type: "text/plain; charset=utf-8", on: conn, bodyless: bodyless)
             return
         }
-        send(status: "200 OK", body: body, type: Self.mimeType(for: target), on: conn)
+        send(status: "200 OK", body: body, type: Self.mimeType(for: target),
+             on: conn, bodyless: bodyless)
     }
 
-    private func send(status: String, body: Data, type: String, on conn: NWConnection) {
+    private func send(status: String, body: Data, type: String, on conn: NWConnection,
+                      bodyless: Bool = false) {
         var header = "HTTP/1.1 \(status)\r\n"
         header += "Content-Type: \(type)\r\n"
         header += "Content-Length: \(body.count)\r\n"
         header += "Cache-Control: no-store\r\n"
         header += "Connection: close\r\n\r\n"
-        conn.send(content: Data(header.utf8) + body,
+        conn.send(content: bodyless ? Data(header.utf8) : Data(header.utf8) + body,
                   completion: .contentProcessed { _ in conn.cancel() })
     }
 
@@ -110,6 +117,12 @@ final class StaticServer {
         case "css":         return "text/css; charset=utf-8"
         case "js":          return "text/javascript; charset=utf-8"
         case "json":        return "application/json; charset=utf-8"
+        // The manifest decides whether the browser offers to install this at
+        // all, and it is ignored outright unless it arrives as JSON. Served
+        // as octet-stream it looked like a download nobody asked for.
+        case "webmanifest": return "application/manifest+json; charset=utf-8"
+        case "xml":         return "application/xml; charset=utf-8"
+        case "txt":         return "text/plain; charset=utf-8"
         case "svg":         return "image/svg+xml"
         case "png":         return "image/png"
         case "jpg", "jpeg": return "image/jpeg"

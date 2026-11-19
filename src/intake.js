@@ -72,7 +72,6 @@
       id: 'easier', kind: 'one', base: 70,
       when: function (s) { return s.dims.comfort === 1; },
       prompt: 'What would make that easier?',
-      hint: 'You said a room of strangers is hard — this decides what gets ranked first.',
       options: [
         pick('task', 'Having a job to do', { prefer: { structure: 'shift' }, goals: ['impact'] }),
         pick('dropin', 'Being able to leave whenever', { prefer: { commitment: 'one-off' } }),
@@ -294,7 +293,6 @@
       id: 'repeat', kind: 'one', base: 46,
       when: function (s) { return (s.dims.goals || []).indexOf('friends') !== -1; },
       prompt: 'Same faces every week, or new ones each time?',
-      hint: 'You said you want friends — this is the single biggest predictor.',
       options: [
         pick('same', 'Same faces', { commitment: 'weekly', goals: ['routine'] }),
         pick('new', 'New ones', { commitment: 'one-off' })
@@ -377,7 +375,6 @@
     {
       id: 'probe-give', kind: 'one', base: 32, when: notPulled('give'),
       prompt: 'A single volunteer shift, no strings?',
-      hint: 'It is the most reliable way to be in a room with people and not have to perform.',
       options: [
         pick('yes', 'Go on then', i({ volunteering: 2 })),
         pick('no', 'No', {})
@@ -394,7 +391,6 @@
     {
       id: 'avoid', kind: 'many', max: 3, base: 38,
       prompt: 'Anything here you would actively avoid?',
-      hint: 'Worth saying — it pushes these down rather than just not boosting them.',
       options: [
         pick('loud', 'Loud, high-energy things', i({ fitness: -3, dance: -2, sports: -2 })),
         pick('perform', 'Anything performed in front of people', i({ theater: -3, music: -2 })),
@@ -513,8 +509,36 @@
     };
   }
 
+  function byId(id) {
+    return QUESTIONS.filter(function (q) { return q.id === id; })[0] || null;
+  }
+
+  /**
+   * Replay every answer except the last, rebuilding state from scratch.
+   * The engine is pure, so replaying is exact — no undo bookkeeping to get
+   * subtly wrong, and the adaptive path recomputes correctly.
+   */
+  function back(state) {
+    if (!state.asked.length) return state;
+    var order = state.asked.slice(0, -1);
+    var answers = state.answers;
+    var fresh = blankState();
+    order.forEach(function (qid) {
+      var q = byId(qid);
+      if (!q) return;
+      if (answers[qid] === undefined) { fresh.asked.push(qid); return; }  // was skipped
+      intake.answer(fresh, q, answers[qid]);
+    });
+    // Keep the dropped answer so going forward again can prefill it.
+    fresh.answers = Object.assign({}, answers);
+    return fresh;
+  }
+
   var intake = {
     TOTAL: TOTAL,
+    back: back,
+    byId: byId,
+    canGoBack: function (state) { return state.asked.length > 0; },
     QUESTIONS: QUESTIONS,
     blankState: blankState,
     nextQuestion: nextQuestion,
@@ -539,9 +563,29 @@
       return state;
     },
 
-    /** How far through, for the progress bar. */
+    /**
+     * How far through, for the progress bar.
+     *
+     * This answered a flat 20, which is the ceiling rather than the length of
+     * the run. The form is adaptive: how many questions are left to ask
+     * depends on what has been said, and `done()` ends it the moment nothing
+     * is worth asking. Answering every question with the last option gives a
+     * nineteen-question run; skipping everything gives sixteen. So the bar
+     * stopped at 80% and the results appeared, and aria-valuemax told a
+     * screen reader "16 of 20" at the end of a finished form. The suite knew
+     * this all along — it asserts a run is between 15 and 20.
+     *
+     * The honest total is what has been asked plus what can still be asked,
+     * capped at the ceiling. It can move while the form is being filled in,
+     * because answering one thing is what makes another worth asking — so it
+     * never moves below what has already been asked, and the bar only ever
+     * goes forward.
+     */
     progress: function (state) {
-      return { asked: state.asked.length, total: TOTAL };
+      var asked = state.asked.length;
+      var left = 0;
+      QUESTIONS.forEach(function (q) { if (priority(q, state) > 0) left++; });
+      return { asked: asked, total: Math.max(asked, Math.min(TOTAL, asked + left)) };
     },
 
     /** True when there is nothing useful left to ask. */

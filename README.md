@@ -1,327 +1,124 @@
-# community_finder
+# Community Finder
 
-A small web app for the problem of *"I live here and I don't know anyone."*
+For the problem of *"I live here and I don't know anyone."* It asks twenty
+short questions and returns real local groups — each with the one thing you
+cannot get without ringing round: **the concrete first step, what it costs,
+what the commitment is, and what actually happens when you turn up.**
 
-It asks **twenty questions, chosen one at a time**. What you have already said
-decides what comes next: pick "Give" and it asks what kind of useful; say a room
-of strangers is hard and it asks what would make it easier; say you want friends
-and it asks whether you want the same faces every week. Once your chosen areas
+**[Open it →](https://amalmehta.com/community_finder/)**
+
+![The results: a column of matches with one open beside it, showing the first step for Alemany Farm, its badge in the green of the Grow group](docs/images/results.png)
+
+Twenty questions, chosen one at a time. What you have already said decides what
+comes next: pick "Give" and it asks what kind of useful; say a room of
+strangers is hard and it asks what would make it easier. Once your chosen areas
 are drilled out it probes the ones you skipped, at half weight — which is where
 the surprises come from.
 
-Then it returns real local groups —
-and for each one, the information you can't get without ringing round: **the
-concrete first step, what it costs, what the commitment is, and what actually
-happens when you turn up.**
+![The first question: the guide waves beside a speech bubble, then "Where are you?" with a terracotta Continue button](docs/images/intake.png)
 
 It assumes you are capable. It does not write your messages for you, reassure
-you, or tell you it's okay to leave early. It tells you that the bird walk lends
-binoculars, that the shelter wants an orientation first, that the league places
-solo sign-ups on a team, and that the dance teaches the steps beforehand — the
-specifics that decide whether something is worth your Saturday.
-
-- **Ten cities are hand-curated** — San Francisco Bay Area, New York City,
-  Los Angeles, Chicago, Seattle, Austin, Boston, Philadelphia, Washington DC
-  and San Diego (242 organisations, every link checked). Every city covers
-  every one of the 32 interests, and the test suite enforces that. Listings mix the big
-  obvious institutions with genuinely obscure ones, on the theory that a
-  hidden four-acre farm is easier to walk into than a famous nonprofit.
-- **Every other city works too.** A fallback engine builds live, working links
-  into national directories (Meetup, VolunteerMatch, parkrun, Feeding America,
-  CenterLink, Repair Café, Audubon, RRCA and more), pointed at the city you
-  typed and the interests you picked.
+you, or tell you it's okay to leave early. It tells you that the bird walk
+lends binoculars, that the shelter wants an orientation first, that the league
+places solo sign-ups on a team — the specifics that decide whether something is
+worth your Saturday.
 
 ---
 
-## Two builds, one codebase
+## What is in it
 
-The app runs in either of two modes, decided at load time by whether an API is
-reachable:
+- **Thirteen cities are hand-curated** — the SF Bay Area, New York, Los
+  Angeles, Chicago, Seattle, Austin, Boston, Philadelphia, Washington DC, San
+  Diego, Denver, Portland and Minneapolis. 305 organisations, every link
+  checked weekly by CI. Every city covers every one of the 32 interests, and
+  the test suite enforces it.
+- **Every other city works too.** A fallback engine builds live, working links
+  into national directories — Meetup, VolunteerMatch, parkrun, Feeding America,
+  CenterLink, Repair Café, Audubon, RRCA and more — pointed at the city you
+  typed and the interests you picked.
+- **And, with a server behind it, circles**: four to eight people in one city
+  who share interests and one group chat. You talk first. Only once the circle
+  has genuinely been a conversation does the app let anyone propose meeting —
+  and then only if enough people say yes. Every mechanic in it comes from the
+  group-dynamics literature, and the numbers are
+  [pinned by tests](docs/SYSTEM-DESIGN.md#why-circles-work-the-way-they-do).
 
-| | Static (GitHub Pages) | With the server |
-|---|---|---|
-| Accounts | none | required |
-| Finder, plan, learned preferences | yes | yes |
-| People and messaging | no | yes |
-| Data leaves your device | never | your profile and messages only |
+Dark mode is checked on every component:
 
-The published site at <https://amalmehta.github.io/community_finder/> is the
-static one: no account, no server, nothing transmitted. Running `npm start`
-gives you the account build on localhost. Nothing needs rebuilding to switch —
-the front end calls `GET /api/me`, and falls back to solo mode if that fails.
+![The same results screen in dark mode](docs/images/results-dark.png)
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["Twenty adaptive<br/>questions"] --> B["A profile:<br/>city, ranked interests,<br/>comfort, budget, when"]
+    B --> C{"Is this city<br/>curated?"}
+    C -->|yes| D["305 hand-written<br/>listings"]
+    C -->|no| E["27 recipes →<br/>real directory links"]
+    D --> F["Score on six<br/>weighted dimensions"]
+    E --> F
+    F --> G["Filter on overlap ·<br/>respect budget ·<br/>diversify"]
+    G --> H["A ranked list, each<br/>with its first step"]
+    I["What you actually<br/>click"] -. "at most 18%<br/>of the score" .-> F
+```
+
+All of that runs in your browser. There is no build step, no dependency and no
+network call — the listings are plain `<script>` tags, so `open index.html`
+works off the disk. A service worker keeps a copy so it opens with no signal.
+With a Node server behind it the same app adds accounts, circles and messages;
+without one it falls back to the finder alone.
 
 ## Run it
-
-No build step, no dependencies, no server required.
 
 ```bash
 open index.html
 ```
 
-That is genuinely it — double-clicking `index.html` works, because the data
-files are plain `<script>` tags rather than `fetch`ed JSON.
-
-If you prefer to serve it over HTTP (recommended, and required if you later add
-anything that needs an origin):
+Or, to get the offline copy, accounts and circles:
 
 ```bash
-python3 -m http.server 4173
+npm start
 ```
 
-Then open <http://localhost:4173>.
-
-### As a Mac app
-
-There is a native macOS wrapper in `mac/`. It builds a real double-clickable
-`.app` with its own icon and Dock entry, with the whole site bundled inside, so
-it works with no internet connection and no dev server.
+Node 22+, no dependencies, nothing to install. Then <http://localhost:4000>.
+There is a native Mac wrapper too — `npm run mac`.
 
 ```bash
-./mac/build.sh
-open "mac/dist/community_finder.app"
+npm test
 ```
 
-Needs only the Xcode command line tools (`swiftc`, `iconutil`) — no npm, no
-Rust, no Electron. The result is about 1 MB.
+Around 9,500 assertions over the data and the engines, then 460 against a real
+HTTP server. Both expect `0 failed`.
 
-Drag it to `/Applications` to keep it. It's ad-hoc signed for local use, so if
-you ever move it to another Mac, Gatekeeper will ask you to confirm the first
-launch (right-click → Open).
+## Where everything is
 
-**It uses the account server when one is running.** On launch the app probes
-`http://127.0.0.1:4000/api/me` (2-second timeout). If that answers it loads the
-backend, so the Mac app gets profiles, People and Messages. If it does not, the
-app falls back to the copy bundled inside it and runs as the finder alone —
-still fully offline, just without accounts. The title bar says which mode you
-are in: the server's host, or "offline copy".
+| | |
+|---|---|
+| **[Setting it up, running it, using it](docs/INSTRUCTIONS.md)** | Every command, checked by following it |
+| **[System design](docs/SYSTEM-DESIGN.md)** | Architecture, flows, where data lives, decisions, threat model, limits |
+| **[What is where](docs/FILE-STRUCTURE.md)** | Every file that matters, one line each |
+| **[Deploying](DEPLOY.md)** | Docker, TLS, and the checklist before letting anyone in |
+| **[The API](server/README.md)** | Routes, safety rules, rate limits |
+| [Prompt log](docs/PROMPTS.md) | What was asked for in each session, and what it led to |
+| [Privacy](privacy.html) · [Terms](terms.html) | What is stored, where, and who can see it |
 
-**View → Server…** (⌘,) points it somewhere else, including a deployed
-instance. **View → Reconnect to Server** (⇧⌘R) retries after you start the
-server. Sign-in persists between launches; the Mac app keeps its own cookie
-store, separate from your browser.
+## Privacy, briefly
 
-**How it works.** `mac/Sources/main.swift` is a Cocoa app hosting a `WKWebView`;
-`mac/Sources/StaticServer.swift` is a small read-only HTTP server bound to
-loopback on a random port, serving `Contents/Resources/web`. The server exists
-because WKWebView gives `file://` pages an opaque origin, which disables
-`localStorage` and would break your saved plan. Serving from `127.0.0.1` gives
-the page a normal web origin, so the app behaves exactly like the browser build.
-Links to real organisations open in your default browser rather than inside the
-app window. ⌘R reloads. View → Clear Local Data erases your saved search, plan and learned preferences on this device.
-
-### With accounts and messaging
-
-```bash
-npm start          # http://localhost:4000
-```
-
-Node 22+ only — it uses the built-in `node:sqlite`. Still no dependencies and
-nothing to install. The database appears at `server/data/community.db`.
-
-**Email verification** is optional for the finder and required before you can
-contact anyone. The default mail transport writes the message to the console
-and to `server/data/outbox/`, so the whole flow works with no provider, no API
-key and no cost — open the link in the file to finish verifying. Swapping in a
-real sender means one transport in `server/mail.js`.
-
-**The alignment graph** on the People tab draws you, your visible interests, and
-the people who share them, so you can see *why* someone is recommended. It is
-bipartite on purpose: it exposes nothing that discovery does not already show.
-
-**Messaging without a request** is unlocked by strong alignment: 3+ shared
-interests, the same city, and both people verified. The recipient can switch it
-off, blocking always wins, and the daily caps still apply.
-
-See [server/README.md](server/README.md) for the API, the safety rules and how
-to change the rate limits. In short: contact is request-then-accept, a new
-account gets three introductions a day, interests can be hidden from discovery
-while still shaping your own results, and reporting someone blocks them.
-
-**Before putting this on the public internet**, you would want at minimum: TLS
-(then run with `SECURE=1` so the session cookie is marked Secure), a backup of
-the SQLite file, and someone actually reading the `reports` table. The safety
-mechanics are built; the operational side is not something code can supply.
-
-### Deploying
-
-It is a static site. Push the repo and point GitHub Pages at the root, or drop
-the folder on any static host. There is no backend to run.
-
----
-
-## Verify it works
-
-Two checks, both zero-dependency:
-
-```bash
-npm test        # both suites
-```
-
-```bash
-node tests/run-tests.js
-```
-
-1670+ assertions covering data integrity (every listing has a valid first step,
-a real URL, interests that exist in the taxonomy, ratings in range), city lookup
-and aliasing, the universal fallback engine, matcher behaviour (a nervous person
-gets gentle options first, budget is respected, the comfort dial actually
-re-ranks, no duplicate results), and that `index.html` loads every file it needs.
-
-```bash
-node tools/check-links.js
-```
-
-Fetches every URL in the dataset and reports broken ones. Expected result:
-**0 broken.** It also reports an "unverifiable" bucket — around 22 URLs at
-sites that refuse automated requests (403), sit behind a virtual queue, or are
-intercepted by a corporate TLS proxy. Those are not dead links; they were
-confirmed live by hand and their DNS resolves. Pass `--all` to also check the
-national directory URLs used by the fallback engine.
-
-### Automated checks
-
-`.github/workflows/check-links.yml` runs the test suite and the link checker
-every Monday on GitHub Actions, and opens an issue if a listing's link breaks.
-It keeps a single open issue and comments on it rather than filing a new one
-each week. You can also run it on demand from the Actions tab.
-
-```bash
-node tests/run-server-tests.js
-```
-
-65 assertions against a real HTTP server on a throwaway database: signup and
-sign-in, session isolation, that a hidden interest cannot be used to find you,
-the request/accept/message flow, outsiders being locked out of other people's
-threads, blocking, reporting, rate limits, and that the server serves only the
-front end — not its own source, the database, or anything reachable by path
-traversal.
-
-The intake has its own tests: that a run is exactly twenty questions, that
-different answers produce measurably different questions, that choosing an area
-asks its drill-downs and skips the others, that deliberate answers outrank
-probes, that negative answers push things down, and that it terminates however
-it is answered.
-
-Manual check: open the app, type `Brooklyn`, pick a few interests, and confirm
-you get New York listings with a "Start here" card. Then type `Boise, Idaho` and
-confirm you get the national-routes view instead.
-
----
-
-## How it works
-
-```
-index.html            the whole UI
-assets/styles.css     styling, light + dark, mobile-first breakpoints
-src/
-  data/core.js        interest taxonomy (32 interests in 6 groups) + city registry
-  data/city-*.js      the ten hand-curated city datasets
-  data/universal.js   fallback recipes → real deep links for any city
-  intake.js           the adaptive 20-question engine (pure functions, no DOM)
-  preferences.js      on-device preference tracker (pure functions, injectable storage)
-  social.js           accounts, people and messaging UI (inert without a backend)
-  match.js            the scoring engine (pure functions, no DOM)
-  app.js              DOM rendering, plan, feedback
-tests/run-tests.js    the test suite
-tools/check-links.js  the link checker
-server/
-  db.js               SQLite schema and queries
-  app.js              HTTP server, auth, API, rate limits
-  README.md           API and safety notes
-mac/
-  Sources/main.swift        Cocoa + WKWebView shell, menus, link handling
-  Sources/StaticServer.swift  loopback static server (so localStorage works)
-  makeicon.swift            generates the app icon
-  build.sh                  builds mac/dist/community_finder.app
-```
-
-### The matcher
-
-`FYC.match(profile)` scores every listing on six weighted dimensions:
-
-| dimension | weight | what it does |
-|---|---|---|
-| interest | 0.44 | overlap with the interests you picked, decayed by pick order |
-| gentleness | 0.20 | how low-pressure and solo-friendly it is, *interpreted through your comfort setting* |
-| commitment | 0.10 | one-off vs weekly vs season-long |
-| schedule | 0.10 | when it runs vs when you are free |
-| cost | 0.08 | against your budget |
-| goals | 0.08 | friends / impact / skill / routine |
-
-Budget is treated as a real constraint (filtered, then relaxed if that would
-leave you with almost nothing). Results are then passed through a diversity
-re-rank so the top of the list isn't five variations of the same activity.
-
-The comfort setting is not cosmetic: "honestly, daunting" and "ready to dive in"
-produce measurably different rankings, and the test suite asserts it.
-
-### The data
-
-Each listing carries a first step (`drop-in` / `sign up` / `book a shift` /
-`RSVP` / `email`), a `when`, and two to four factual "what to expect" bullets —
-logistics, cost, what's provided, what's expected of you. Ratings for `solo`
-(can you turn up alone) and `gentleness` (low-key or full-on) drive the badge
-and the matching.
-
-Listings deliberately carry **no** pre-written messages. An earlier version
-shipped a copy-and-paste introduction for each one; it was cut, along with the
-reassurance copy, on the grounds that the audience is perfectly capable of
-writing their own sentence.
-
-### Theme
-
-The header toggle cycles **Auto → Light → Dark**. Auto follows the operating
-system; the other two override it and persist. The saved choice is applied by an
-inline script before the stylesheet renders, so there is no flash of the wrong
-theme on load.
-
-### Sharing
-
-Every listing has a **Share** button. It sends the name, where it is, the
-concrete first step and the link — enough for someone to act on without opening
-the app. On a phone it opens the native share sheet; everywhere else it copies
-to the clipboard, with a `document.execCommand` fallback for browsers that block
-the async clipboard API.
-
-Sharing is also recorded as a preference signal, weighted like opening the page
-but below saving it: sending something to a friend says you meant it.
-
-### Learned preferences
-
-The app watches what you actually do — which first steps you expand, which
-links you open, what you copy, save and tick off — and builds a weighted
-profile from it. Recent actions count for more than old ones (they halve in
-influence every 45 days), and removing something from your plan counts against
-it.
-
-That profile nudges the ranking but never drives it: it is capped at 18% of the
-score, scaled by how much evidence there is, and it can never override your
-stated city, interests or budget, nor resurrect a listing that matches nothing
-you asked for. The test suite asserts all of that.
-
-The **You** tab shows exactly what has been inferred — an affinity chart, your
-gentleness, cost and solo leanings, and how heavily the matcher is leaning on
-them — with buttons to pause tracking or erase it.
-
-`src/preferences.js` is the engine; its storage is injectable so it can be
-tested in Node without a browser.
-
-### Privacy
-
-Everything stays in the browser. `localStorage` holds your last search, your
-plan, your feedback and the record of what you have clicked. There is no
-account, no server, no analytics and no network request other than the links
-you choose to click. Nothing is ever transmitted, and the You tab can erase the
-behavioural record completely.
-
----
+Your answers, your saved list and the record of what you click are in your
+browser and are never transmitted — with or without an account. The **You** tab
+shows exactly what has been inferred and can pause or erase it. With an
+account, the same tab will hand you everything the server holds about you as a
+file, and delete the account outright. No analytics, anywhere, deliberately.
 
 ## Known limits
 
-- Curated coverage is ten metros. Everywhere else gets the fallback engine,
-  which is genuinely useful but not the same as a hand-picked list.
-- Listings are a point-in-time snapshot. Groups fold, move and change schedules.
-  Re-run `node tools/check-links.js` periodically; the app tells users to check
-  the organisation's own page before going.
-- Contact details are organisation contact *pages*, never scraped personal
-  email addresses.
+Thirteen curated metros; everywhere else gets national directories, which is
+useful but not the same. Denver is the thinnest city — seventeen of its
+thirty-two interests have exactly one listing. The data is a point-in-time
+snapshot, so the weekly link check catches a dead URL but not a group that
+still has a website and stopped meeting. The solo and gentleness ratings are
+judgement, not measurement. Messages are plain text in SQLite, readable by
+whoever runs the server, and the privacy page says so.
+
+The longer list, including what the circles research does and does not
+support, is in **[the system design doc](docs/SYSTEM-DESIGN.md#known-limits)**.

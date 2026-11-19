@@ -9,11 +9,14 @@
     "test:app": "node tests/run-tests.js",
     "test:server": "node tests/run-server-tests.js",
     "links": "node tools/check-links.js",
+    "stamp": "node tools/stamp.js",
     "mac": "./mac/build.sh",
     "start:bg": "node tools/server-daemon.js start",
     "stop": "node tools/server-daemon.js stop",
     "status": "node tools/server-daemon.js status",
-    "log": "node tools/server-daemon.js log"
+    "log": "node tools/server-daemon.js log",
+    "backup": "node tools/backup.js",
+    "moderate": "node tools/moderate.js"
   },
   "engines": {
     "node": ">=22"

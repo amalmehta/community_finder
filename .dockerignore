@@ -1,0 +1,8 @@
+.git
+.github
+.claude
+mac
+tests
+server/data
+node_modules
+*.md

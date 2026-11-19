@@ -99,7 +99,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             backing: .buffered,
             defer: false
         )
-        window.title = "community_finder"
+        window.title = "Community Finder"
         window.subtitle = ""
         window.minSize = NSSize(width: 380, height: 520)
         window.contentView = webView
@@ -113,12 +113,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About community_finder",
+        appMenu.addItem(withTitle: "About Community Finder",
                         action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide community_finder",
+        appMenu.addItem(withTitle: "Hide Community Finder",
                         action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        appMenu.addItem(withTitle: "Quit community_finder",
+        appMenu.addItem(withTitle: "Quit Community Finder",
                         action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         main.addItem(appItem)
@@ -185,7 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     private func fail(_ message: String) {
         let alert = NSAlert()
-        alert.messageText = "community_finder could not start"
+        alert.messageText = "Community Finder could not start"
         alert.informativeText = message
         alert.addButton(withTitle: "Quit")
         alert.runModal()
@@ -207,7 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private func showLoadFailure(_ error: Error) {
         let html = """
         <html><body style="font: 15px -apple-system; padding: 40px; color: #221f1b;
-        background: #fbf8f4"><h2 style="font-weight:600">The page could not load.</h2>
+        background: #fbf6ee"><h2 style="font-weight:600">The page could not load.</h2>
         <p>\(error.localizedDescription)</p><p style="color:#8a8176">Try View &rarr; Reload.</p>
         </body></html>
         """

@@ -7,6 +7,9 @@
     id: 'bos',
     name: 'Boston',
     region: 'MA',
+    // A metro area is not a state: the north shore runs into New Hampshire, and someone
+    // typing either should land here rather than nowhere.
+    states: ['MA', 'NH'],
     aliases: ['boston', 'bos', 'cambridge', 'somerville', 'brookline', 'greater boston', 'jamaica plain', 'allston'],
     orgs: [
       {
