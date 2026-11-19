@@ -1823,7 +1823,14 @@ async function verifyEmail(call, email) {
     store.setEmail(target, 'window_target@example.com');
     store.createVerification('tok_window', target, 'window_target@example.com', 60000);
     store.useVerification('tok_window');
-    store.touch ? store.touch(target) : null;
+
+    // discover() orders by `shared DESC, u.last_seen DESC`, and last_seen is
+    // Date.now() at creation — so fifty-one accounts made inside the same
+    // millisecond tie, and which one falls off the end of the window is
+    // whatever SQLite happens to return. That is the kind of test that passes
+    // on a laptop and fails in CI, which is what it did. A few milliseconds
+    // puts the target genuinely last, which is the state being tested.
+    await new Promise((r) => setTimeout(r, 8));
 
     // Fifty others sharing the same three, all seen more recently.
     for (let i = 0; i < 50; i++) {
