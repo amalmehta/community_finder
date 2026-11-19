@@ -84,6 +84,8 @@
   var TIMEOUT = 15000;
 
   function api(method, route, body) {
+    // fetch throws on a body with GET or HEAD; drop it rather than fail.
+    if (method === 'GET' || method === 'HEAD') body = undefined;
     var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
     var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, TIMEOUT) : null;
     return fetch(apiUrl(route), {

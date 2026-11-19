@@ -29,7 +29,7 @@ var VERSION = 'v2';
 // A worker cannot hash files at run time and this project has no build step,
 // so the digest is stamped in by `npm run stamp` and checked by the suite:
 // change a shell file and the tests say so, and one command fixes it.
-var SHELL_HASH = '1s9ognl';
+var SHELL_HASH = 'o41pv5';
 
 // Where the app lives, read off this file rather than assumed: it is served
 // from a subdirectory on GitHub Pages and from the root by the Node server,
