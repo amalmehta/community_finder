@@ -58,6 +58,9 @@ globalThis.fetch = function (input, init) {
 function client() {
   let jar = '';
   return async function call(method, url, body) {
+    // fetch refuses a body on GET or HEAD outright, so a stray `{}` or `null`
+    // there would throw instead of making the request.
+    if (method === 'GET' || method === 'HEAD') body = undefined;
     const res = await fetch(base + url, {
       method,
       headers: Object.assign({ 'Content-Type': 'application/json' }, jar ? { Cookie: jar } : {}),
