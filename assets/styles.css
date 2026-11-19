@@ -5,30 +5,31 @@
      the textarea in the feedback panel. The palette below only reaches what
      the stylesheet paints. */
   color-scheme: light;
-  /* Quiet: the ground went from a cream (#fbf8f4) to something barely warm.
-     A tinted page makes every surface on it a decision — white cards had to
-     be lifted off it with a shadow, the sunk tone had to be browner still,
-     and the accent had to shout over all of it. Near-neutral asks for none
-     of that, and gives the one accent somewhere quiet to be loud. */
-  --bg: #fafaf9;
-  --bg-raised: #ffffff;
-  --bg-sunk: #f2f1ee;
-  --ink: #1a1a18;
-  --ink-soft: #55534d;
+  /* Friendly (2026-11-19): cream again. The Nov 7 pass took the ground to
+     near-neutral grey for good reasons — fewer decisions per surface — but it
+     read as vanilla: a form on a grey page, nobody home. The ground is warm
+     now, and so is every neutral built on it, so the cards sit on it with a
+     soft shadow rather than fighting it. Contrast was measured, not assumed:
+     every text tier below clears 4.5:1 on all three surfaces. */
+  --bg: #fbf6ee;
+  --bg-raised: #fffdf9;
+  --bg-sunk: #f4ece0;
+  --ink: #2b2622;
+  --ink-soft: #5c534a;
   /* The faint tier carries real text — timestamps, counts, the line under the
      readiness gate — at 13px, so it has to clear 4.5:1 on every surface it
      lands on. The old #8a8176 measured 3.83:1 on a white card and 3.24:1 on
      the moss panel. Faintness is carried by size and weight as well as this. */
-  --ink-faint: #6b6760;
-  --line: #e7e5e1;
-  --line-strong: #d4d1cb;
+  --ink-faint: #6f655a;
+  --line: #ece3d6;
+  --line-strong: #dccfbd;
   /* The one accent. It marks what you are doing and where you are — the
      progress through the form, the listing you have open, a link, the focus
      ring. It is no longer the fill on every button: a page where the only
      saturated thing is the primary action does not need the primary action
      to be saturated. */
-  --accent: #b1502a;
-  --accent-soft: #f7e9e2;
+  --accent: #a8481f;
+  --accent-soft: #f8e8df;
   --accent-ink: #8c3d1f;
   /* Moss is not a second accent. It means one thing — earned, confirmed,
      done — and appears only on ticks, met conditions and completed steps.
@@ -36,17 +37,22 @@
      are neither. */
   --moss: #2f6b56;
   --moss-soft: #e2efe9;
-  --focus: #b1502a;
+  /* Text on a filled accent: white here, near-black in dark mode, where the
+     accent goes light. A token rather than a dark-mode .btn rule, which once
+     out-specified .btn.ghost and left ghost text unreadable. */
+  --on-accent: #ffffff;
+  --focus: #a8481f;
   /* 18/12 read as something soft to pick up, which suited the cream. On a
      near-neutral ground the same corners read as a toy. These are tight
      enough to be a surface and round enough not to be a box. */
-  --radius: 10px;
-  --radius-sm: 8px;
+  /* Friendly: rounder again. On cream, 14/10 reads as something to pick up. */
+  --radius: 14px;
+  --radius-sm: 10px;
   --radius-pill: 999px;
-  /* A line does the work a shadow used to. The 26px brown bloom existed to
-     lift white off cream; against #fafaf9 a border is enough, and the page
-     stops looking like cards floating over a table. */
-  --shadow: 0 1px 2px rgba(26, 26, 24, .04);
+  /* A hairline plus a short, soft warm shadow. Nov 7 cut this to the
+     hairline alone; on cream that read flat, so a little lift is back,
+     well short of the old 26px brown bloom. */
+  --shadow: 0 1px 2px rgba(90, 60, 30, .05), 0 8px 22px -14px rgba(90, 60, 30, .22);
   --maxw: 880px;
   /* Find is two panes, so it gets more room than a column of prose needs. */
   --maxw-wide: 1120px;
@@ -70,7 +76,9 @@
      below it — the page's hierarchy was upside down, and no colour change
      could fix it because both were already full-strength ink. Size and
      weight in one family say it without the argument. */
-  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+  /* Rounded where the system has it (Safari and the Mac app get SF Pro
+     Rounded), the plain system sans everywhere else. Nothing downloaded. */
+  --font: ui-rounded, "SF Pro Rounded", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
 }
 
 /* Dark theme.
@@ -82,20 +90,21 @@
  * beyond whoever was editing remembering there was a second copy. Naming
  * them once up here and assigning them twice leaves one place to change. */
 :root {
-  --d-bg: #161615;
-  --d-bg-raised: #1f1f1d;
-  --d-bg-sunk: #121211;
-  --d-ink: #ededea;
-  --d-ink-soft: #b2b0aa;
-  --d-ink-faint: #9a9892;
-  --d-line: #2e2e2b;
-  --d-line-strong: #434340;
+  --d-bg: #1b1814;
+  --d-bg-raised: #24201b;
+  --d-bg-sunk: #15120f;
+  --d-ink: #f1ebe3;
+  --d-ink-soft: #c2b8ab;
+  --d-ink-faint: #a39889;
+  --d-line: #332d26;
+  --d-line-strong: #4a4239;
   --d-accent: #e08155;
-  --d-accent-soft: #33231c;
+  --d-accent-soft: #3a261c;
+  --d-on-accent: #1b1814;
   --d-accent-ink: #f0a582;
   --d-moss: #79b79c;
   --d-moss-soft: #1c2b25;
-  --d-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  --d-shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 22px -14px rgba(0, 0, 0, .6);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -112,6 +121,7 @@
     --accent: var(--d-accent);
     --accent-soft: var(--d-accent-soft);
     --accent-ink: var(--d-accent-ink);
+    --on-accent: var(--d-on-accent);
     --moss: var(--d-moss);
     --moss-soft: var(--d-moss-soft);
     --focus: var(--d-accent);
@@ -132,6 +142,7 @@
   --accent: var(--d-accent);
   --accent-soft: var(--d-accent-soft);
   --accent-ink: var(--d-accent-ink);
+  --on-accent: var(--d-on-accent);
   --moss: var(--d-moss);
   --moss-soft: var(--d-moss-soft);
   --focus: var(--d-accent);
@@ -186,7 +197,7 @@ a { color: var(--accent-ink); }
 .tab {
   display: inline-flex; align-items: center; gap: var(--s2);
   border: 0; background: none; font: inherit; font-size: 14px; cursor: pointer;
-  color: var(--ink-soft); padding: 7px 11px; border-radius: 9px;
+  color: var(--ink-soft); padding: 7px 12px; border-radius: var(--radius-pill);
   transition: background .14s ease, color .14s ease;
 }
 /* Line icons. Scoped to .ti alone, not .tab .ti: the theme control uses the
@@ -197,7 +208,7 @@ a { color: var(--accent-ink); }
   stroke-linecap: round; stroke-linejoin: round;
 }
 .tab:hover { background: var(--bg-sunk); color: var(--ink); }
-.tab[aria-selected="true"] { color: var(--accent-ink); font-weight: 600; }
+.tab[aria-selected="true"] { color: var(--accent-ink); font-weight: 600; background: var(--accent-soft); }
 .tab[aria-selected="true"] .ti { stroke-width: 2; }
 .tab .count {
   font-size: 11px; font-style: normal; background: var(--accent); color: var(--bg-raised);
@@ -234,6 +245,7 @@ a { color: var(--accent-ink); }
     border-radius: 0; position: relative;
   }
   .tab:hover { background: none; }
+  .tab[aria-selected="true"] { background: none; }
   .tab .ti { width: 23px; height: 23px; }
   .tab .count {
     position: absolute; top: 2px; left: 50%; margin-left: 5px;
@@ -249,8 +261,8 @@ a { color: var(--accent-ink); }
 }
 input[type="text"] {
   width: 100%; padding: 12px 14px; font: inherit; font-size: 16px;
-  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
-  background: var(--bg); color: var(--ink);
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--bg-raised); color: var(--ink);
 }
 input[type="text"]::placeholder { color: var(--ink-faint); }
 
@@ -281,21 +293,18 @@ input[type="text"]::placeholder { color: var(--ink-faint); }
 .choice span { font-size: 13.5px; color: var(--ink-soft); }
 .choice[aria-pressed="true"] span { color: var(--accent-ink); }
 
-/* The filled button is ink. It was the accent, which meant the loudest
-   colour on the page appeared on every screen, several times, next to
-   itself — and so marked nothing. Ink is unmistakably the thing to press
-   and leaves the accent free to mean "here" rather than "press". */
+/* The filled button is a terracotta pill. Nov 7 made it ink so the accent
+   would only mean "here"; that was tidy and cold. There is one filled button
+   per screen, so it is still the only accent-filled thing on it. Its text
+   comes from --on-accent, which flips with the palette. */
 .btn {
   font: inherit; font-size: var(--t-body); font-weight: 600; cursor: pointer;
-  background: var(--ink); color: var(--bg-raised); border: 1px solid var(--ink);
-  padding: 12px 20px; border-radius: var(--radius-sm);
+  background: var(--accent); color: var(--on-accent); border: 1px solid var(--accent);
+  padding: 12px 22px; border-radius: var(--radius-pill);
 }
-.btn:hover { filter: brightness(1.35); }
-/* The filled button used to need its text flipped to dark in dark mode,
-   because its fill was the accent and the accent goes light there. It is
-   ink on raised now, which inverts with the palette on its own. */
+.btn:hover { filter: brightness(1.08); }
 :root[data-theme="light"] { color-scheme: light; }
-.btn.ghost { background: none; color: var(--ink-soft); border-color: var(--line-strong); font-weight: 500; }
+.btn.ghost { background: var(--bg-raised); color: var(--ink-soft); border-color: var(--line-strong); font-weight: 500; }
 .btn.ghost:hover { border-color: var(--ink); color: var(--ink); filter: none; }
 /* The one button in the app that cannot be undone. It stays a ghost — the
    accent means "here", and this is not where you are — and only takes the
@@ -586,7 +595,8 @@ body { font-size: var(--t-body); }
 /* Clipped only while the height is moving. At rest the box is exactly as
    tall as the card, and overflow:hidden would cut off a focus ring. */
 #intake.settling { overflow: hidden; }
-#intake .question { animation: fyc-fade .24s ease both; }
+/* A question arrives rather than appears: a short fade with a small rise. */
+#intake .question { animation: fyc-rise .26s cubic-bezier(.2, .7, .3, 1) both; }
 @keyframes fyc-fade { from { opacity: 0; } to { opacity: 1; } }
 
 /* Cards lift slightly on hover, so the list feels handled rather than static.
@@ -1142,9 +1152,13 @@ main { padding: var(--s6) 0 var(--s7); }
    One consequence worth knowing: every question is now the same height, so
    settleHeight finds from === to and the card stops animating between
    questions. That jiggle only existed because the heights differed. */
+/* It used to sit dead centre of that frame, which left a third of a screen
+   of blank space above it. It still fills the frame, so questions do not
+   jump, but starts near the top. */
 #intake .question {
   min-height: calc(100dvh - 56px - var(--s6) - var(--s7));
-  display: flex; flex-direction: column; justify-content: center;
+  display: flex; flex-direction: column; justify-content: flex-start;
+  padding-top: clamp(24px, 9vh, 88px);
 }
 .question .choices { grid-template-columns: 1fr; gap: var(--s2); }
 .question .choice {
@@ -1198,7 +1212,6 @@ main { padding: var(--s6) 0 var(--s7); }
   background: var(--moss-soft); color: var(--moss);
 }
 .pic-badge .pic { width: 22px; height: 22px; }
-.pic-badge.warm {}
 
 /* The guide. Line everywhere except the jumper, which is the one place the
    accent lands, so the figure reads as a person and not a pictogram. */
@@ -1229,8 +1242,7 @@ main { padding: var(--s6) 0 var(--s7); }
 
 /* The guide's seat on the intake: a small presence beside the progress bar,
    not a screen of its own. The first question is still the first thing. */
-.intake-guide { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s4); }
-.intake-guide p { margin: 0; font-size: var(--t-small); color: var(--ink-faint); }
+.intake-guide { display: flex; align-items: flex-end; gap: var(--s3); margin-bottom: var(--s5); }
 
 /* A person on a row: face, then name, then whatever the row is about. */
 .who { display: flex; align-items: center; gap: var(--s3); }
@@ -1291,11 +1303,7 @@ main { padding: var(--s6) 0 var(--s7); }
 .step-head .when { margin: 2px 0 0; }
 .step-box .pic-badge { background: var(--bg-raised); }
 
-/* Three tints rather than one. The taxonomy's six groups map onto them, so
-   a page of listings is not a page of identical green squares. */
-.pic-badge.leaf { background: var(--moss-soft); color: var(--moss); }
-.pic-badge.warm { background: var(--accent-soft); color: var(--accent-ink); }
-.pic-badge.cool { background: var(--bg-sunk); color: var(--ink-soft); }
+
 
 /* A finished plan item. Four ticks is the whole point of the list. */
 .plan-top { display: flex; align-items: flex-start; gap: var(--s3); }
@@ -1350,6 +1358,109 @@ main { padding: var(--s6) 0 var(--s7); }
    engine; the saved list is a short document and reads better with a margin
    that is the same wherever it is printed. */
 @page { margin: 16mm; }
+
+/* ======================================================================
+   The friendly pass (2026-11-19). Three things made the app feel vanilla:
+   the grey (fixed in the tokens at the top), nothing moving, and empty
+   space. This section is the second and third, plus colour that means
+   something: each interest group has its own hue family.
+   ====================================================================== */
+
+/* Interest groups. Related things share a family; the six groups are not
+   related to each other, so each gets its own muted hue, soft fill plus
+   dark ink in light mode, dark fill plus light ink in dark mode. Every pair
+   measured at 6.3:1 or better. The colour is a label for the group, the
+   same wherever the group shows up, never decoration. */
+:root {
+  --g-move-bg: #e3f1ea;   --g-move-ink: #1f5a46;
+  --g-make-bg: #f8e8df;   --g-make-ink: #8c3d1f;
+  --g-think-bg: #ecebf7;  --g-think-ink: #3f3a7a;
+  --g-grow-bg: #e9f1dc;   --g-grow-ink: #3b5a14;
+  --g-give-bg: #f8eed9;   --g-give-ink: #6e4a0c;
+  --g-belong-bg: #f6e6ea; --g-belong-ink: #7a2e45;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --g-move-bg: #1d2d27;   --g-move-ink: #9fd3bd;
+    --g-make-bg: #352219;   --g-make-ink: #f0b394;
+    --g-think-bg: #25233a;  --g-think-ink: #bcb7ee;
+    --g-grow-bg: #232c19;   --g-grow-ink: #b5d48e;
+    --g-give-bg: #33291a;   --g-give-ink: #e8c584;
+    --g-belong-bg: #33212a; --g-belong-ink: #eab0c2;
+  }
+}
+:root[data-theme="dark"] {
+  --g-move-bg: #1d2d27;   --g-move-ink: #9fd3bd;
+  --g-make-bg: #352219;   --g-make-ink: #f0b394;
+  --g-think-bg: #25233a;  --g-think-ink: #bcb7ee;
+  --g-grow-bg: #232c19;   --g-grow-ink: #b5d48e;
+  --g-give-bg: #33291a;   --g-give-ink: #e8c584;
+  --g-belong-bg: #33212a; --g-belong-ink: #eab0c2;
+}
+[data-group="move"]   { --g-bg: var(--g-move-bg);   --g-ink: var(--g-move-ink); }
+[data-group="make"]   { --g-bg: var(--g-make-bg);   --g-ink: var(--g-make-ink); }
+[data-group="think"]  { --g-bg: var(--g-think-bg);  --g-ink: var(--g-think-ink); }
+[data-group="grow"]   { --g-bg: var(--g-grow-bg);   --g-ink: var(--g-grow-ink); }
+[data-group="give"]   { --g-bg: var(--g-give-bg);   --g-ink: var(--g-give-ink); }
+[data-group="belong"] { --g-bg: var(--g-belong-bg); --g-ink: var(--g-belong-ink); }
+
+/* A listing's badge wears its group's colour, so a page of listings reads
+   as the mix of things it is, in the same colours as the questions. */
+.pic-badge[data-group] { background: var(--g-bg); color: var(--g-ink); }
+
+/* A chip that belongs to a group wears its colour at rest, and a ring of
+   the group's ink when chosen, so a choice reads at a glance without
+   six saturated fills next to each other. */
+.pill[data-group] {
+  background: var(--g-bg); color: var(--g-ink); border-color: transparent;
+}
+.pill[data-group]:hover { border-color: var(--g-ink); }
+.pill[data-group][aria-pressed="true"] {
+  background: var(--g-bg); color: var(--g-ink); border-color: var(--g-ink);
+  box-shadow: 0 0 0 1.5px var(--g-ink);
+}
+.pill[data-group] .key { background: color-mix(in srgb, var(--g-ink) 12%, transparent); color: var(--g-ink); }
+.pill[data-group][aria-pressed="true"] .key { background: var(--g-ink); color: var(--g-bg); }
+.pill .pic { width: 17px; height: 17px; }
+.pill[aria-pressed="true"] { animation: fyc-pop .26s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes fyc-pop { 0% { transform: scale(1); } 45% { transform: scale(1.06); } 100% { transform: scale(1); } }
+
+/* The guide speaks. It said its line in grey beside a progress bar; now it
+   is a figure with a speech bubble, so the first screen has somebody on it. */
+.intake-guide .guide { width: 52px; height: 52px; flex: none; color: var(--ink-soft); }
+.intake-guide p {
+  position: relative; margin: 0 0 14px;
+  background: var(--bg-raised); border: 1px solid var(--line);
+  border-radius: 16px 16px 16px 4px; box-shadow: var(--shadow);
+  padding: 10px 14px; font-size: var(--t-meta); color: var(--ink-soft);
+  animation: fyc-rise .4s .35s cubic-bezier(.2, .7, .3, 1) both;
+}
+.intake-guide .guide { animation: fyc-wave .9s .2s ease-in-out both; transform-origin: 50% 90%; }
+@keyframes fyc-wave {
+  0% { transform: rotate(0); } 25% { transform: rotate(-6deg); }
+  55% { transform: rotate(5deg); } 100% { transform: rotate(0); }
+}
+
+/* Choices sit up off the cream a little, like the cards do. */
+.question .choice { box-shadow: var(--shadow); }
+
+/* The opening: the mark springs in, then the page eases up into place.
+   About 0.7s in all, once per page load, and never in the way: it is
+   opacity and transform only, so everything is clickable throughout.
+   `backwards` rather than `both`, so no transform is left on <main>
+   afterwards to become a containing block for fixed children. */
+.brand .mark { animation: fyc-spring .55s cubic-bezier(.3, 1.6, .5, 1) backwards; }
+@keyframes fyc-spring { from { transform: scale(.4) rotate(-20deg); opacity: 0; } }
+main { animation: fyc-open .45s .18s cubic-bezier(.2, .7, .3, 1) backwards; }
+@keyframes fyc-open { from { opacity: 0; transform: translateY(10px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The opening keeps a plain fade; every other movement above goes. It
+     needs !important to get past the global rule that stops all motion,
+     and wins on specificity (an element selector over *). */
+  main { animation: fyc-fade .3s ease backwards !important; }
+}
+
 
 @media print {
   /* Dark mode must not follow the page onto paper. */

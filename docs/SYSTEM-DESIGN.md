@@ -306,34 +306,81 @@ the circles screen alone.
 
 ### The look
 
-One typeface, one accent, a ground that asks for nothing.
+Warm, rounded, and with somebody on the first screen. Two passes got it here,
+and the second reversed part of the first, so both are written down.
 
-Headings used to be set in a serif whose stems are thin, so a 22px heading read
-*lighter* than the 14px bold sans in the list below it — the hierarchy was
-upside down while both were at full-strength ink, which no colour change can
-fix. Size and weight in one family say it without the argument.
-
-The page was cream. A tinted ground makes every surface on it a decision: white
-cards had to be lifted off it with a 26px shadow, the sunk tone had to be
-browner still, and the accent had to shout over all of it. The ground is within
-a few points of neutral now, a hairline border does what the shadow did, and
-the corners came in from 18px to 10px.
-
-Two colours were acting as accents. They have one job each:
+**Nov 7, "quiet".** One typeface, one accent, a near-neutral grey ground, tight
+10px corners, a hairline instead of a shadow, and an ink-black filled button.
+What it got right still holds. Headings in a thin-stemmed serif read lighter
+than the bold sans list below them, so there is one family and size and weight
+do the work. And colours have one job each:
 
 | | means | where |
 |---|---|---|
-| **Accent** (terracotta) | *here*, or *do this* | progress through the form, the open listing, the rung you are on, links, focus |
+| **Accent** (terracotta) | *here*, or *do this* | the filled button, progress through the form, the open listing, the rung you are on, links, focus |
 | **Moss** | *earned*, *confirmed*, *done* | ticks, met conditions, a finished plan, a confirmed meetup |
+| **Group hues** | *which kind of thing* | interest chips, the badge on each listing |
 
-The filled button is ink rather than the accent. When the loudest colour on the
-page appears several times on every screen it marks nothing; ink is
-unmistakably the thing to press, and it frees the accent to mean *here*.
+**Nov 19, "friendly".** In use, the quiet pass read as vanilla: a form on a
+grey page, nobody home. Asked what did it, the answer was the grey, nothing
+moving, and empty space. The changes, one for each:
 
-The suite pins all of this: that nothing asks for the serif, that the ground is
-within four points of neutral, that the accent is the one saturated token, and
-that progress, the open listing and the current rung are the accent while ticks
-and finished plans are moss.
+- *The grey.* The ground is a light cream (`#fbf6ee`) and every neutral is
+  warmed to match, dark mode included (`#1b1814`, not grey-black). Corners went
+  to 14/10px, and a short, soft warm shadow sits under the hairline. The filled
+  button is a terracotta pill. There is one per screen, so it is still the only
+  accent fill there. Its text comes from `--on-accent`, which is white in light
+  mode and near-black in dark, where the accent goes light. The font stack
+  starts with `ui-rounded`, so Safari and the Mac app get SF Pro Rounded and
+  other browsers fall back to the system sans. Nothing is downloaded.
+- *Colour that means something.* Each of the six interest groups (Move, Make,
+  Think and play, Grow, Give, Belong) has its own muted hue: a soft fill and a
+  dark ink in light mode, the reverse in dark. A chip for a group or an
+  interest wears its group's colour, and so does the badge on every listing,
+  so the colour you picked in the questions is the colour of what comes back.
+  The groups aren't related to each other, so they don't share a family.
+  Every pair measures 6.3:1 or better.
+- *Nothing moving.* An opening: the brand mark springs in, then the page eases
+  up, about 0.7s in all, once per load. It animates only opacity and
+  transform, so nothing is blocked, and it ends with no transform left on
+  `<main>`, which would otherwise trap fixed-position children. The guide
+  waves, its speech bubble rises, a chosen chip gives a small pop, and each
+  question fades up rather than appearing. With Reduce Motion on, the global
+  rule stops all of it, and the opening alone stays as a plain fade.
+- *Empty space.* The first question was centred in a full-height frame, which
+  left about a third of the screen blank above it. It still fills the frame, so
+  questions don't jump, but it starts near the top. The guide's line, which
+  used to be small grey text, is now a speech bubble beside it.
+
+What would prove this wrong: someone who liked the quiet version finds the
+cream and the group hues busy on the dense screens (Circles, the Inbox), which
+this pass did not redesign. The manual review checklist below says where to
+look.
+
+The suite pins all of it: one family, the accent pill, a ground that is cream
+but light (tone 5–16), soft corners, no 26px bloom, `--on-accent` in all three
+palettes, every group hue in all three, the opening and its reduced-motion
+fade, and the question starting near the top. The theme-colour test reads
+`--bg` and `--d-bg` off the stylesheet and checks the six places that repeat
+them (three HTML heads, the manifest, `BAR` in app.js, the Mac shell's error
+page).
+
+#### Manual review: the friendly pass
+
+What the tests can't see:
+
+- [ ] First load, light and dark: the mark springs, the page eases in, and
+      nothing flickers or jumps.
+- [ ] Turn on Reduce Motion (System Settings → Accessibility → Display): only
+      a fade on load, and no wave, pop or rise.
+- [ ] The Mac app: headings and body are in SF Pro Rounded, and the error page
+      matches the cream.
+- [ ] Circles, Inbox and You in both themes: do the cream and rounder corners
+      sit well on the dense screens, or does anything look washed out?
+- [ ] Pick chips from three different groups on the first question: is it
+      lively, or loud?
+- [ ] On a phone: the bottom bar's selected tab isn't a filled block, and the
+      question isn't hidden under the bar.
 
 ### The back button
 

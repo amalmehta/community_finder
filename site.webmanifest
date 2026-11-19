@@ -14,8 +14,8 @@
   "id": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#fafaf9",
-  "theme_color": "#b1502a",
+  "background_color": "#fbf6ee",
+  "theme_color": "#a8481f",
   "icons": [
     {
       "src": "assets/icon.svg",

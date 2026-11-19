@@ -7,7 +7,7 @@ what the commitment is, and what actually happens when you turn up.**
 
 **[Open it →](https://amalmehta.com/community_finder/)**
 
-![The results: a column of matches with one open beside it, showing the first step for Golden Gate Bird Alliance](docs/images/results.png)
+![The results: a column of matches with one open beside it, showing the first step for Alemany Farm, its badge in the green of the Grow group](docs/images/results.png)
 
 Twenty questions, chosen one at a time. What you have already said decides what
 comes next: pick "Give" and it asks what kind of useful; say a room of
@@ -15,7 +15,7 @@ strangers is hard and it asks what would make it easier. Once your chosen areas
 are drilled out it probes the ones you skipped, at half weight — which is where
 the surprises come from.
 
-![The first question: "Where are you?", with a progress bar and a Skip button](docs/images/intake.png)
+![The first question: the guide waves beside a speech bubble, then "Where are you?" with a terracotta Continue button](docs/images/intake.png)
 
 It assumes you are capable. It does not write your messages for you, reassure
 you, or tell you it's okay to leave early. It tells you that the bird walk

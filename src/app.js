@@ -25,16 +25,13 @@
   }
 
   /**
-   * Which tint the subject badge takes. The taxonomy already sorts every
-   * interest into one of six groups, so the colour says something true about
-   * the listing rather than decorating it: moving and making are warm, the
-   * rest are the moss the app already uses for "this is the thing".
+   * The interest group a listing belongs to, by its first interest. The badge
+   * wears that group's colour, the same colour the group's chip wears in the
+   * questions, so the colour says something true about the listing.
    */
-  var TINT = { move: 'warm', make: 'warm', think: 'cool', grow: 'leaf', give: 'leaf', belong: 'cool' };
-  function tintFor(org) {
+  function groupForOrg(org) {
     var id = (org.interests || [])[0];
-    var grp = id && FYC.INTERESTS[id] ? FYC.INTERESTS[id].group : null;
-    return TINT[grp] || 'leaf';
+    return id && FYC.INTERESTS[id] ? FYC.INTERESTS[id].group : null;
   }
 
   /** A drawing for a screen with nothing on it yet. */
@@ -102,6 +99,20 @@
   // appear already full. A fresh element set straight to its final width has
   // nothing to transition from.
   var lastPct = 0;
+
+  // The drawing a group's chip borrows: the interest that most says what the
+  // group is. Groups have no pictogram of their own.
+  var INTEREST_FOR_GROUP = {
+    move: 'running', make: 'art', think: 'books',
+    grow: 'gardening', give: 'volunteering', belong: 'social'
+  };
+  /** The group an option id belongs to: itself if it is a group, its group if
+      it is an interest, null for anything else. */
+  function groupOf(id) {
+    if (INTEREST_FOR_GROUP[id]) return id;
+    var i = FYC.INTERESTS && FYC.INTERESTS[id];
+    return i ? i.group : null;
+  }
 
   function questionCard(q) {
     var prog = I.progress(session);
@@ -181,17 +192,22 @@
       var picked = Array.isArray(previous) ? previous.slice() : [];
       var pills = el('div', { class: 'pills' });
       q.options.forEach(function (o, idx) {
+        // A chip for an interest group, or for an interest in one, wears that
+        // group's colour and a drawing; anything else (when, why) stays plain.
+        var grp = groupOf(o.id);
+        var pic = grp && art() ? art().pictogram(INTEREST_FOR_GROUP[o.id] || o.id) : null;
         var btn = el('button', {
           type: 'button', class: 'pill',
           'aria-pressed': picked.indexOf(o.id) !== -1 ? 'true' : 'false',
           'data-idx': String(idx + 1),
+          'data-group': grp,
           onclick: function () {
             var at = picked.indexOf(o.id);
             if (at !== -1) picked.splice(at, 1);
             else if (picked.length < (q.max || 99)) picked.push(o.id);
             btn.setAttribute('aria-pressed', picked.indexOf(o.id) !== -1 ? 'true' : 'false');
           }
-        }, [el('span', { class: 'key', 'aria-hidden': 'true', text: String(idx + 1) }), el('span', { text: o.label })]);
+        }, [el('span', { class: 'key', 'aria-hidden': 'true', text: String(idx + 1) }), pic, el('span', { text: o.label })]);
         pills.appendChild(btn);
       });
       box.appendChild(pills);
@@ -512,7 +528,7 @@
       el('button', {
         class: 'back-btn', type: 'button', 'aria-label': 'Back to the list', onclick: onBack
       }, ['\u2190']),
-      el('span', { class: 'pic-badge ' + tintFor(org) }, [orgPic(org)]),
+      el('span', { class: 'pic-badge', 'data-group': groupForOrg(org) }, [orgPic(org)]),
       el('div', { class: 'detail-title' }, [
         el('h2', { text: org.name }),
         el('p', { class: 'where', text: [org.neighborhood, org.cityName].filter(Boolean).join(' \u00b7 ') })
@@ -543,7 +559,7 @@
 
     pane.appendChild(el('div', { class: 'step-box' }, [
       el('div', { class: 'step-head' }, [
-        el('span', { class: 'pic-badge ' + tintFor(org) }, [orgPic(org)]),
+        el('span', { class: 'pic-badge', 'data-group': groupForOrg(org) }, [orgPic(org)]),
         el('div', {}, [
           el('h3', { text: org.firstStep.label }),
           org.firstStep.when ? el('p', { class: 'when', text: org.firstStep.when }) : null
@@ -1277,7 +1293,7 @@
      the system. From then on the page is dark and the browser's own chrome
      around it is not, which is the one place the choice visibly fails to
      take. A third, unscoped tag wins over both and is removed on auto. */
-  var BAR = { light: '#fafaf9', dark: '#161615' };
+  var BAR = { light: '#fbf6ee', dark: '#1b1814' };
   function paintBrowserChrome(t) {
     var tag = document.getElementById('theme-color-pick');
     if (t === 'auto') { if (tag) tag.remove(); return; }

@@ -606,8 +606,8 @@ group('front-end wiring', function () {
   // The fix was to scope it; the filled button now takes its text from
   // --bg-raised, which inverts with the palette, so there is no such rule to
   // scope. What has to stay true is that nothing recolours every .btn.
-  ok(/\.btn \{[^}]*color: var\(--bg-raised\)/.test(css),
-     'the filled button takes its text colour from the ground');
+  ok(/\.btn \{[^}]*color: var\(--on-accent\)/.test(css),
+     'the filled button takes its text colour from a token that flips with the palette');
   var btnColourRules = (css.match(/\.btn(?!\.ghost|:not)[^{,]*\{[^}]*\bcolor:/g) || [])
     .filter(function (r) { return !/^\.btn \{/.test(r.trim()); });
   eq(btnColourRules.length, 0, 'and no other rule recolours every button at once');
@@ -1397,12 +1397,15 @@ group('the pass over the whole thing: the interface', function () {
      'a person’s interests are drawn, as they are everywhere else');
 
   // 12. The subject badge was always moss, so a page of listings was a page
-  //     of identical green squares. Six groups, three tints.
-  ok(app.indexOf('function tintFor(org)') !== -1, 'the badge takes a tint from the interest group');
-  ['.pic-badge.leaf', '.pic-badge.warm', '.pic-badge.cool'].forEach(function (c) {
-    ok(css.indexOf(c) !== -1, c + ' exists');
+  //     of identical green squares. Each of the six groups has its own hue,
+  //     and the badge wears its group's, as the group's chip does.
+  ok(app.indexOf('function groupForOrg(org)') !== -1, 'the badge takes its group from the listing');
+  ['move', 'make', 'think', 'grow', 'give', 'belong'].forEach(function (g) {
+    ok(css.indexOf('[data-group="' + g + '"]') !== -1, 'the ' + g + ' group has a colour');
   });
-  ok(app.indexOf("'pic-badge ' + tintFor(org)") !== -1, 'and the pane uses it');
+  ok(css.indexOf('.pic-badge[data-group]') !== -1, 'the badge wears it');
+  ok(css.indexOf('.pill[data-group]') !== -1, 'and so does the chip');
+  ok(app.indexOf("'data-group': groupForOrg(org)") !== -1, 'and the pane uses it');
 
   // 13. The app bar was the one surface with no drawing on it.
   ok(html.indexOf('class="mark"') !== -1, 'the brand has a mark');
@@ -3035,14 +3038,19 @@ group('quiet: one typeface, one accent, a ground that asks for nothing', functio
   // colour could fix it.
   eq((bare.match(/var\(--serif\)/g) || []).length, 0, 'nothing asks for the serif');
   ok(bare.indexOf('--serif:') === -1, 'and the token is gone rather than left dangling');
-  ok(/--font: ui-sans-serif/.test(bare), 'one family is declared');
+  // Rounded where the system has it, the plain sans where it does not: still
+  // one family, nothing downloaded (friendly pass, 2026-11-19).
+  ok(/--font: ui-rounded, "SF Pro Rounded", ui-sans-serif/.test(bare), 'one family is declared');
   ok(/\.browse-bar h2 \{[^}]*font-weight: 700/.test(bare),
      'the city out-weighs the listing names under it');
   ok(/\.row-name \{[^}]*font-weight: 600/.test(bare), 'which are 600');
 
   // One accent. It means "here" and "do this"; moss means "earned". The two
   // used to share the selected row, the progress bar and every filled button.
-  ok(/\.btn \{[^}]*background: var\(--ink\)/.test(bare), 'the filled button is ink, not the accent');
+  // The friendly pass made the filled button a terracotta pill: ink read as
+  // cold. There is one per screen, so it is still the only accent fill there.
+  ok(/\.btn \{[^}]*background: var\(--accent\)/.test(bare), 'the filled button is the accent');
+  ok(/\.btn \{[^}]*border-radius: var\(--radius-pill\)/.test(bare), 'and a pill');
   ok(/\.progress i \{[^}]*background: var\(--accent\)/.test(bare), 'progress is the accent');
   ok(/\.row\[aria-current="true"\]::before \{[^}]*background: var\(--accent\)/.test(bare),
      'so is the open listing');
@@ -3054,7 +3062,9 @@ group('quiet: one typeface, one accent, a ground that asks for nothing', functio
   ok(/\.ready-list li\.done \.tick \{[^}]*var\(--moss\)/.test(bare), 'a met condition is still moss');
   ok(/\.plan-item\.done \{[^}]*var\(--moss\)/.test(bare), 'and so is a finished plan');
 
-  // The ground stopped being a colour with opinions.
+  // The ground. Nov 7 took it to near-neutral; the friendly pass (2026-11-19)
+  // brought back a light cream because grey read as vanilla. What stays
+  // pinned is that it is light and only gently warm, never a strong tint.
   var light = bare.slice(bare.indexOf(':root {'), bare.indexOf(':root[data-theme="dark"]'));
   function tone(hex) {
     var r = parseInt(hex.substr(1, 2), 16), g = parseInt(hex.substr(3, 2), 16), b = parseInt(hex.substr(5, 2), 16);
@@ -3063,17 +3073,18 @@ group('quiet: one typeface, one accent, a ground that asks for nothing', functio
   var bg = (light.match(/--bg:\s*(#[0-9a-f]{6})/) || [])[1];
   var raised = (light.match(/--bg-raised:\s*(#[0-9a-f]{6})/) || [])[1];
   var sunk = (light.match(/--bg-sunk:\s*(#[0-9a-f]{6})/) || [])[1];
-  ok(bg && tone(bg) <= 4, 'the page ground is within four points of neutral (' + bg + ', ' + tone(bg) + ')');
-  ok(sunk && tone(sunk) <= 6, 'and so is the sunk one (' + sunk + ', ' + tone(sunk) + ')');
-  eq(raised, '#ffffff', 'raised surfaces are white');
+  ok(bg && tone(bg) > 4 && tone(bg) <= 16, 'the page ground is a light cream, not grey (' + bg + ', ' + tone(bg) + ')');
+  ok(sunk && tone(sunk) <= 24, 'and the sunk one is only gently warmer (' + sunk + ', ' + tone(sunk) + ')');
+  ok(raised && tone(raised) <= 6, 'raised surfaces are near-white (' + raised + ')');
   // The accent is the one saturated thing, so it has to stay saturated.
   var accent = (light.match(/--accent:\s*(#[0-9a-f]{6})/) || [])[1];
   ok(accent && tone(accent) > 80, 'the accent is the one colour with an opinion (' + accent + ')');
 
-  // Corners and shadow: a line does the lifting now.
-  ok(/--radius: 10px/.test(bare) && /--radius-sm: 8px/.test(bare), 'corners are tight');
+  // Corners and shadow: soft corners and a short warm shadow, well short of
+  // the 26px bloom the Nov 7 pass removed.
+  ok(/--radius: 14px/.test(bare) && /--radius-sm: 10px/.test(bare), 'corners are soft');
   ok(!/--shadow:[^;]*26px/.test(bare), 'the 26px bloom that lifted white off cream is gone');
-  ok(/--shadow: 0 1px 2px/.test(bare), 'one hairline of a shadow is left');
+  ok(/--shadow: 0 1px 2px/.test(bare), 'a hairline of a shadow under a short soft one');
 
   // Skipping is a control, not a word.
   var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
@@ -3081,6 +3092,38 @@ group('quiet: one typeface, one accent, a ground that asks for nothing', functio
   ok(!/class: 'linkish', type: 'button',\s*\n\s*onclick: function \(\) \{ submit\(q, q\.kind/.test(app),
      'and not bare text with no padding');
   ok(/\.question \.actions \{[^}]*gap: var\(--s2\)/.test(bare), 'it sits in the row with Continue');
+});
+
+group('friendly: warmth, motion and something on the first screen', function () {
+  var fs = require('fs');
+  var css = fs.readFileSync(path.join(root, 'assets/styles.css'), 'utf8');
+  var bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  var app = fs.readFileSync(path.join(root, 'src/app.js'), 'utf8');
+
+  // Text on the filled accent flips with the palette through a token, not a
+  // dark-mode .btn rule (which once out-specified .btn.ghost).
+  ok(/--on-accent: #ffffff/.test(bare), 'white on the accent in light mode');
+  ok(/--d-on-accent: #1b1814/.test(bare), 'near-black on the light accent in dark mode');
+  eq((bare.match(/--on-accent: var\(--d-on-accent\)/g) || []).length, 2,
+     'and both ways into dark mode assign it');
+
+  // Every group colour exists in light and in both dark blocks.
+  ['move', 'make', 'think', 'grow', 'give', 'belong'].forEach(function (g) {
+    eq((bare.match(new RegExp('--g-' + g + '-bg:', 'g')) || []).length, 3,
+       g + ' has a fill in light, system dark and chosen dark');
+  });
+  ok(/function groupOf\(id\)/.test(app), 'a chip finds its group');
+  ok(/'data-group': grp/.test(app), 'and wears it');
+
+  // The opening: once per load, opacity and transform only, and a plain fade
+  // when Reduce Motion is on. `backwards`, so nothing is left on <main>.
+  ok(/main \{ animation: fyc-open [^}]*backwards; \}/.test(bare), 'the page eases in on load');
+  ok(/\.brand \.mark \{ animation: fyc-spring/.test(bare), 'after the mark springs in');
+  ok(/main \{ animation: fyc-fade [^}]*!important; \}/.test(bare),
+     'and under Reduce Motion it is a plain fade that survives the global stop');
+
+  // The first question starts near the top instead of floating mid-screen.
+  ok(/#intake \.question \{[^}]*justify-content: flex-start/.test(bare), 'no blank third above the question');
 });
 
 console.log('\n' + (fail ? '✗' : '✓') + ' ' + pass + ' passed, ' + fail + ' failed');

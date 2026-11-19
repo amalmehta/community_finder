@@ -207,7 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     private func showLoadFailure(_ error: Error) {
         let html = """
         <html><body style="font: 15px -apple-system; padding: 40px; color: #221f1b;
-        background: #fafaf9"><h2 style="font-weight:600">The page could not load.</h2>
+        background: #fbf6ee"><h2 style="font-weight:600">The page could not load.</h2>
         <p>\(error.localizedDescription)</p><p style="color:#8a8176">Try View &rarr; Reload.</p>
         </body></html>
         """
